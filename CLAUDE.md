@@ -27,7 +27,7 @@ src/
     ├── collections.ts           # listCollections, getCollectionStats
     ├── schema.ts                # inferSchema — sample-based field/type discovery
     ├── indexes.ts               # listIndexes
-    ├── query.ts                 # findDocuments, getDocumentById, countDocuments, sampleDocuments, distinctValues
+    ├── query.ts                 # findDocuments, findById, countDocuments, getDistinctValues
     ├── aggregate.ts             # runAggregate with $out/$merge rejection
     └── serialize.ts             # BSON → JSON-safe conversion (ObjectId, Date, Binary, Long, etc.)
 ```

@@ -7,10 +7,9 @@ export function registerTest(connection: Command): void {
   connection
     .command("test")
     .description("Test a MongoDB connection (ping)")
-    .option("-c, --connection <alias>", "Connection alias (default: default connection)")
-    .action(async (opts: { connection?: string }) => {
+    .action(async (_opts: unknown, command: Command) => {
       try {
-        const alias = opts.connection ?? getDefaultConnectionAlias();
+        const alias = command.optsWithGlobals().connection ?? getDefaultConnectionAlias();
         if (!alias) {
           const available = Object.keys(getConnections());
           throw new Error(

@@ -1,5 +1,6 @@
 import type { Command } from "commander";
-import { storeConnection } from "../../lib/config.ts";
+import { storeConnection, setDefaultConnection } from "../../lib/config.ts";
+import { parseDbFromUri } from "../../mongo/client.ts";
 import { printError, printJson } from "../../lib/output.ts";
 
 export function registerAdd(connection: Command): void {
@@ -23,24 +24,19 @@ export function registerAdd(connection: Command): void {
           database: opts.database,
         });
 
+        if (opts.default) {
+          setDefaultConnection(alias);
+        }
+
         printJson({
           ok: true,
           alias,
           database: opts.database ?? parseDbFromUri(connectionString),
+          isDefault: opts.default ?? false,
           hint: "Test with: agent-mongo connection test",
         });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to add connection");
       }
     });
-}
-
-function parseDbFromUri(uri: string): string | undefined {
-  try {
-    const url = new URL(uri);
-    const path = url.pathname.replace(/^\//, "");
-    return path || undefined;
-  } catch {
-    return undefined;
-  }
 }

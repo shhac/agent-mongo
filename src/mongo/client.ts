@@ -63,7 +63,7 @@ function resolveAlias(flag?: string): string {
   );
 }
 
-function parseDbFromUri(uri: string): string | undefined {
+export function parseDbFromUri(uri: string): string | undefined {
   try {
     const url = new URL(uri);
     const path = url.pathname.replace(/^\//, "");
