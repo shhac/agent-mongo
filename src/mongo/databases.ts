@@ -1,9 +1,7 @@
 import type { MongoClient } from "mongodb";
 import { getSettings } from "../lib/config.ts";
 
-export async function listDatabases(
-  client: MongoClient,
-): Promise<{
+export async function listDatabases(client: MongoClient): Promise<{
   databases: { name: string; sizeOnDisk: number; empty: boolean }[];
   totalSize: number;
 }> {

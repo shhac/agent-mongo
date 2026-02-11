@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, afterAll } from "bun:test";
+import type { MongoClient } from "mongodb";
 import { ObjectId, Binary, Long, Decimal128 } from "mongodb";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -35,7 +36,7 @@ function createMockClient(docs: Record<string, unknown>[]) {
   const estimatedDocumentCount = mock(() => Promise.resolve(docs.length));
   const collection = mock(() => ({ aggregate, estimatedDocumentCount }));
   const db = mock(() => ({ collection }));
-  return { db } as unknown;
+  return { db } as unknown as MongoClient;
 }
 
 describe("inferSchema", () => {
@@ -171,9 +172,7 @@ describe("inferSchema", () => {
   });
 
   test("detects double vs int distinction", async () => {
-    const docs = [
-      { _id: new ObjectId("507f1f77bcf86cd799439011"), integer: 42, decimal: 3.14 },
-    ];
+    const docs = [{ _id: new ObjectId("507f1f77bcf86cd799439011"), integer: 42, decimal: 3.14 }];
     const client = createMockClient(docs);
     const result = await inferSchema(client, "testdb", "numbers", 100);
 

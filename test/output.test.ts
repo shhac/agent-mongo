@@ -63,10 +63,7 @@ describe("printPaginated", () => {
 
   test("prunes and truncates items", () => {
     const spy = spyOn(console, "log").mockImplementation(() => {});
-    printPaginated(
-      [{ name: "test", empty: null, long: "b".repeat(300) }],
-      { hasMore: false },
-    );
+    printPaginated([{ name: "test", empty: null, long: "b".repeat(300) }], { hasMore: false });
     const output = JSON.parse(spy.mock.calls[0]![0] as string);
     expect(output.items[0].empty).toBeUndefined();
     expect(output.items[0].long).toBe(`${"b".repeat(200)}\u2026`);

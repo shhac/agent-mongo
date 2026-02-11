@@ -49,7 +49,10 @@ describe("config CRUD", () => {
   });
 
   test("readConfig reads back what was written", () => {
-    writeConfig({ default_connection: "prod", connections: { prod: { connection_string: "mongodb://localhost" } } });
+    writeConfig({
+      default_connection: "prod",
+      connections: { prod: { connection_string: "mongodb://localhost" } },
+    });
     const config = readConfig();
     expect(config.default_connection).toBe("prod");
     expect(config.connections?.prod?.connection_string).toBe("mongodb://localhost");

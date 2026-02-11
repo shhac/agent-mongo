@@ -10,7 +10,10 @@ describe("validatePipeline", () => {
   });
 
   test("rejects $merge stage", () => {
-    const pipeline = [{ $group: { _id: "$type", count: { $sum: 1 } } }, { $merge: { into: "results" } }];
+    const pipeline = [
+      { $group: { _id: "$type", count: { $sum: 1 } } },
+      { $merge: { into: "results" } },
+    ];
     expect(() => validatePipeline(pipeline)).toThrow(
       'Write stage "$merge" is not allowed. agent-mongo is read-only.',
     );
