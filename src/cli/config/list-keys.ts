@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { printJson } from "../../lib/output.ts";
+import { printJsonRaw } from "../../lib/output.ts";
 import { KEY_DEFINITIONS } from "./valid-keys.ts";
 
 export function registerListKeys(config: Command): void {
@@ -7,7 +7,7 @@ export function registerListKeys(config: Command): void {
     .command("list-keys")
     .description("List all valid config keys with defaults")
     .action(() => {
-      printJson({
+      printJsonRaw({
         keys: KEY_DEFINITIONS.map((k) => ({
           key: k.key,
           type: k.type,

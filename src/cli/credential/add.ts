@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { storeCredential } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerAdd(credential: Command): void {
   credential
@@ -15,7 +15,7 @@ export function registerAdd(credential: Command): void {
           username: opts.username,
           password: opts.password,
         });
-        printJson({
+        printJsonRaw({
           ok: true,
           credential: name,
           username: opts.username,

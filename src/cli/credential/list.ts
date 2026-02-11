@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { getCredentials, getConnectionsUsingCredential } from "../../lib/config.ts";
-import { printJson } from "../../lib/output.ts";
+import { printJsonRaw } from "../../lib/output.ts";
 
 export function registerList(credential: Command): void {
   credential
@@ -16,6 +16,6 @@ export function registerList(credential: Command): void {
         usedBy: getConnectionsUsingCredential(name),
       }));
 
-      printJson({ credentials: items });
+      printJsonRaw({ credentials: items });
     });
 }

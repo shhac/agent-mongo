@@ -4,7 +4,7 @@ import {
   getConnectionsUsingCredential,
   updateConnection,
 } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerRemove(credential: Command): void {
   credential
@@ -23,7 +23,7 @@ export function registerRemove(credential: Command): void {
         }
 
         removeCredential(name);
-        printJson({
+        printJsonRaw({
           ok: true,
           removed: name,
           clearedFrom: usedBy.length > 0 && opts.force ? usedBy : undefined,

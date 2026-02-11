@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { setDefaultConnection } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerSetDefault(connection: Command): void {
   connection
@@ -10,7 +10,7 @@ export function registerSetDefault(connection: Command): void {
     .action((alias: string) => {
       try {
         setDefaultConnection(alias);
-        printJson({ ok: true, default: alias });
+        printJsonRaw({ ok: true, default: alias });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to set default");
       }

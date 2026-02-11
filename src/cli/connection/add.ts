@@ -6,7 +6,7 @@ import {
   getCredentials,
 } from "../../lib/config.ts";
 import { parseDbFromUri } from "../../mongo/client.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerAdd(connection: Command): void {
   connection
@@ -45,7 +45,7 @@ export function registerAdd(connection: Command): void {
           setDefaultConnection(alias);
         }
 
-        printJson({
+        printJsonRaw({
           ok: true,
           alias,
           database: opts.database ?? parseDbFromUri(connectionString),

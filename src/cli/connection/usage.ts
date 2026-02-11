@@ -18,7 +18,7 @@ COMMANDS:
     Remove a saved connection.
 
   connection list
-    List all saved connections (connection strings redacted, credential names shown).
+    List all saved connections with credential names.
 
   connection test [-c <alias>]
     Ping MongoDB to verify connectivity. Uses default connection if -c omitted.

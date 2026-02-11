@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { resetSettings } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerReset(config: Command): void {
   config
@@ -9,7 +9,7 @@ export function registerReset(config: Command): void {
     .action(() => {
       try {
         resetSettings();
-        printJson({ ok: true, message: "Settings reset to defaults" });
+        printJsonRaw({ ok: true, message: "Settings reset to defaults" });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Reset failed");
       }

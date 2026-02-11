@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerTest(connection: Command): void {
   connection
@@ -12,7 +12,7 @@ export function registerTest(connection: Command): void {
         const { client, alias: resolved } = await getMongoClient(alias);
         try {
           const result = await client.db("admin").command({ ping: 1 });
-          printJson({
+          printJsonRaw({
             ok: true,
             alias: resolved,
             ping: result,

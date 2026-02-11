@@ -8,6 +8,11 @@ export function printJson(data: unknown): void {
   console.log(JSON.stringify(applyTruncation(pruneEmpty(data)), null, 2));
 }
 
+/** Print JSON without truncation — for admin/config output where truncation is undesirable. */
+export function printJsonRaw(data: unknown): void {
+  console.log(JSON.stringify(pruneEmpty(data), null, 2));
+}
+
 /**
  * Print paginated list output with { items, pagination? } wrapper.
  * Always returns { items: [...] } even when the array is empty.

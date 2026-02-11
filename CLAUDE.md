@@ -20,7 +20,6 @@ src/
 │   ├── output.ts                # printJson, printPaginated, printError
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty fields
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
-│   ├── redact.ts                # Connection string redaction for display
 │   └── version.ts               # Version from build-time define / env / package.json
 └── mongo/
     ├── client.ts                # MongoClient factory (alias resolution, connection pool)

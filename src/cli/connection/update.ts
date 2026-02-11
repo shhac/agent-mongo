@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { updateConnection, getCredential, getCredentials } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerUpdate(connection: Command): void {
   connection
@@ -33,7 +33,7 @@ export function registerUpdate(connection: Command): void {
         }
 
         updateConnection(alias, updates);
-        printJson({ ok: true, alias, updated: Object.keys(updates) });
+        printJsonRaw({ ok: true, alias, updated: Object.keys(updates) });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to update connection");
       }

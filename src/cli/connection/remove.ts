@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { removeConnection } from "../../lib/config.ts";
-import { printError, printJson } from "../../lib/output.ts";
+import { printError, printJsonRaw } from "../../lib/output.ts";
 
 export function registerRemove(connection: Command): void {
   connection
@@ -10,7 +10,7 @@ export function registerRemove(connection: Command): void {
     .action((alias: string) => {
       try {
         removeConnection(alias);
-        printJson({ ok: true, removed: alias });
+        printJsonRaw({ ok: true, removed: alias });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to remove connection");
       }

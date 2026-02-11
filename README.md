@@ -104,7 +104,7 @@ Save connection strings locally (stored in `~/.config/agent-mongo/config.json`):
 agent-mongo connection add local "mongodb://localhost:27017/myapp"
 agent-mongo connection add staging "mongodb+srv://user:pass@cluster.mongodb.net/staging"
 agent-mongo connection set-default staging
-agent-mongo connection list            # connection strings are redacted
+agent-mongo connection list
 agent-mongo connection test            # pings default connection
 agent-mongo connection test -c local   # pings specific connection
 ```
