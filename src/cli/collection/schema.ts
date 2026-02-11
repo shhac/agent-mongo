@@ -1,9 +1,8 @@
 import type { Command } from "commander";
 import { printJson, printError } from "../../lib/output.ts";
+import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { inferSchema } from "../../mongo/schema.ts";
-
-const DEFAULT_SAMPLE_SIZE = 100;
 
 export function registerSchema(parent: Command): void {
   parent
@@ -11,17 +10,18 @@ export function registerSchema(parent: Command): void {
     .description("Infer collection schema by sampling documents")
     .argument("<database>", "Database name")
     .argument("<collection>", "Collection name")
-    .option("--sample-size <n>", "Number of documents to sample", String(DEFAULT_SAMPLE_SIZE))
+    .option("--sample-size <n>", "Number of documents to sample")
     .action(
       async (
         database: string,
         collection: string,
-        opts: { sampleSize: string },
+        opts: { sampleSize?: string },
         command: Command,
       ) => {
         try {
           const alias = command.optsWithGlobals().connection;
-          const sampleSize = parseInt(opts.sampleSize, 10);
+          const defaultSize = getSettings().defaults?.schemaSampleSize ?? 100;
+          const sampleSize = opts.sampleSize ? parseInt(opts.sampleSize, 10) : defaultSize;
           if (!Number.isFinite(sampleSize) || sampleSize < 1) {
             throw new Error(
               `Invalid --sample-size: "${opts.sampleSize}". Must be a positive integer.`,

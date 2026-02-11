@@ -33,6 +33,7 @@ export type Connection = {
 export type DefaultsSettings = {
   limit?: number;
   sampleSize?: number;
+  schemaSampleSize?: number;
 };
 
 export type QuerySettings = {

@@ -53,13 +53,13 @@ agent-mongo query distinct myapp orders status
 ## Command map
 
 ```text
-agent-mongo
+agent-mongo [-c <alias>] [--full] [--expand <fields>]
 ├── connection
-│   ├── add <alias> <uri> [--database <db>] [--credential <name>]
+│   ├── add <alias> <uri> [--database <db>] [--credential <name>] [--default]
 │   ├── update <alias> [--credential <name>] [--no-credential] [--database <db>]
 │   ├── remove <alias>
 │   ├── list
-│   ├── test [-c <alias>]
+│   ├── test
 │   ├── set-default <alias>
 │   └── usage
 ├── credential
@@ -89,7 +89,7 @@ agent-mongo
 │   ├── count <db> <coll> [--filter]
 │   ├── sample <db> <coll> [--size <n>]
 │   ├── distinct <db> <coll> <field> [--filter]
-│   ├── aggregate <db> <coll> --pipeline <json>
+│   ├── aggregate <db> <coll> --pipeline <json> [--limit <n>]
 │   └── usage
 └── usage                              # LLM-optimized docs
 ```
@@ -172,13 +172,14 @@ agent-mongo is strictly read-only:
 
 Persistent settings via `agent-mongo config`:
 
-| Key                    | Default | Description                                  |
-| ---------------------- | ------- | -------------------------------------------- |
-| `defaults.limit`       | 20      | Default result limit for list/query commands |
-| `defaults.sampleSize`  | 5       | Default sample size for schema inference     |
-| `query.timeout`        | 30000   | Query timeout in milliseconds                |
-| `query.maxDocuments`   | 100     | Maximum documents returned per query         |
-| `truncation.maxLength` | 200     | Max string length before truncation          |
+| Key                         | Default | Description                                  |
+| --------------------------- | ------- | -------------------------------------------- |
+| `defaults.limit`            | 20      | Default result limit for list/query commands |
+| `defaults.sampleSize`       | 5       | Default sample size for query sample         |
+| `defaults.schemaSampleSize` | 100     | Default sample size for schema inference     |
+| `query.timeout`             | 30000   | Query timeout in milliseconds                |
+| `query.maxDocuments`        | 100     | Maximum documents returned per query         |
+| `truncation.maxLength`      | 200     | Max string length before truncation          |
 
 ```bash
 agent-mongo config set defaults.limit 50

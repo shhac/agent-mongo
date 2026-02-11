@@ -7,7 +7,7 @@ COMMANDS:
     List all collections in a database. Returns name and type (collection or view).
 
   collection schema <database> <collection> [--sample-size <n>] [-c <alias>]
-    Infer collection schema by sampling documents. Default: 100 samples.
+    Infer collection schema by sampling documents. Default: 100 (configurable via defaults.schemaSampleSize).
     Returns field paths, types, and presence rates (0.0-1.0).
     Array element types shown as "path.$" entries.
 

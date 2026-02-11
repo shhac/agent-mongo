@@ -17,8 +17,8 @@ src/
 │   └── usage/                   # LLM-optimized top-level usage text
 ├── lib/
 │   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
-│   ├── output.ts                # printJson, printPaginated, printError
-│   ├── compact-json.ts          # pruneEmpty() — strips null/empty fields
+│   ├── output.ts                # printJson, printJsonRaw, printPaginated, printError, resolvePageSize
+│   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
 │   └── version.ts               # Version from build-time define / env / package.json
 └── mongo/
@@ -35,12 +35,12 @@ src/
 ## Key patterns
 
 - **Command registration**: Each `cli/*/index.ts` exports `registerXyzCommand({ program })` called from `index.ts`. Subcommands are in separate files within each directory.
-- **Output**: All commands use `printJson()` or `printPaginated()` from `lib/output.ts`. Errors use `printError()`. All output is JSON, empty/null fields auto-pruned via `pruneEmpty()`.
+- **Output**: All commands use `printJson()` or `printPaginated()` from `lib/output.ts`. Admin/config commands use `printJsonRaw()` (no truncation). Errors use `printError()`. All output is JSON, empty/null fields auto-pruned via `pruneEmpty()`.
 - **Truncation**: Any string field exceeding `truncation.maxLength` gets truncated with `…` and a companion `{field}Length` key. Controlled by `--expand` and `--full` global flags. Unlike lin (which only truncates preset field names), this truncates any string over the limit.
 - **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections. Connections can reference named credentials for shared auth.
 - **Credential separation**: Credentials (username/password) stored separately from connections (host/options). Connections reference credentials by name via `credential` field. Backward compatible — connections without a credential use the URI as-is.
 - **Error messages**: Include valid values so LLMs can self-correct (e.g., `Connection "x" not found. Available: local, staging`).
-- **BSON serialization**: `mongo/serialize.ts` converts all BSON types to JSON-safe values before output. ObjectId → hex string, Date → ISO string, Binary → base64, Long → number (if safe) or string.
+- **BSON serialization**: `mongo/serialize.ts` converts all BSON types to JSON-safe values before output. ObjectId → hex string, Date → ISO string, Binary → base64, Long → number (if safe) or string, Decimal128 → string, UUID → string, RegExp → string.
 - **Read-only safety**: No write operations exist. `mongo/aggregate.ts` rejects `$out`/`$merge` stages. Results capped at `query.maxDocuments`.
 - **Usage subcommands**: Each command group has a `usage` subcommand providing LLM-friendly docs. When modifying a command's behavior, options, or flags, update its usage text too.
 - **Config validation**: `cli/config/valid-keys.ts` defines all valid keys with types, defaults, and min/max ranges. Invalid keys or out-of-range values produce errors listing valid options.

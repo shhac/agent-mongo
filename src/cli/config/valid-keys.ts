@@ -20,9 +20,17 @@ export const KEY_DEFINITIONS: KeyDefinition[] = [
     key: "defaults.sampleSize",
     type: "number",
     defaultValue: 5,
-    description: "Default sample size for schema inference",
+    description: "Default sample size for query sample",
     min: 1,
     max: 100,
+  },
+  {
+    key: "defaults.schemaSampleSize",
+    type: "number",
+    defaultValue: 100,
+    description: "Default sample size for schema inference",
+    min: 1,
+    max: 1000,
   },
   {
     key: "query.timeout",

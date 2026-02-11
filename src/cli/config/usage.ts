@@ -10,7 +10,8 @@ COMMANDS:
 
 KEYS:
   defaults.limit        (20)     Default result limit for list/query commands [1-1000]
-  defaults.sampleSize   (5)      Default sample size for schema inference [1-100]
+  defaults.sampleSize       (5)      Default sample size for query sample [1-100]
+  defaults.schemaSampleSize (100)    Default sample size for schema inference [1-1000]
   query.timeout         (30000)  Query timeout in ms [1000-300000]
   query.maxDocuments    (100)    Max documents per query [1-10000]
   truncation.maxLength  (200)    Max string length before truncation [50-100000]

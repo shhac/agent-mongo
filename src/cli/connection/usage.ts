@@ -8,6 +8,7 @@ COMMANDS:
     URI: mongodb://... or mongodb+srv://...
     --database overrides the database from the URI.
     --credential references a stored credential for authentication.
+    --default sets this connection as the default.
 
   connection update <alias> [--credential <name>] [--no-credential] [--database <db>]
     Update a saved connection. Only specified fields are changed.
