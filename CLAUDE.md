@@ -8,14 +8,15 @@ Read-only MongoDB CLI for AI agents. TypeScript + Bun, compiled to standalone bi
 src/
 ├── index.ts                     # CLI entry — registers all commands via commander
 ├── cli/
-│   ├── connection/              # connection add/remove/list/test/set-default
+│   ├── connection/              # connection add/remove/update/list/test/set-default
+│   ├── credential/              # credential add/remove/list
 │   ├── config/                  # config get/set/reset/list-keys
 │   ├── db/                      # db list/stats
 │   ├── collection/              # collection list/schema/indexes/stats
 │   ├── query/                   # query find/get/count/sample/distinct/aggregate
 │   └── usage/                   # LLM-optimized top-level usage text
 ├── lib/
-│   ├── config.ts                # ~/.config/agent-mongo/ config + connection storage
+│   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
 │   ├── output.ts                # printJson, printPaginated, printError
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty fields
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
@@ -37,7 +38,8 @@ src/
 - **Command registration**: Each `cli/*/index.ts` exports `registerXyzCommand({ program })` called from `index.ts`. Subcommands are in separate files within each directory.
 - **Output**: All commands use `printJson()` or `printPaginated()` from `lib/output.ts`. Errors use `printError()`. All output is JSON, empty/null fields auto-pruned via `pruneEmpty()`.
 - **Truncation**: Any string field exceeding `truncation.maxLength` gets truncated with `…` and a companion `{field}Length` key. Controlled by `--expand` and `--full` global flags. Unlike lin (which only truncates preset field names), this truncates any string over the limit.
-- **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections.
+- **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections. Connections can reference named credentials for shared auth.
+- **Credential separation**: Credentials (username/password) stored separately from connections (host/options). Connections reference credentials by name via `credential` field. Backward compatible — connections without a credential use the URI as-is.
 - **Error messages**: Include valid values so LLMs can self-correct (e.g., `Connection "x" not found. Available: local, staging`).
 - **BSON serialization**: `mongo/serialize.ts` converts all BSON types to JSON-safe values before output. ObjectId → hex string, Date → ISO string, Binary → base64, Long → number (if safe) or string.
 - **Read-only safety**: No write operations exist. `mongo/aggregate.ts` rejects `$out`/`$merge` stages. Results capped at `query.maxDocuments`.

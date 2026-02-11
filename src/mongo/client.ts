@@ -1,5 +1,11 @@
-import { MongoClient, type Db } from "mongodb";
-import { getConnection, getDefaultConnectionAlias, getConnections } from "../lib/config.ts";
+import { MongoClient, type MongoClientOptions, type Db } from "mongodb";
+import {
+  getConnection,
+  getCredential,
+  getCredentials,
+  getDefaultConnectionAlias,
+  getConnections,
+} from "../lib/config.ts";
 
 type MongoContext = {
   client: MongoClient;
@@ -34,7 +40,8 @@ export async function getMongoClient(aliasFlag?: string): Promise<MongoContext> 
     return { client: existing, db: existing.db(dbName), alias };
   }
 
-  const client = new MongoClient(conn.connection_string);
+  const opts = resolveClientOptions(conn.credential);
+  const client = new MongoClient(conn.connection_string, opts);
   await client.connect();
   activeClients.set(alias, client);
 
@@ -61,6 +68,20 @@ function resolveAlias(flag?: string): string {
   throw new Error(
     `No connection specified. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo connection add <alias> <connection-string>`,
   );
+}
+
+export function resolveClientOptions(credentialAlias?: string): MongoClientOptions {
+  if (!credentialAlias) {
+    return {};
+  }
+  const cred = getCredential(credentialAlias);
+  if (!cred) {
+    const available = Object.keys(getCredentials());
+    throw new Error(
+      `Credential "${credentialAlias}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
+    );
+  }
+  return { auth: { username: cred.username, password: cred.password } };
 }
 
 export function parseDbFromUri(uri: string): string | undefined {

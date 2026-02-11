@@ -3,8 +3,9 @@ import type { Command } from "commander";
 const USAGE_TEXT = `agent-mongo — MongoDB CLI for AI agents (JSON output, read-only)
 
 COMMANDS:
-  connection add|remove|list|test|set-default     Manage MongoDB connections
-  config get|set|reset|list-keys                  Persistent settings
+  connection add|remove|update|list|test|set-default   Manage MongoDB connections
+  credential add|remove|list                           Manage stored credentials
+  config get|set|reset|list-keys                       Persistent settings
 
   db list                                         List all databases
   db stats <database>                             Database statistics
@@ -24,6 +25,7 @@ COMMANDS:
 GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full
 
 CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
+  Connections can reference stored credentials via --credential for shared auth.
 
 SAFETY: Read-only. No write operations. Aggregation rejects $out/$merge.
   Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).

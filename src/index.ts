@@ -3,6 +3,7 @@ import { getPackageVersion } from "./lib/version.ts";
 import { configureTruncation } from "./lib/truncation.ts";
 import { getSettings } from "./lib/config.ts";
 import { registerConnectionCommand } from "./cli/connection/index.ts";
+import { registerCredentialCommand } from "./cli/credential/index.ts";
 import { registerConfigCommand } from "./cli/config/index.ts";
 import { registerDbCommand } from "./cli/db/index.ts";
 import { registerCollectionCommand } from "./cli/collection/index.ts";
@@ -25,6 +26,7 @@ program.hook("preAction", (thisCommand) => {
 });
 
 registerConnectionCommand({ program });
+registerCredentialCommand({ program });
 registerConfigCommand({ program });
 registerDbCommand({ program });
 registerCollectionCommand({ program });

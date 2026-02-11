@@ -15,6 +15,7 @@ export function registerList(connection: Command): void {
         alias,
         connection_string: redactSecret(conn.connection_string),
         database: conn.database,
+        credential: conn.credential,
         default: alias === defaultAlias,
       }));
 

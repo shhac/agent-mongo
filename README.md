@@ -55,11 +55,17 @@ agent-mongo query distinct myapp orders status
 ```text
 agent-mongo
 ├── connection
-│   ├── add <alias> <uri> [--database <db>]
+│   ├── add <alias> <uri> [--database <db>] [--credential <name>]
+│   ├── update <alias> [--credential <name>] [--no-credential] [--database <db>]
 │   ├── remove <alias>
 │   ├── list
 │   ├── test [-c <alias>]
 │   ├── set-default <alias>
+│   └── usage
+├── credential
+│   ├── add <name> --username <user> --password <pass>
+│   ├── remove <name> [--force]
+│   ├── list
 │   └── usage
 ├── config
 │   ├── get <key>
@@ -110,6 +116,31 @@ export AGENT_MONGO_CONNECTION="local"  # use a saved alias
 ```
 
 Connection resolution order: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default.
+
+## Credential management
+
+Store credentials separately from connections. Useful when the same username/password is shared across multiple environments (staging, prod) within an organization:
+
+```bash
+# Store a credential once
+agent-mongo credential add acme --username deploy --password secret123
+
+# Reference it from multiple connections
+agent-mongo connection add acme-staging "mongodb+srv://staging.acme.net/app" --credential acme
+agent-mongo connection add acme-prod "mongodb+srv://prod.acme.net/app" --credential acme
+
+# Rotate a password — all connections pick up the change
+agent-mongo credential add acme --username deploy --password new-secret
+
+# List credentials (passwords always redacted)
+agent-mongo credential list
+
+# Attach/detach credentials from existing connections
+agent-mongo connection update prod --credential acme
+agent-mongo connection update legacy --no-credential
+```
+
+Connections without a `--credential` use the connection string as-is (backward compatible).
 
 ## Output
 

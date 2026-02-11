@@ -18,10 +18,16 @@ function ensureConfigDir(): string {
   return dir;
 }
 
+export type Credential = {
+  username: string;
+  password: string;
+};
+
 export type Connection = {
   connection_string: string;
   name?: string;
   database?: string;
+  credential?: string;
 };
 
 export type DefaultsSettings = {
@@ -47,6 +53,7 @@ export type Settings = {
 export type Config = {
   default_connection?: string;
   connections?: Record<string, Connection>;
+  credentials?: Record<string, Credential>;
   settings?: Settings;
 };
 
@@ -156,5 +163,67 @@ export function updateSetting(key: string, value: unknown): void {
 export function resetSettings(): void {
   const config = readConfig();
   delete config.settings;
+  writeConfig(config);
+}
+
+export function getCredential(alias: string): Credential | undefined {
+  return readConfig().credentials?.[alias];
+}
+
+export function getCredentials(): Record<string, Credential> {
+  return readConfig().credentials ?? {};
+}
+
+export function storeCredential(alias: string, credential: Credential): void {
+  const config = readConfig();
+  config.credentials = config.credentials ?? {};
+  config.credentials[alias] = credential;
+  writeConfig(config);
+}
+
+export function getConnectionsUsingCredential(credentialAlias: string): string[] {
+  const connections = getConnections();
+  return Object.entries(connections)
+    .filter(([, conn]) => conn.credential === credentialAlias)
+    .map(([alias]) => alias);
+}
+
+export function removeCredential(alias: string): void {
+  const config = readConfig();
+  if (!config.credentials?.[alias]) {
+    throw new Error(
+      `Unknown credential: "${alias}". Valid: ${Object.keys(config.credentials ?? {}).join(", ") || "(none)"}`,
+    );
+  }
+  const usedBy = getConnectionsUsingCredential(alias);
+  if (usedBy.length > 0) {
+    throw new Error(
+      `Credential "${alias}" is used by connections: ${usedBy.join(", ")}. Remove or update those connections first.`,
+    );
+  }
+  delete config.credentials[alias];
+  if (Object.keys(config.credentials).length === 0) {
+    delete config.credentials;
+  }
+  writeConfig(config);
+}
+
+export function updateConnection(
+  alias: string,
+  updates: Partial<Omit<Connection, "connection_string">>,
+): void {
+  const config = readConfig();
+  if (!config.connections?.[alias]) {
+    throw new Error(
+      `Unknown connection: "${alias}". Valid: ${Object.keys(config.connections ?? {}).join(", ") || "(none)"}`,
+    );
+  }
+  const conn = config.connections[alias]!;
+  if (updates.database !== undefined) {
+    conn.database = updates.database || undefined;
+  }
+  if ("credential" in updates) {
+    conn.credential = updates.credential || undefined;
+  }
   writeConfig(config);
 }
