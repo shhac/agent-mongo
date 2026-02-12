@@ -1,6 +1,7 @@
 import { ObjectId, Binary, Long, Decimal128, UUID } from "mongodb";
 import type { MongoClient, Document } from "mongodb";
 import { getSettings } from "../lib/config.ts";
+import { validateCollectionExists } from "./collections.ts";
 
 type FieldInfo = {
   path: string;
@@ -8,7 +9,7 @@ type FieldInfo = {
   presence: number;
 };
 
-type SchemaResult = {
+export type SchemaResult = {
   database: string;
   collection: string;
   sampleSize: number;
@@ -21,7 +22,10 @@ export async function inferSchema(
   dbName: string,
   collName: string,
   sampleSize: number,
+  maxDepth?: number,
 ): Promise<SchemaResult> {
+  await validateCollectionExists(client, dbName, collName);
+
   const timeout = getSettings().query?.timeout ?? 30000;
   const collection = client.db(dbName).collection(collName);
 
@@ -36,7 +40,7 @@ export async function inferSchema(
 
   for (const doc of docs) {
     const seen = new Set<string>();
-    walkDocument(doc, "", seen, fieldMap);
+    walkDocument(doc, "", seen, fieldMap, 1, maxDepth);
   }
 
   const fields: FieldInfo[] = Array.from(fieldMap.entries())
@@ -61,15 +65,21 @@ function walkDocument(
   prefix: string,
   seen: Set<string>,
   fields: Map<string, { types: Set<string>; count: number }>,
+  depth: number,
+  maxDepth?: number,
 ): void {
   for (const [key, value] of Object.entries(doc)) {
     const path = prefix ? `${prefix}.${key}` : key;
     recordField(path, getTypeName(value), seen, fields);
 
+    if (maxDepth !== undefined && depth >= maxDepth) {
+      continue;
+    }
+
     if (isPlainObject(value)) {
-      walkDocument(value as Document, path, seen, fields);
+      walkDocument(value as Document, path, seen, fields, depth + 1, maxDepth);
     } else if (Array.isArray(value)) {
-      walkArrayElements(value, path, seen, fields);
+      walkArrayElements(value, path, seen, fields, depth, maxDepth);
     }
   }
 }
@@ -79,13 +89,17 @@ function walkArrayElements(
   parentPath: string,
   seen: Set<string>,
   fields: Map<string, { types: Set<string>; count: number }>,
+  depth: number,
+  maxDepth?: number,
 ): void {
   const elemPath = `${parentPath}.$`;
   for (const elem of arr) {
     recordFieldType(elemPath, getTypeName(elem), fields);
 
-    if (isPlainObject(elem)) {
-      walkDocument(elem as Document, elemPath, seen, fields);
+    if (maxDepth === undefined || depth < maxDepth) {
+      if (isPlainObject(elem)) {
+        walkDocument(elem as Document, elemPath, seen, fields, depth + 1, maxDepth);
+      }
     }
   }
 

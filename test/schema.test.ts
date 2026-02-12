@@ -30,12 +30,16 @@ afterAll(() => {
   }
 });
 
-function createMockClient(docs: Record<string, unknown>[]) {
+function createMockClient(docs: Record<string, unknown>[], collectionExists = true) {
   const toArray = mock(() => Promise.resolve(docs));
   const aggregate = mock(() => ({ toArray }));
   const estimatedDocumentCount = mock(() => Promise.resolve(docs.length));
   const collection = mock(() => ({ aggregate, estimatedDocumentCount }));
-  const db = mock(() => ({ collection }));
+  const listCollectionsToArray = mock(() =>
+    Promise.resolve(collectionExists ? [{ name: "test", type: "collection" }] : []),
+  );
+  const listCollections = mock(() => ({ toArray: listCollectionsToArray }));
+  const db = mock(() => ({ collection, listCollections }));
   return { db } as unknown as MongoClient;
 }
 
@@ -179,5 +183,68 @@ describe("inferSchema", () => {
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("integer")?.types).toEqual(["int"]);
     expect(fieldMap.get("decimal")?.types).toEqual(["double"]);
+  });
+
+  test("errors on non-existent collection", async () => {
+    const client = createMockClient([], false);
+    await expect(inferSchema(client, "testdb", "nonexistent", 100)).rejects.toThrow(
+      'Collection "nonexistent" not found in database "testdb"',
+    );
+  });
+
+  test("depth 1 limits to top-level fields only", async () => {
+    const docs = [
+      {
+        _id: new ObjectId("507f1f77bcf86cd799439011"),
+        name: "Alice",
+        address: { city: "NYC", zip: 10001, geo: { lat: 40.7, lng: -74.0 } },
+      },
+    ];
+    const client = createMockClient(docs);
+    const result = await inferSchema(client, "testdb", "depth1", 100, 1);
+
+    const paths = result.fields.map((f) => f.path);
+    expect(paths).toContain("_id");
+    expect(paths).toContain("name");
+    expect(paths).toContain("address");
+    expect(paths).not.toContain("address.city");
+    expect(paths).not.toContain("address.zip");
+    expect(paths).not.toContain("address.geo");
+  });
+
+  test("depth 2 includes one level of nesting", async () => {
+    const docs = [
+      {
+        _id: new ObjectId("507f1f77bcf86cd799439011"),
+        address: { city: "NYC", geo: { lat: 40.7, lng: -74.0 } },
+      },
+    ];
+    const client = createMockClient(docs);
+    const result = await inferSchema(client, "testdb", "depth2", 100, 2);
+
+    const paths = result.fields.map((f) => f.path);
+    expect(paths).toContain("address");
+    expect(paths).toContain("address.city");
+    expect(paths).toContain("address.geo");
+    expect(paths).not.toContain("address.geo.lat");
+    expect(paths).not.toContain("address.geo.lng");
+  });
+
+  test("depth limits array element nesting", async () => {
+    const docs = [
+      {
+        _id: new ObjectId("507f1f77bcf86cd799439011"),
+        items: [{ name: "widget", meta: { color: "red" } }],
+      },
+    ];
+    const client = createMockClient(docs);
+    const result = await inferSchema(client, "testdb", "depth-arr", 100, 2);
+
+    const paths = result.fields.map((f) => f.path);
+    expect(paths).toContain("items");
+    expect(paths).toContain("items.$");
+    expect(paths).toContain("items.$.name");
+    expect(paths).toContain("items.$.meta");
+    expect(paths).not.toContain("items.$.meta.color");
   });
 });
