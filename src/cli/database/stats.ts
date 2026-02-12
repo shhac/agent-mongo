@@ -4,7 +4,8 @@ import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { getDatabaseStats } from "../../mongo/databases.ts";
 
 export function registerStats(database: Command): void {
-  database.command("stats")
+  database
+    .command("stats")
     .description("Get database statistics")
     .argument("<database>", "Database name")
     .action(async (database: string, _opts: unknown, command: Command) => {

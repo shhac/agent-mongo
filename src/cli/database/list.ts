@@ -4,7 +4,8 @@ import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { listDatabases } from "../../mongo/databases.ts";
 
 export function registerList(database: Command): void {
-  database.command("list")
+  database
+    .command("list")
     .description("List all databases")
     .action(async (_opts: unknown, command: Command) => {
       try {

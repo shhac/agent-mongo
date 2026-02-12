@@ -22,45 +22,37 @@ export function registerSchema(parent: Command): void {
     .option("--depth <n>", "Max nesting depth for fields (1 = top-level only)")
     .option("--limit <n>", "Max fields to return (for pagination)")
     .option("--skip <n>", "Number of fields to skip (for pagination)")
-    .action(
-      async (
-        database: string,
-        collection: string,
-        opts: SchemaOpts,
-        command: Command,
-      ) => {
-        try {
-          const alias = command.optsWithGlobals().connection;
-          const defaultSize = getSettings().defaults?.schemaSampleSize ?? 100;
-          const sampleSize = opts.sampleSize ? parseInt(opts.sampleSize, 10) : defaultSize;
-          if (!Number.isFinite(sampleSize) || sampleSize < 1) {
-            throw new Error(
-              `Invalid --sample-size: "${opts.sampleSize}". Must be a positive integer.`,
-            );
-          }
-
-          const maxDepth = parsePositiveInt(opts.depth, "--depth");
-          const limit = parsePositiveInt(opts.limit, "--limit");
-          const skip = opts.skip !== undefined ? parseNonNegativeInt(opts.skip, "--skip") : 0;
-
-          const { client } = await getMongoClient(alias);
-          const result = await inferSchema(client, database, collection, sampleSize, maxDepth);
-
-          printSchemaResult(result, limit, skip);
-        } catch (err) {
-          printError(err instanceof Error ? err.message : "Failed to infer schema");
-        } finally {
-          await closeAllClients();
+    .action(async (database: string, collection: string, opts: SchemaOpts, command: Command) => {
+      try {
+        const alias = command.optsWithGlobals().connection;
+        const defaultSize = getSettings().defaults?.schemaSampleSize ?? 100;
+        const sampleSize = opts.sampleSize ? parseInt(opts.sampleSize, 10) : defaultSize;
+        if (!Number.isFinite(sampleSize) || sampleSize < 1) {
+          throw new Error(
+            `Invalid --sample-size: "${opts.sampleSize}". Must be a positive integer.`,
+          );
         }
-      },
-    );
+
+        const maxDepth = parsePositiveInt(opts.depth, "--depth");
+        const limit = parsePositiveInt(opts.limit, "--limit");
+        const skip = opts.skip !== undefined ? parseNonNegativeInt(opts.skip, "--skip") : 0;
+
+        const { client } = await getMongoClient(alias);
+        const result = await inferSchema(client, database, collection, sampleSize, maxDepth);
+
+        printSchemaResult(result, limit, skip);
+      } catch (err) {
+        printError(err instanceof Error ? err.message : "Failed to infer schema");
+      } finally {
+        await closeAllClients();
+      }
+    });
 }
 
 function printSchemaResult(result: SchemaResult, limit: number | undefined, skip: number): void {
   const totalFields = result.fields.length;
-  const slicedFields = limit !== undefined
-    ? result.fields.slice(skip, skip + limit)
-    : result.fields.slice(skip);
+  const slicedFields =
+    limit !== undefined ? result.fields.slice(skip, skip + limit) : result.fields.slice(skip);
   const hasMore = skip + slicedFields.length < totalFields;
 
   const output: Record<string, unknown> = {
