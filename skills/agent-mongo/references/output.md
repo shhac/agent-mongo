@@ -8,6 +8,8 @@ Empty/null fields are pruned automatically — missing keys mean no value, not `
 
 Error messages include valid values when input is invalid (e.g., `Connection "x" not found. Available: local, staging`).
 
+Timeout errors include hints to increase `query.timeout` and check collection indexes. Collection-not-found errors suggest using `collection list` to discover available collections.
+
 ## Truncation
 
 Any string field exceeding `truncation.maxLength` (default 200) gets truncated with `…` and a companion `{field}Length` key showing the original character count.
@@ -62,11 +64,12 @@ All BSON types are converted to JSON-safe values:
 
 ```json
 {
-  "db": "myapp",
+  "database": "myapp",
   "collections": 12,
   "documents": 45000,
   "dataSize": 15728640,
   "storageSize": 8388608,
+  "indexes": 24,
   "indexSize": 2097152
 }
 ```
@@ -84,18 +87,36 @@ All BSON types are converted to JSON-safe values:
 
 ```json
 {
+  "database": "myapp",
+  "collection": "users",
+  "sampleSize": 100,
+  "totalDocuments": 15000,
+  "totalFields": 12,
   "fields": [
     { "path": "_id", "types": ["ObjectId"], "presence": 1.0 },
-    { "path": "name", "types": ["String"], "presence": 1.0 },
-    { "path": "tags", "types": ["Array"], "presence": 0.85 },
-    { "path": "tags.$", "types": ["String"], "presence": 0.85 },
-    { "path": "address.city", "types": ["String"], "presence": 0.72 }
-  ],
-  "sampleSize": 100
+    { "path": "name", "types": ["string"], "presence": 1.0 },
+    { "path": "tags", "types": ["array"], "presence": 0.85 },
+    { "path": "tags.$", "types": ["string"], "presence": 0.85 },
+    { "path": "address.city", "types": ["string"], "presence": 0.72 }
+  ]
 }
 ```
 
-Array element types appear as `path.$` entries. Nested objects use dot notation. `presence` is 0.0-1.0 (fraction of sampled documents containing the field).
+With `--limit`/`--skip` pagination:
+
+```json
+{
+  "database": "myapp",
+  "collection": "events",
+  "sampleSize": 100,
+  "totalDocuments": 10000000,
+  "totalFields": 150,
+  "fields": [ "... first 50 fields ..." ],
+  "pagination": { "hasMore": true, "nextSkip": 50 }
+}
+```
+
+Array element types appear as `path.$` entries. Nested objects use dot notation. `presence` is 0.0-1.0 (fraction of sampled documents containing the field). Errors if collection does not exist.
 
 ## Collection indexes (`collection indexes`)
 
@@ -110,11 +131,14 @@ Array element types appear as `path.$` entries. Nested objects use dot notation.
 
 ```json
 {
-  "ns": "myapp.users",
-  "count": 15000,
-  "size": 5242880,
+  "database": "myapp",
+  "collection": "users",
+  "documentCount": 15000,
+  "dataSize": 5242880,
+  "avgDocumentSize": 349,
   "storageSize": 2097152,
-  "totalIndexSize": 524288,
+  "indexes": 3,
+  "indexSize": 524288,
   "capped": false
 }
 ```
@@ -123,6 +147,9 @@ Array element types appear as `path.$` entries. Nested objects use dot notation.
 
 ```json
 {
+  "database": "myapp",
+  "collection": "users",
+  "filter": { "age": { "$gte": 21 } },
   "documents": [{ "_id": "665a...", "name": "Alice", "age": 30 }],
   "count": 1,
   "hasMore": true,
@@ -134,21 +161,29 @@ Array element types appear as `path.$` entries. Nested objects use dot notation.
 
 ## Query get (`query get`)
 
-Returns the document directly:
-
 ```json
 {
-  "_id": "665a1b2c3d4e5f6a7b8c9d0e",
-  "name": "Alice",
-  "email": "alice@example.com",
-  "createdAt": "2024-06-01T12:00:00.000Z"
+  "database": "myapp",
+  "collection": "users",
+  "fieldCount": 4,
+  "document": {
+    "_id": "665a1b2c3d4e5f6a7b8c9d0e",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "createdAt": "2024-06-01T12:00:00.000Z"
+  }
 }
 ```
+
+`fieldCount` shows the number of top-level fields in the document. Use it to decide if `--projection` is needed.
 
 ## Query count (`query count`)
 
 ```json
 {
+  "database": "myapp",
+  "collection": "orders",
+  "filter": { "status": "pending" },
   "count": 42
 }
 ```
@@ -159,6 +194,7 @@ Returns the document directly:
 {
   "database": "myapp",
   "collection": "users",
+  "filter": {},
   "sampleSize": 2,
   "documents": [
     { "_id": "...", "name": "Alice" },
@@ -171,6 +207,9 @@ Returns the document directly:
 
 ```json
 {
+  "database": "myapp",
+  "collection": "orders",
+  "field": "status",
   "values": ["pending", "shipped", "delivered"],
   "count": 3
 }
@@ -180,6 +219,8 @@ Returns the document directly:
 
 ```json
 {
+  "database": "myapp",
+  "collection": "orders",
   "documents": [
     { "_id": "pending", "count": 15 },
     { "_id": "shipped", "count": 27 }

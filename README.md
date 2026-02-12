@@ -79,15 +79,15 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>]
 │   └── usage
 ├── collection
 │   ├── list <database>
-│   ├── schema <database> <collection> [--sample-size <n>]
+│   ├── schema <database> <collection> [--sample-size <n>] [--depth <n>] [--limit <n>] [--skip <n>]
 │   ├── indexes <database> <collection>
 │   ├── stats <database> <collection>
 │   └── usage
 ├── query
 │   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip]
-│   ├── get <database> <collection> <id> [--type objectid|string|number]
+│   ├── get <database> <collection> <id> [--type objectid|string|number] [--projection <json>]
 │   ├── count <database> <collection> [--filter]
-│   ├── sample <database> <collection> [--size <n>]
+│   ├── sample <database> <collection> [--size <n>] [--filter <json>]
 │   ├── distinct <database> <collection> <field> [--filter]
 │   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>]
 │   └── usage

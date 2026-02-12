@@ -19,12 +19,13 @@ src/
 │   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
 │   ├── output.ts                # printJson, printJsonRaw, printPaginated, printError, resolvePageSize
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
+│   ├── errors.ts                # enhanceErrorMessage — timeout hints, index suggestions
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
 │   └── version.ts               # Version from build-time define / env / package.json
 └── mongo/
     ├── client.ts                # MongoClient factory (alias resolution, connection pool)
     ├── databases.ts             # listDatabases, getDatabaseStats
-    ├── collections.ts           # listCollections, getCollectionStats
+    ├── collections.ts           # listCollections, getCollectionStats, validateCollectionExists
     ├── schema.ts                # inferSchema — sample-based field/type discovery
     ├── indexes.ts               # listIndexes
     ├── query.ts                 # findDocuments, findById, countDocuments, getDistinctValues
@@ -43,6 +44,8 @@ src/
 - **BSON serialization**: `mongo/serialize.ts` converts all BSON types to JSON-safe values before output. ObjectId → hex string, Date → ISO string, Binary → base64, Long → number (if safe) or string, Decimal128 → string, UUID → string, RegExp → string.
 - **Read-only safety**: No write operations exist. `mongo/aggregate.ts` rejects `$out`/`$merge` stages. Results capped at `query.maxDocuments`.
 - **Usage subcommands**: Each command group has a `usage` subcommand providing LLM-friendly docs. When modifying a command's behavior, options, or flags, update its usage text too.
+- **Collection validation**: `mongo/collections.ts` validates collection existence before operations like schema inference. Error messages include a hint to list available collections.
+- **Timeout hints**: `lib/errors.ts` detects MongoDB timeout errors (code 50) and enhances messages with timeout config and index check suggestions.
 - **Config validation**: `cli/config/valid-keys.ts` defines all valid keys with types, defaults, and min/max ranges. Invalid keys or out-of-range values produce errors listing valid options.
 
 ## Commands

@@ -33,16 +33,16 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 ## Collection
 
 - `agent-mongo collection list <database> [-c <alias>]` — list collections (name, type)
-- `agent-mongo collection schema <database> <collection> [--sample-size <n>] [-c <alias>]` — infer schema from samples (default: 100, configurable via defaults.schemaSampleSize)
+- `agent-mongo collection schema <database> <collection> [--sample-size <n>] [--depth <n>] [--limit <n>] [--skip <n>] [-c <alias>]` — infer schema from samples (default: 100, configurable via defaults.schemaSampleSize). Errors if collection does not exist. Use --depth to limit nesting, --limit/--skip for field pagination.
 - `agent-mongo collection indexes <database> <collection> [-c <alias>]` — list indexes with key patterns
 - `agent-mongo collection stats <database> <collection> [-c <alias>]` — collection statistics (document count, sizes, capped)
 
 ## Query
 
 - `agent-mongo query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]` — find documents (default sort: `{_id:-1}`, default limit: 20)
-- `agent-mongo query get <database> <collection> <id> [--type objectid|string|number] [-c <alias>]` — get document by \_id (auto-detects ObjectId)
+- `agent-mongo query get <database> <collection> <id> [--type objectid|string|number] [--projection <json>] [-c <alias>]` — get document by \_id (auto-detects ObjectId). Returns { database, collection, fieldCount, document }.
 - `agent-mongo query count <database> <collection> [--filter <json>] [-c <alias>]` — count documents (omit filter for total)
-- `agent-mongo query sample <database> <collection> [--size <n>] [-c <alias>]` — random documents (default: 5, configurable via defaults.sampleSize)
+- `agent-mongo query sample <database> <collection> [--size <n>] [--filter <json>] [-c <alias>]` — random documents (default: 5, configurable via defaults.sampleSize). Use --filter to sample from a subset.
 - `agent-mongo query distinct <database> <collection> <field> [--filter <json>] [-c <alias>]` — distinct values (supports dot notation)
 - `agent-mongo query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]` — run aggregation ($out/$merge rejected)
 

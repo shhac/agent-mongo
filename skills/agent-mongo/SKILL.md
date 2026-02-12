@@ -35,6 +35,9 @@ agent-mongo connection add prod "mongodb+srv://cluster.example.net/myapp" --cred
 agent-mongo database list                                # all databases with sizes
 agent-mongo collection list myapp                        # all collections in myapp
 agent-mongo collection schema myapp users                # infer schema from samples
+agent-mongo collection schema myapp users --depth 2      # limit nesting depth
+agent-mongo collection schema myapp events --limit 50    # paginate large schemas
+agent-mongo collection schema myapp events --limit 50 --skip 50  # next page
 agent-mongo collection indexes myapp users               # index key patterns
 agent-mongo collection stats myapp orders                # document count, sizes
 agent-mongo database stats myapp                         # database-level statistics
@@ -46,17 +49,22 @@ agent-mongo database stats myapp                         # database-level statis
 agent-mongo query find myapp users --filter '{"age":{"$gte":21}}' --limit 10
 agent-mongo query find myapp orders --sort '{"createdAt":-1}' --projection '{"status":1,"total":1}'
 agent-mongo query get myapp users 665a1b2c3d4e5f6a7b8c9d0e      # by _id (auto-detects ObjectId)
+agent-mongo query get myapp users 665a1b2c3d4e5f6a7b8c9d0e --projection '{"name":1,"email":1}'
 agent-mongo query count myapp orders --filter '{"status":"pending"}'
 agent-mongo query sample myapp users --size 10                    # random documents
+agent-mongo query sample myapp users --size 10 --filter '{"status":"active"}'  # filtered sample
 agent-mongo query distinct myapp orders status                    # unique values
 ```
 
 ## Aggregation
 
 ```bash
+agent-mongo query aggregate myapp orders '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
 agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
-agent-mongo query aggregate myapp events --pipeline '[{"$match":{"type":"purchase"}},{"$group":{"_id":"$userId","total":{"$sum":"$amount"}}}]'
+agent-mongo query aggregate myapp events '[{"$match":{"type":"purchase"}},{"$group":{"_id":"$userId","total":{"$sum":"$amount"}}}]'
 ```
+
+Pipeline can be passed as a positional argument, via `--pipeline` flag, or piped via stdin.
 
 Write stages (`$out`, `$merge`) are rejected — the CLI is strictly read-only.
 
