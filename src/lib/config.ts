@@ -262,7 +262,9 @@ export function getCredentialStorage(alias: string): "keychain" | "config" {
   if (!cred) {
     return "config";
   }
-  return cred.username === "__KEYCHAIN__" && cred.password === "__KEYCHAIN__" ? "keychain" : "config";
+  return cred.username === "__KEYCHAIN__" && cred.password === "__KEYCHAIN__"
+    ? "keychain"
+    : "config";
 }
 
 export function updateConnection(

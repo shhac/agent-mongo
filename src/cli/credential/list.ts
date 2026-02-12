@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { getCredentials, getConnectionsUsingCredential, getCredentialStorage } from "../../lib/config.ts";
+import {
+  getCredentials,
+  getConnectionsUsingCredential,
+  getCredentialStorage,
+} from "../../lib/config.ts";
 import { printJsonRaw } from "../../lib/output.ts";
 
 export function registerList(credential: Command): void {
