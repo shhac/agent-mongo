@@ -32,12 +32,12 @@ agent-mongo connection add prod "mongodb+srv://cluster.example.net/myapp" --cred
 ## Exploring a database
 
 ```bash
-agent-mongo db list                                      # all databases with sizes
+agent-mongo database list                                # all databases with sizes
 agent-mongo collection list myapp                        # all collections in myapp
 agent-mongo collection schema myapp users                # infer schema from samples
 agent-mongo collection indexes myapp users               # index key patterns
 agent-mongo collection stats myapp orders                # document count, sizes
-agent-mongo db stats myapp                               # database-level statistics
+agent-mongo database stats myapp                         # database-level statistics
 ```
 
 ## Querying documents
@@ -120,7 +120,7 @@ Every command group has a `usage` subcommand with detailed, LLM-optimized docs:
 agent-mongo usage                  # top-level overview
 agent-mongo connection usage       # connection + credential commands
 agent-mongo credential usage       # credential management
-agent-mongo db usage               # database commands
+agent-mongo database usage          # database commands
 agent-mongo collection usage       # collection commands
 agent-mongo query usage            # all query commands
 agent-mongo config usage           # settings keys, defaults, validation

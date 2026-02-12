@@ -7,20 +7,20 @@ COMMANDS:
   credential add|remove|list                           Manage stored credentials
   config get|set|reset|list-keys                       Persistent settings
 
-  db list                                         List all databases
-  db stats <database>                             Database statistics
+  database list                                         List all databases
+  database stats <database>                             Database statistics
 
   collection list <database>                      List collections
   collection schema <database> <collection>       Infer schema from samples
   collection indexes <database> <collection>      List indexes
   collection stats <database> <collection>        Collection statistics
 
-  query find <db> <coll> [--filter] [--sort]      Find documents
-  query get <db> <coll> <id>                      Get document by _id
-  query count <db> <coll> [--filter]              Count documents
-  query sample <db> <coll> [--size]               Random documents
-  query distinct <db> <coll> <field>              Distinct field values
-  query aggregate <db> <coll> --pipeline <json>   Aggregation pipeline
+  query find <database> <collection> [--filter] [--sort]      Find documents
+  query get <database> <collection> <id>                      Get document by _id
+  query count <database> <collection> [--filter]              Count documents
+  query sample <database> <collection> [--size]               Random documents
+  query distinct <database> <collection> <field>              Distinct field values
+  query aggregate <database> <collection> [pipeline] [--pipeline <json>]   Aggregation pipeline
 
 GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full
 

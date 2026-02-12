@@ -11,7 +11,7 @@ src/
 │   ├── connection/              # connection add/remove/update/list/test/set-default
 │   ├── credential/              # credential add/remove/list
 │   ├── config/                  # config get/set/reset/list-keys
-│   ├── db/                      # db list/stats
+│   ├── database/                # database list/stats
 │   ├── collection/              # collection list/schema/indexes/stats
 │   ├── query/                   # query find/get/count/sample/distinct/aggregate
 │   └── usage/                   # LLM-optimized top-level usage text

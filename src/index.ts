@@ -5,7 +5,7 @@ import { getSettings } from "./lib/config.ts";
 import { registerConnectionCommand } from "./cli/connection/index.ts";
 import { registerCredentialCommand } from "./cli/credential/index.ts";
 import { registerConfigCommand } from "./cli/config/index.ts";
-import { registerDbCommand } from "./cli/db/index.ts";
+import { registerDatabaseCommand } from "./cli/database/index.ts";
 import { registerCollectionCommand } from "./cli/collection/index.ts";
 import { registerQueryCommand } from "./cli/query/index.ts";
 import { registerUsageCommand } from "./cli/usage/index.ts";
@@ -28,7 +28,7 @@ program.hook("preAction", (thisCommand) => {
 registerConnectionCommand({ program });
 registerCredentialCommand({ program });
 registerConfigCommand({ program });
-registerDbCommand({ program });
+registerDatabaseCommand({ program });
 registerCollectionCommand({ program });
 registerQueryCommand({ program });
 registerUsageCommand({ program });

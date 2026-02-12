@@ -3,8 +3,8 @@ import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { getDatabaseStats } from "../../mongo/databases.ts";
 
-export function registerStats(db: Command): void {
-  db.command("stats")
+export function registerStats(database: Command): void {
+  database.command("stats")
     .description("Get database statistics")
     .argument("<database>", "Database name")
     .action(async (database: string, _opts: unknown, command: Command) => {

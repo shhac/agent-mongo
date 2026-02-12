@@ -16,14 +16,15 @@ export function registerAggregate(parent: Command): void {
     .description("Run a read-only aggregation pipeline")
     .argument("<database>", "Database name")
     .argument("<collection>", "Collection name")
+    .argument("[pipeline]", "Aggregation pipeline as JSON array")
     .option("--pipeline <json>", "Aggregation pipeline as JSON array (or pipe via stdin)")
     .option("--limit <n>", "Max results if pipeline has no $limit stage")
-    .action(async (database: string, collection: string, opts: AggregateOpts, command: Command) => {
+    .action(async (database: string, collection: string, pipelineArg: string | undefined, opts: AggregateOpts, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;
         const { client } = await getMongoClient(alias);
 
-        const pipeline = await resolvePipeline(opts.pipeline);
+        const pipeline = await resolvePipeline(pipelineArg, opts.pipeline);
         const maxDocs = getSettings().query?.maxDocuments ?? 100;
         const requestedLimit = resolvePageSize(opts);
         const limit = Math.min(requestedLimit, maxDocs);
@@ -38,15 +39,17 @@ export function registerAggregate(parent: Command): void {
     });
 }
 
-async function resolvePipeline(pipelineFlag?: string): Promise<Document[]> {
+async function resolvePipeline(positionalArg?: string, pipelineFlag?: string): Promise<Document[]> {
   let raw: string;
 
-  if (pipelineFlag) {
+  if (positionalArg) {
+    raw = positionalArg;
+  } else if (pipelineFlag) {
     raw = pipelineFlag;
   } else if (!process.stdin.isTTY) {
     raw = await readStdin();
   } else {
-    throw new Error("Provide --pipeline <json> or pipe a JSON array via stdin.");
+    throw new Error("Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.");
   }
 
   let parsed: unknown;
@@ -71,7 +74,7 @@ async function readStdin(): Promise<string> {
   }
   const result = chunks.join("").trim();
   if (!result) {
-    throw new Error("Empty stdin. Provide --pipeline <json> or pipe a JSON array via stdin.");
+    throw new Error("Empty stdin. Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.");
   }
   return result;
 }

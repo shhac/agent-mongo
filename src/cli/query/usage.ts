@@ -3,26 +3,26 @@ import type { Command } from "commander";
 const USAGE_TEXT = `query — Document retrieval (read-only)
 
 COMMANDS:
-  query find <db> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]
+  query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]
     Find documents matching a filter. Default sort: { _id: -1 }. Default limit: 20.
     Returns documents, count, hasMore flag, and totalMatching count.
 
-  query get <db> <collection> <id> [--type objectid|string|number] [-c <alias>]
+  query get <database> <collection> <id> [--type objectid|string|number] [-c <alias>]
     Get a single document by _id. Auto-detects ObjectId (24-char hex) vs string.
     Use --type to force id interpretation.
 
-  query count <db> <collection> [--filter <json>] [-c <alias>]
+  query count <database> <collection> [--filter <json>] [-c <alias>]
     Count documents matching a filter. Omit --filter for total count.
 
-  query sample <db> <collection> [--size <n>] [-c <alias>]
+  query sample <database> <collection> [--size <n>] [-c <alias>]
     Get random documents. Default size: 5 (configurable via defaults.sampleSize).
 
-  query distinct <db> <collection> <field> [--filter <json>] [-c <alias>]
+  query distinct <database> <collection> <field> [--filter <json>] [-c <alias>]
     Get distinct values for a field. Supports dot notation (e.g. address.city).
 
-  query aggregate <db> <collection> --pipeline <json> [--limit <n>] [-c <alias>]
+  query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
-    Pipeline can be passed via --pipeline flag or piped via stdin.
+    Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
 
 JSON ARGS: All --filter, --sort, --projection, --pipeline values must be valid JSON.
 
@@ -34,6 +34,7 @@ EXAMPLES:
   agent-mongo query count myapp orders --filter '{"status":"pending"}'
   agent-mongo query sample myapp users --size 10
   agent-mongo query distinct myapp orders status
+  agent-mongo query aggregate myapp orders '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
   agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
 `;
 

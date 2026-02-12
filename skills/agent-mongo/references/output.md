@@ -49,7 +49,7 @@ All BSON types are converted to JSON-safe values:
 | RegExp     | String (e.g. `/pattern/flags`)     |
 | UUID       | String representation              |
 
-## Database list (`db list`)
+## Database list (`database list`)
 
 ```json
 {
@@ -58,7 +58,7 @@ All BSON types are converted to JSON-safe values:
 }
 ```
 
-## Database stats (`db stats`)
+## Database stats (`database stats`)
 
 ```json
 {

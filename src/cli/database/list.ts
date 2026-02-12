@@ -3,8 +3,8 @@ import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { listDatabases } from "../../mongo/databases.ts";
 
-export function registerList(db: Command): void {
-  db.command("list")
+export function registerList(database: Command): void {
+  database.command("list")
     .description("List all databases")
     .action(async (_opts: unknown, command: Command) => {
       try {

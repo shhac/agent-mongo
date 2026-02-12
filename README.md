@@ -34,7 +34,7 @@ agent-mongo connection test
 ### 2. Discover structure
 
 ```bash
-agent-mongo db list
+agent-mongo database list
 agent-mongo collection list myapp
 agent-mongo collection schema myapp users
 agent-mongo collection indexes myapp users
@@ -73,7 +73,7 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>]
 │   ├── reset
 │   ├── list-keys
 │   └── usage
-├── db
+├── database
 │   ├── list
 │   ├── stats <database>
 │   └── usage
@@ -84,12 +84,12 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>]
 │   ├── stats <database> <collection>
 │   └── usage
 ├── query
-│   ├── find <db> <coll> [--filter] [--sort] [--projection] [--limit] [--skip]
-│   ├── get <db> <coll> <id> [--type objectid|string|number]
-│   ├── count <db> <coll> [--filter]
-│   ├── sample <db> <coll> [--size <n>]
-│   ├── distinct <db> <coll> <field> [--filter]
-│   ├── aggregate <db> <coll> --pipeline <json> [--limit <n>]
+│   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip]
+│   ├── get <database> <collection> <id> [--type objectid|string|number]
+│   ├── count <database> <collection> [--filter]
+│   ├── sample <database> <collection> [--size <n>]
+│   ├── distinct <database> <collection> <field> [--filter]
+│   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>]
 │   └── usage
 └── usage                              # LLM-optimized docs
 ```

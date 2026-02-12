@@ -27,8 +27,8 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 ## Database
 
-- `agent-mongo db list [-c <alias>]` — list all databases with sizes
-- `agent-mongo db stats <database> [-c <alias>]` — database statistics (collection count, document count, sizes)
+- `agent-mongo database list [-c <alias>]` — list all databases with sizes
+- `agent-mongo database stats <database> [-c <alias>]` — database statistics (collection count, document count, sizes)
 
 ## Collection
 
@@ -39,12 +39,12 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 ## Query
 
-- `agent-mongo query find <db> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]` — find documents (default sort: `{_id:-1}`, default limit: 20)
-- `agent-mongo query get <db> <collection> <id> [--type objectid|string|number] [-c <alias>]` — get document by \_id (auto-detects ObjectId)
-- `agent-mongo query count <db> <collection> [--filter <json>] [-c <alias>]` — count documents (omit filter for total)
-- `agent-mongo query sample <db> <collection> [--size <n>] [-c <alias>]` — random documents (default: 5, configurable via defaults.sampleSize)
-- `agent-mongo query distinct <db> <collection> <field> [--filter <json>] [-c <alias>]` — distinct values (supports dot notation)
-- `agent-mongo query aggregate <db> <collection> --pipeline <json> [--limit <n>] [-c <alias>]` — run aggregation ($out/$merge rejected)
+- `agent-mongo query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]` — find documents (default sort: `{_id:-1}`, default limit: 20)
+- `agent-mongo query get <database> <collection> <id> [--type objectid|string|number] [-c <alias>]` — get document by \_id (auto-detects ObjectId)
+- `agent-mongo query count <database> <collection> [--filter <json>] [-c <alias>]` — count documents (omit filter for total)
+- `agent-mongo query sample <database> <collection> [--size <n>] [-c <alias>]` — random documents (default: 5, configurable via defaults.sampleSize)
+- `agent-mongo query distinct <database> <collection> <field> [--filter <json>] [-c <alias>]` — distinct values (supports dot notation)
+- `agent-mongo query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]` — run aggregation ($out/$merge rejected)
 
 ## Usage
 
@@ -52,7 +52,7 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 - `agent-mongo <command> usage` — detailed per-command docs:
   - `agent-mongo connection usage`
   - `agent-mongo credential usage`
-  - `agent-mongo db usage`
+  - `agent-mongo database usage`
   - `agent-mongo collection usage`
   - `agent-mongo query usage`
   - `agent-mongo config usage`
