@@ -10,6 +10,7 @@ COMMANDS:
   query get <database> <collection> <id> [--type objectid|string|number] [--projection <json>] [-c <alias>]
     Get a single document by _id. Auto-detects ObjectId (24-char hex) vs string.
     Use --type to force id interpretation. Use --projection to select specific fields.
+    Returns { database, collection, fieldCount, document }. Use fieldCount to decide if --projection is needed.
 
   query count <database> <collection> [--filter <json>] [-c <alias>]
     Count documents matching a filter. Omit --filter for total count.

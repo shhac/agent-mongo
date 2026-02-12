@@ -35,7 +35,12 @@ export function registerGet(parent: Command): void {
             throw new Error(`Document not found: _id=${id} in ${database}.${collection}`);
           }
 
-          printJson(doc);
+          printJson({
+            database,
+            collection,
+            fieldCount: Object.keys(doc).length,
+            document: doc,
+          });
         } catch (err) {
           printError(
             err instanceof Error
