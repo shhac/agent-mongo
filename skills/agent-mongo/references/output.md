@@ -111,7 +111,7 @@ With `--limit`/`--skip` pagination:
   "sampleSize": 100,
   "totalDocuments": 10000000,
   "totalFields": 150,
-  "fields": [ "... first 50 fields ..." ],
+  "fields": ["... first 50 fields ..."],
   "pagination": { "hasMore": true, "nextSkip": 50 }
 }
 ```
