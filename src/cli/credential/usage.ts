@@ -25,6 +25,12 @@ WORKFLOW:
 RESOLUTION: When a connection references a credential, auth is passed to the MongoDB
 driver. Connections without a credential use the URI as-is (backward compatible).
 
+KEYCHAIN (macOS):
+  On macOS, credentials are stored in the system keychain automatically.
+  Non-macOS falls back to plaintext config. \`credential list\` shows the
+  storage source ("keychain" or "config") per credential.
+  Existing plaintext credentials continue to work unchanged.
+
 CONFIG: ~/.config/agent-mongo/config.json (respects XDG_CONFIG_HOME)
 `;
 

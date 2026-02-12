@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { getCredentials, getConnectionsUsingCredential } from "../../lib/config.ts";
+import { getCredentials, getConnectionsUsingCredential, getCredentialStorage } from "../../lib/config.ts";
 import { printJsonRaw } from "../../lib/output.ts";
 
 export function registerList(credential: Command): void {
@@ -11,8 +11,9 @@ export function registerList(credential: Command): void {
 
       const items = Object.entries(credentials).map(([name, cred]) => ({
         name,
-        username: cred.username,
+        username: cred.username === "__KEYCHAIN__" ? "(keychain)" : cred.username,
         password: "***",
+        storage: getCredentialStorage(name),
         usedBy: getConnectionsUsingCredential(name),
       }));
 

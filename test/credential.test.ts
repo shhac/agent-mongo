@@ -13,6 +13,7 @@ const {
   storeCredential,
   getCredential,
   getCredentials,
+  getCredentialStorage,
   removeCredential,
   storeConnection,
   getConnectionsUsingCredential,
@@ -38,8 +39,19 @@ describe("credential CRUD", () => {
   });
 
   test("storeCredential stores a credential", () => {
-    storeCredential("acme", { username: "deploy", password: "secret123" });
+    const result = storeCredential("acme", { username: "deploy", password: "secret123" });
     expect(getCredential("acme")).toEqual({ username: "deploy", password: "secret123" });
+    expect(["keychain", "config"]).toContain(result.storage);
+  });
+
+  test("getCredentialStorage returns correct storage type", () => {
+    storeCredential("acme", { username: "deploy", password: "secret123" });
+    const storage = getCredentialStorage("acme");
+    expect(["keychain", "config"]).toContain(storage);
+  });
+
+  test("getCredentialStorage returns config for unknown alias", () => {
+    expect(getCredentialStorage("nonexistent")).toBe("config");
   });
 
   test("storeCredential overwrites existing credential (upsert)", () => {

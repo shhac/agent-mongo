@@ -11,7 +11,7 @@ export function registerAdd(credential: Command): void {
     .requiredOption("--password <pass>", "MongoDB password")
     .action((name: string, opts: { username: string; password: string }) => {
       try {
-        storeCredential(name, {
+        const { storage } = storeCredential(name, {
           username: opts.username,
           password: opts.password,
         });
@@ -19,6 +19,7 @@ export function registerAdd(credential: Command): void {
           ok: true,
           credential: name,
           username: opts.username,
+          storage,
           hint: `Use with: agent-mongo connection add <alias> <uri> --credential ${name}`,
         });
       } catch (err) {

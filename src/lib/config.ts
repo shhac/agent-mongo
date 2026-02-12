@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { keychainGet, keychainSet, keychainDelete, KEYCHAIN_SERVICE } from "./keychain.ts";
 
 function getConfigDir(): string {
   const xdg = process.env.XDG_CONFIG_HOME?.trim();
@@ -168,18 +169,63 @@ export function resetSettings(): void {
 }
 
 export function getCredential(alias: string): Credential | undefined {
-  return readConfig().credentials?.[alias];
+  const cred = readConfig().credentials?.[alias];
+  if (!cred) {
+    return undefined;
+  }
+
+  if (cred.username === "__KEYCHAIN__" || cred.password === "__KEYCHAIN__") {
+    const username =
+      cred.username === "__KEYCHAIN__"
+        ? keychainGet(`username:${alias}`, KEYCHAIN_SERVICE)
+        : cred.username;
+    const password =
+      cred.password === "__KEYCHAIN__"
+        ? keychainGet(`password:${alias}`, KEYCHAIN_SERVICE)
+        : cred.password;
+    if (!username || !password) {
+      return undefined;
+    }
+    return { username, password };
+  }
+
+  return cred;
 }
 
 export function getCredentials(): Record<string, Credential> {
   return readConfig().credentials ?? {};
 }
 
-export function storeCredential(alias: string, credential: Credential): void {
+export function storeCredential(
+  alias: string,
+  credential: Credential,
+): { storage: "keychain" | "config" } {
   const config = readConfig();
   config.credentials = config.credentials ?? {};
+
+  const usernameStored = keychainSet({
+    account: `username:${alias}`,
+    value: credential.username,
+    service: KEYCHAIN_SERVICE,
+  });
+  const passwordStored = keychainSet({
+    account: `password:${alias}`,
+    value: credential.password,
+    service: KEYCHAIN_SERVICE,
+  });
+
+  if (usernameStored && passwordStored) {
+    config.credentials[alias] = { username: "__KEYCHAIN__", password: "__KEYCHAIN__" };
+    writeConfig(config);
+    return { storage: "keychain" };
+  }
+
+  // Fallback: store plaintext (clean up any partial keychain entries)
+  keychainDelete(`username:${alias}`, KEYCHAIN_SERVICE);
+  keychainDelete(`password:${alias}`, KEYCHAIN_SERVICE);
   config.credentials[alias] = credential;
   writeConfig(config);
+  return { storage: "config" };
 }
 
 export function getConnectionsUsingCredential(credentialAlias: string): string[] {
@@ -202,11 +248,21 @@ export function removeCredential(alias: string): void {
       `Credential "${alias}" is used by connections: ${usedBy.join(", ")}. Remove or update those connections first.`,
     );
   }
+  keychainDelete(`username:${alias}`, KEYCHAIN_SERVICE);
+  keychainDelete(`password:${alias}`, KEYCHAIN_SERVICE);
   delete config.credentials[alias];
   if (Object.keys(config.credentials).length === 0) {
     delete config.credentials;
   }
   writeConfig(config);
+}
+
+export function getCredentialStorage(alias: string): "keychain" | "config" {
+  const cred = readConfig().credentials?.[alias];
+  if (!cred) {
+    return "config";
+  }
+  return cred.username === "__KEYCHAIN__" && cred.password === "__KEYCHAIN__" ? "keychain" : "config";
 }
 
 export function updateConnection(
