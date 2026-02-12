@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { getDistinctValues } from "../../mongo/query.ts";
+import { enhanceErrorMessage } from "../../lib/errors.ts";
 
 export function registerDistinct(parent: Command): void {
   parent
@@ -26,7 +27,11 @@ export function registerDistinct(parent: Command): void {
           const values = await getDistinctValues(client, database, collection, field, filter);
           printJson({ database, collection, field, values, count: values.length });
         } catch (err) {
-          printError(err instanceof Error ? err.message : "Failed to get distinct values");
+          printError(
+            err instanceof Error
+              ? enhanceErrorMessage(err, { database, collection })
+              : "Failed to get distinct values",
+          );
         } finally {
           await closeAllClients();
         }

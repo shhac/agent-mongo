@@ -16,9 +16,9 @@ COMMANDS:
   collection stats <database> <collection>        Collection statistics
 
   query find <database> <collection> [--filter] [--sort]      Find documents
-  query get <database> <collection> <id>                      Get document by _id
+  query get <database> <collection> <id> [--projection]        Get document by _id
   query count <database> <collection> [--filter]              Count documents
-  query sample <database> <collection> [--size]               Random documents
+  query sample <database> <collection> [--size] [--filter]    Random documents
   query distinct <database> <collection> <field>              Distinct field values
   query aggregate <database> <collection> [pipeline] [--pipeline <json>]   Aggregation pipeline
 

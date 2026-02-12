@@ -4,6 +4,7 @@ import { printJson, printError, resolvePageSize } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { findDocuments } from "../../mongo/query.ts";
+import { enhanceErrorMessage } from "../../lib/errors.ts";
 
 type FindOpts = {
   filter?: string;
@@ -44,7 +45,11 @@ export function registerFind(parent: Command): void {
 
         printJson(result);
       } catch (err) {
-        printError(err instanceof Error ? err.message : "Failed to find documents");
+        printError(
+          err instanceof Error
+            ? enhanceErrorMessage(err, { database, collection })
+            : "Failed to find documents",
+        );
       } finally {
         await closeAllClients();
       }

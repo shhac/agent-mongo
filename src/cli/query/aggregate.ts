@@ -4,6 +4,7 @@ import { printJson, printError, resolvePageSize } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { runAggregate } from "../../mongo/aggregate.ts";
+import { enhanceErrorMessage } from "../../lib/errors.ts";
 
 type AggregateOpts = {
   pipeline?: string;
@@ -19,24 +20,36 @@ export function registerAggregate(parent: Command): void {
     .argument("[pipeline]", "Aggregation pipeline as JSON array")
     .option("--pipeline <json>", "Aggregation pipeline as JSON array (or pipe via stdin)")
     .option("--limit <n>", "Max results if pipeline has no $limit stage")
-    .action(async (database: string, collection: string, pipelineArg: string | undefined, opts: AggregateOpts, command: Command) => {
-      try {
-        const alias = command.optsWithGlobals().connection;
-        const { client } = await getMongoClient(alias);
+    .action(
+      async (
+        database: string,
+        collection: string,
+        pipelineArg: string | undefined,
+        opts: AggregateOpts,
+        command: Command,
+      ) => {
+        try {
+          const alias = command.optsWithGlobals().connection;
+          const { client } = await getMongoClient(alias);
 
-        const pipeline = await resolvePipeline(pipelineArg, opts.pipeline);
-        const maxDocs = getSettings().query?.maxDocuments ?? 100;
-        const requestedLimit = resolvePageSize(opts);
-        const limit = Math.min(requestedLimit, maxDocs);
+          const pipeline = await resolvePipeline(pipelineArg, opts.pipeline);
+          const maxDocs = getSettings().query?.maxDocuments ?? 100;
+          const requestedLimit = resolvePageSize(opts);
+          const limit = Math.min(requestedLimit, maxDocs);
 
-        const result = await runAggregate(client, database, collection, pipeline, limit);
-        printJson({ database, collection, ...result });
-      } catch (err) {
-        printError(err instanceof Error ? err.message : "Failed to run aggregation");
-      } finally {
-        await closeAllClients();
-      }
-    });
+          const result = await runAggregate(client, database, collection, pipeline, limit);
+          printJson({ database, collection, ...result });
+        } catch (err) {
+          printError(
+            err instanceof Error
+              ? enhanceErrorMessage(err, { database, collection })
+              : "Failed to run aggregation",
+          );
+        } finally {
+          await closeAllClients();
+        }
+      },
+    );
 }
 
 async function resolvePipeline(positionalArg?: string, pipelineFlag?: string): Promise<Document[]> {
@@ -49,7 +62,9 @@ async function resolvePipeline(positionalArg?: string, pipelineFlag?: string): P
   } else if (!process.stdin.isTTY) {
     raw = await readStdin();
   } else {
-    throw new Error("Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.");
+    throw new Error(
+      "Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.",
+    );
   }
 
   let parsed: unknown;
@@ -74,7 +89,9 @@ async function readStdin(): Promise<string> {
   }
   const result = chunks.join("").trim();
   if (!result) {
-    throw new Error("Empty stdin. Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.");
+    throw new Error(
+      "Empty stdin. Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.",
+    );
   }
   return result;
 }

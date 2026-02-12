@@ -67,11 +67,15 @@ export async function findById(
   collName: string,
   rawId: string,
   idType?: string,
+  projection?: Document,
 ): Promise<Record<string, unknown> | null> {
   const timeout = getSettings().query?.timeout ?? 30000;
   const collection = client.db(dbName).collection(collName);
   const id = parseId(rawId, idType);
-  const doc = await collection.findOne({ _id: id } as Filter<Document>, { maxTimeMS: timeout });
+  const doc = await collection.findOne({ _id: id } as Filter<Document>, {
+    maxTimeMS: timeout,
+    projection,
+  });
   return doc ? serializeDocument(doc) : null;
 }
 

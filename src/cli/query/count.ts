@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { countDocuments } from "../../mongo/query.ts";
+import { enhanceErrorMessage } from "../../lib/errors.ts";
 
 export function registerCount(parent: Command): void {
   parent
@@ -19,7 +20,11 @@ export function registerCount(parent: Command): void {
           const count = await countDocuments(client, database, collection, filter);
           printJson({ database, collection, filter: filter ?? {}, count });
         } catch (err) {
-          printError(err instanceof Error ? err.message : "Failed to count documents");
+          printError(
+            err instanceof Error
+              ? enhanceErrorMessage(err, { database, collection })
+              : "Failed to count documents",
+          );
         } finally {
           await closeAllClients();
         }
