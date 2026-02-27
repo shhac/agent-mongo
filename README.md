@@ -8,6 +8,8 @@ Read-only MongoDB CLI for AI agents.
 - **Schema inference** — sample documents to discover collection structure
 - **Zero runtime deps** — single compiled binary via `bun build --compile`
 
+**Website:** [agent-mongo.paulie.app](https://agent-mongo.paulie.app/)
+
 ## Installation
 
 ```bash
