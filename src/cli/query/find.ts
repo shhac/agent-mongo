@@ -35,7 +35,9 @@ export function registerFind(parent: Command): void {
         const limit = Math.min(requestedLimit, maxDocs);
         const skip = parseInt(opts.skip ?? "0", 10);
 
-        const result = await findDocuments(client, database, collection, {
+        const result = await findDocuments(client, {
+          dbName: database,
+          collName: collection,
           filter: opts.filter ? parseJson(opts.filter, "filter") : undefined,
           sort: (opts.sort ? parseJson(opts.sort, "sort") : { _id: -1 }) as Sort,
           projection: opts.projection ? parseJson(opts.projection, "projection") : undefined,

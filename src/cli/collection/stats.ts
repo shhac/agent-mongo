@@ -13,7 +13,7 @@ export function registerStats(parent: Command): void {
       try {
         const alias = command.optsWithGlobals().connection;
         const { client } = await getMongoClient(alias);
-        const result = await getCollectionStats(client, database, collection);
+        const result = await getCollectionStats(client, { dbName: database, collName: collection });
         printJson(result);
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to get collection stats");

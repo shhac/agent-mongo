@@ -28,7 +28,9 @@ program.hook("preAction", (thisCommand) => {
   if (opts.timeout) {
     const ms = parseInt(opts.timeout, 10);
     if (!Number.isFinite(ms) || ms < 1) {
-      throw new Error(`Invalid --timeout: "${opts.timeout}". Must be a positive integer (milliseconds).`);
+      throw new Error(
+        `Invalid --timeout: "${opts.timeout}". Must be a positive integer (milliseconds).`,
+      );
     }
     configureTimeout(ms);
   }

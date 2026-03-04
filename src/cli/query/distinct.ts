@@ -24,7 +24,12 @@ export function registerDistinct(parent: Command): void {
           const alias = command.optsWithGlobals().connection;
           const { client } = await getMongoClient(alias);
           const filter = opts.filter ? parseJson(opts.filter) : undefined;
-          const values = await getDistinctValues(client, database, collection, field, filter);
+          const values = await getDistinctValues(client, {
+            dbName: database,
+            collName: collection,
+            field,
+            filter,
+          });
           printJson({ database, collection, field, values, count: values.length });
         } catch (err) {
           printError(

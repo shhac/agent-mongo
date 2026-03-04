@@ -1,10 +1,14 @@
 import type { MongoClient } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
 
+type CollectionRef = {
+  dbName: string;
+  collName: string;
+};
+
 export async function validateCollectionExists(
   client: MongoClient,
-  dbName: string,
-  collName: string,
+  { dbName, collName }: CollectionRef,
 ): Promise<void> {
   const db = client.db(dbName);
   const matches = await db.listCollections({ name: collName }).toArray();
@@ -30,8 +34,7 @@ export async function listCollections(
 
 export async function getCollectionStats(
   client: MongoClient,
-  dbName: string,
-  collName: string,
+  { dbName, collName }: CollectionRef,
 ): Promise<Record<string, unknown>> {
   const timeout = getTimeout();
   const db = client.db(dbName);

@@ -13,7 +13,7 @@ export function registerIndexes(parent: Command): void {
       try {
         const alias = command.optsWithGlobals().connection;
         const { client } = await getMongoClient(alias);
-        const indexes = await listIndexes(client, database, collection);
+        const indexes = await listIndexes(client, { dbName: database, collName: collection });
         printJson({ database, collection, indexes });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to list indexes");

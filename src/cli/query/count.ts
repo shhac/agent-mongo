@@ -17,7 +17,11 @@ export function registerCount(parent: Command): void {
           const alias = command.optsWithGlobals().connection;
           const { client } = await getMongoClient(alias);
           const filter = opts.filter ? parseJson(opts.filter) : undefined;
-          const count = await countDocuments(client, database, collection, filter);
+          const count = await countDocuments(client, {
+            dbName: database,
+            collName: collection,
+            filter,
+          });
           printJson({ database, collection, filter: filter ?? {}, count });
         } catch (err) {
           printError(

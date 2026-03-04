@@ -1,9 +1,13 @@
 import type { MongoClient } from "mongodb";
 
+type IndexOpts = {
+  dbName: string;
+  collName: string;
+};
+
 export async function listIndexes(
   client: MongoClient,
-  dbName: string,
-  collName: string,
+  { dbName, collName }: IndexOpts,
 ): Promise<Record<string, unknown>[]> {
   const collection = client.db(dbName).collection(collName);
   const indexes = await collection.indexes();

@@ -29,7 +29,13 @@ export function registerGet(parent: Command): void {
           const alias = command.optsWithGlobals().connection;
           const { client } = await getMongoClient(alias);
           const projection = opts.projection ? parseJson(opts.projection) : undefined;
-          const doc = await findById(client, database, collection, id, opts.type, projection);
+          const doc = await findById(client, {
+            dbName: database,
+            collName: collection,
+            rawId: id,
+            idType: opts.type,
+            projection,
+          });
 
           if (!doc) {
             throw new Error(`Document not found: _id=${id} in ${database}.${collection}`);

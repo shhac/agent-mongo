@@ -17,21 +17,22 @@ export type SchemaResult = {
   fields: FieldInfo[];
 };
 
-export async function inferSchema(
-  client: MongoClient,
-  dbName: string,
-  collName: string,
-  sampleSize: number,
-  maxDepth?: number,
-): Promise<SchemaResult> {
-  await validateCollectionExists(client, dbName, collName);
+type SchemaOpts = {
+  dbName: string;
+  collName: string;
+  sampleSize: number;
+  maxDepth?: number;
+};
+
+export async function inferSchema(client: MongoClient, opts: SchemaOpts): Promise<SchemaResult> {
+  await validateCollectionExists(client, { dbName: opts.dbName, collName: opts.collName });
 
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
+  const collection = client.db(opts.dbName).collection(opts.collName);
 
   const totalDocuments = await collection.estimatedDocumentCount({ maxTimeMS: timeout });
 
-  const effectiveSize = Math.min(sampleSize, totalDocuments || sampleSize);
+  const effectiveSize = Math.min(opts.sampleSize, totalDocuments || opts.sampleSize);
   const docs = await collection
     .aggregate<Document>([{ $sample: { size: effectiveSize } }], { maxTimeMS: timeout })
     .toArray();
@@ -40,7 +41,7 @@ export async function inferSchema(
 
   for (const doc of docs) {
     const seen = new Set<string>();
-    walkDocument(doc, "", seen, fieldMap, 1, maxDepth);
+    walkDocument({ doc, prefix: "", seen, fields: fieldMap, depth: 1, maxDepth: opts.maxDepth });
   }
 
   const fields: FieldInfo[] = Array.from(fieldMap.entries())
@@ -52,53 +53,64 @@ export async function inferSchema(
     .sort((a, b) => a.path.localeCompare(b.path));
 
   return {
-    database: dbName,
-    collection: collName,
+    database: opts.dbName,
+    collection: opts.collName,
     sampleSize: docs.length,
     totalDocuments,
     fields,
   };
 }
 
-function walkDocument(
-  doc: Document,
-  prefix: string,
-  seen: Set<string>,
-  fields: Map<string, { types: Set<string>; count: number }>,
-  depth: number,
-  maxDepth?: number,
-): void {
+type WalkOpts = {
+  doc: Document;
+  prefix: string;
+  seen: Set<string>;
+  fields: Map<string, { types: Set<string>; count: number }>;
+  depth: number;
+  maxDepth?: number;
+};
+
+function walkDocument({ doc, prefix, seen, fields, depth, maxDepth }: WalkOpts): void {
   for (const [key, value] of Object.entries(doc)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    recordField(path, getTypeName(value), seen, fields);
+    recordField({ path, typeName: getTypeName(value), seen, fields });
 
     if (maxDepth !== undefined && depth >= maxDepth) {
       continue;
     }
 
     if (isPlainObject(value)) {
-      walkDocument(value as Document, path, seen, fields, depth + 1, maxDepth);
+      walkDocument({ doc: value as Document, prefix: path, seen, fields, depth: depth + 1, maxDepth });
     } else if (Array.isArray(value)) {
-      walkArrayElements(value, path, seen, fields, depth, maxDepth);
+      walkArrayElements({ arr: value, parentPath: path, seen, fields, depth, maxDepth });
     }
   }
 }
 
-function walkArrayElements(
-  arr: unknown[],
-  parentPath: string,
-  seen: Set<string>,
-  fields: Map<string, { types: Set<string>; count: number }>,
-  depth: number,
-  maxDepth?: number,
-): void {
+type WalkArrayOpts = {
+  arr: unknown[];
+  parentPath: string;
+  seen: Set<string>;
+  fields: Map<string, { types: Set<string>; count: number }>;
+  depth: number;
+  maxDepth?: number;
+};
+
+function walkArrayElements({ arr, parentPath, seen, fields, depth, maxDepth }: WalkArrayOpts): void {
   const elemPath = `${parentPath}.$`;
   for (const elem of arr) {
-    recordFieldType(elemPath, getTypeName(elem), fields);
+    recordFieldType({ path: elemPath, typeName: getTypeName(elem), fields });
 
     if (maxDepth === undefined || depth < maxDepth) {
       if (isPlainObject(elem)) {
-        walkDocument(elem as Document, elemPath, seen, fields, depth + 1, maxDepth);
+        walkDocument({
+          doc: elem as Document,
+          prefix: elemPath,
+          seen,
+          fields,
+          depth: depth + 1,
+          maxDepth,
+        });
       }
     }
   }
@@ -112,13 +124,15 @@ function walkArrayElements(
   }
 }
 
-function recordField(
-  path: string,
-  typeName: string,
-  seen: Set<string>,
-  fields: Map<string, { types: Set<string>; count: number }>,
-): void {
-  recordFieldType(path, typeName, fields);
+type RecordFieldOpts = {
+  path: string;
+  typeName: string;
+  seen: Set<string>;
+  fields: Map<string, { types: Set<string>; count: number }>;
+};
+
+function recordField({ path, typeName, seen, fields }: RecordFieldOpts): void {
+  recordFieldType({ path, typeName, fields });
   if (!seen.has(path)) {
     seen.add(path);
     const field = fields.get(path);
@@ -128,11 +142,13 @@ function recordField(
   }
 }
 
-function recordFieldType(
-  path: string,
-  typeName: string,
-  fields: Map<string, { types: Set<string>; count: number }>,
-): void {
+type RecordFieldTypeOpts = {
+  path: string;
+  typeName: string;
+  fields: Map<string, { types: Set<string>; count: number }>;
+};
+
+function recordFieldType({ path, typeName, fields }: RecordFieldTypeOpts): void {
   let field = fields.get(path);
   if (!field) {
     field = { types: new Set(), count: 0 };

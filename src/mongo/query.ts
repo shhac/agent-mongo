@@ -3,7 +3,9 @@ import type { MongoClient, Document, Filter, Sort } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
 import { serializeDocuments, serializeDocument } from "./serialize.ts";
 
-type FindOptions = {
+type FindOpts = {
+  dbName: string;
+  collName: string;
   filter?: Document;
   sort?: Sort;
   projection?: Document;
@@ -21,14 +23,9 @@ type FindResult = {
   totalMatching: number;
 };
 
-export async function findDocuments(
-  client: MongoClient,
-  dbName: string,
-  collName: string,
-  opts: FindOptions,
-): Promise<FindResult> {
+export async function findDocuments(client: MongoClient, opts: FindOpts): Promise<FindResult> {
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
+  const collection = client.db(opts.dbName).collection(opts.collName);
   const filter = (opts.filter ?? {}) as Filter<Document>;
 
   const cursor = collection.find(filter, { maxTimeMS: timeout });
@@ -51,8 +48,8 @@ export async function findDocuments(
     : await collection.countDocuments(filter, { maxTimeMS: timeout });
 
   return {
-    database: dbName,
-    collection: collName,
+    database: opts.dbName,
+    collection: opts.collName,
     filter,
     documents: serializeDocuments(docs),
     count: docs.length,
@@ -61,50 +58,56 @@ export async function findDocuments(
   };
 }
 
+type FindByIdOpts = {
+  dbName: string;
+  collName: string;
+  rawId: string;
+  idType?: string;
+  projection?: Document;
+};
+
 export async function findById(
   client: MongoClient,
-  dbName: string,
-  collName: string,
-  rawId: string,
-  idType?: string,
-  projection?: Document,
+  opts: FindByIdOpts,
 ): Promise<Record<string, unknown> | null> {
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
-  const id = parseId(rawId, idType);
+  const collection = client.db(opts.dbName).collection(opts.collName);
+  const id = parseId(opts.rawId, opts.idType);
   const doc = await collection.findOne({ _id: id } as Filter<Document>, {
     maxTimeMS: timeout,
-    projection,
+    projection: opts.projection,
   });
   return doc ? serializeDocument(doc) : null;
 }
 
-export async function countDocuments(
-  client: MongoClient,
-  dbName: string,
-  collName: string,
-  filter?: Document,
-): Promise<number> {
+type CountOpts = {
+  dbName: string;
+  collName: string;
+  filter?: Document;
+};
+
+export async function countDocuments(client: MongoClient, opts: CountOpts): Promise<number> {
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
-  const f = (filter ?? {}) as Filter<Document>;
+  const collection = client.db(opts.dbName).collection(opts.collName);
+  const f = (opts.filter ?? {}) as Filter<Document>;
   const isEmpty = Object.keys(f).length === 0;
   return isEmpty
     ? collection.estimatedDocumentCount({ maxTimeMS: timeout })
     : collection.countDocuments(f, { maxTimeMS: timeout });
 }
 
-export async function getDistinctValues(
-  client: MongoClient,
-  dbName: string,
-  collName: string,
-  field: string,
-  filter?: Document,
-): Promise<unknown[]> {
+type DistinctOpts = {
+  dbName: string;
+  collName: string;
+  field: string;
+  filter?: Document;
+};
+
+export async function getDistinctValues(client: MongoClient, opts: DistinctOpts): Promise<unknown[]> {
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
-  const f = (filter ?? {}) as Filter<Document>;
-  const values = await collection.distinct(field, f, { maxTimeMS: timeout });
+  const collection = client.db(opts.dbName).collection(opts.collName);
+  const f = (opts.filter ?? {}) as Filter<Document>;
+  const values = await collection.distinct(opts.field, f, { maxTimeMS: timeout });
   return values.map((v) => {
     if (v instanceof ObjectId) {
       return v.toHexString();

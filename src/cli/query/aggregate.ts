@@ -37,7 +37,12 @@ export function registerAggregate(parent: Command): void {
           const requestedLimit = resolvePageSize(opts);
           const limit = Math.min(requestedLimit, maxDocs);
 
-          const result = await runAggregate(client, database, collection, pipeline, limit);
+          const result = await runAggregate(client, {
+            dbName: database,
+            collName: collection,
+            pipeline,
+            limit,
+          });
           printJson({ database, collection, ...result });
         } catch (err) {
           printError(

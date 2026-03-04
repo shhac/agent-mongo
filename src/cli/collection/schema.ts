@@ -38,9 +38,14 @@ export function registerSchema(parent: Command): void {
         const skip = opts.skip !== undefined ? parseNonNegativeInt(opts.skip, "--skip") : 0;
 
         const { client } = await getMongoClient(alias);
-        const result = await inferSchema(client, database, collection, sampleSize, maxDepth);
+        const result = await inferSchema(client, {
+          dbName: database,
+          collName: collection,
+          sampleSize,
+          maxDepth,
+        });
 
-        printSchemaResult(result, limit, skip);
+        printSchemaResult(result, { limit, skip });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to infer schema");
       } finally {
@@ -49,7 +54,10 @@ export function registerSchema(parent: Command): void {
     });
 }
 
-function printSchemaResult(result: SchemaResult, limit: number | undefined, skip: number): void {
+function printSchemaResult(
+  result: SchemaResult,
+  { limit, skip }: { limit: number | undefined; skip: number },
+): void {
   const totalFields = result.fields.length;
   const slicedFields =
     limit !== undefined ? result.fields.slice(skip, skip + limit) : result.fields.slice(skip);

@@ -50,7 +50,7 @@ describe("inferSchema", () => {
       { _id: new ObjectId("507f1f77bcf86cd799439012"), name: "Bob", age: 25, active: false },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "users", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "users", sampleSize: 100 });
 
     expect(result.database).toBe("testdb");
     expect(result.collection).toBe("users");
@@ -75,7 +75,7 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "types", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "types", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("created")?.types).toEqual(["date"]);
@@ -92,7 +92,7 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "nested", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "nested", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("address")?.types).toEqual(["object"]);
@@ -109,7 +109,7 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "arrays", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "arrays", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("tags")?.types).toEqual(["array"]);
@@ -127,7 +127,7 @@ describe("inferSchema", () => {
       { _id: new ObjectId("507f1f77bcf86cd799439013"), value: null },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "mixed", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "mixed", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     const valueTypes = fieldMap.get("value")?.types ?? [];
@@ -142,7 +142,7 @@ describe("inferSchema", () => {
       { _id: new ObjectId("507f1f77bcf86cd799439012"), name: "B" },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "presence", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "presence", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("_id")?.presence).toBe(1);
@@ -160,7 +160,7 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "sorted", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "sorted", sampleSize: 100 });
 
     const paths = result.fields.map((f) => f.path);
     const sorted = [...paths].sort();
@@ -169,7 +169,7 @@ describe("inferSchema", () => {
 
   test("handles empty collection", async () => {
     const client = createMockClient([]);
-    const result = await inferSchema(client, "testdb", "empty", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "empty", sampleSize: 100 });
 
     expect(result.sampleSize).toBe(0);
     expect(result.fields).toEqual([]);
@@ -178,7 +178,7 @@ describe("inferSchema", () => {
   test("detects double vs int distinction", async () => {
     const docs = [{ _id: new ObjectId("507f1f77bcf86cd799439011"), integer: 42, decimal: 3.14 }];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "numbers", 100);
+    const result = await inferSchema(client, { dbName: "testdb", collName: "numbers", sampleSize: 100 });
 
     const fieldMap = new Map(result.fields.map((f) => [f.path, f]));
     expect(fieldMap.get("integer")?.types).toEqual(["int"]);
@@ -187,7 +187,9 @@ describe("inferSchema", () => {
 
   test("errors on non-existent collection", async () => {
     const client = createMockClient([], false);
-    await expect(inferSchema(client, "testdb", "nonexistent", 100)).rejects.toThrow(
+    await expect(
+      inferSchema(client, { dbName: "testdb", collName: "nonexistent", sampleSize: 100 }),
+    ).rejects.toThrow(
       'Collection "nonexistent" not found in database "testdb"',
     );
   });
@@ -201,7 +203,12 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "depth1", 100, 1);
+    const result = await inferSchema(client, {
+      dbName: "testdb",
+      collName: "depth1",
+      sampleSize: 100,
+      maxDepth: 1,
+    });
 
     const paths = result.fields.map((f) => f.path);
     expect(paths).toContain("_id");
@@ -220,7 +227,12 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "depth2", 100, 2);
+    const result = await inferSchema(client, {
+      dbName: "testdb",
+      collName: "depth2",
+      sampleSize: 100,
+      maxDepth: 2,
+    });
 
     const paths = result.fields.map((f) => f.path);
     expect(paths).toContain("address");
@@ -238,7 +250,12 @@ describe("inferSchema", () => {
       },
     ];
     const client = createMockClient(docs);
-    const result = await inferSchema(client, "testdb", "depth-arr", 100, 2);
+    const result = await inferSchema(client, {
+      dbName: "testdb",
+      collName: "depth-arr",
+      sampleSize: 100,
+      maxDepth: 2,
+    });
 
     const paths = result.fields.map((f) => f.path);
     expect(paths).toContain("items");

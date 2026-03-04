@@ -17,20 +17,24 @@ export function validatePipeline(pipeline: Document[]): void {
   }
 }
 
+type AggregateOpts = {
+  dbName: string;
+  collName: string;
+  pipeline: Document[];
+  limit: number;
+};
+
 export async function runAggregate(
   client: MongoClient,
-  dbName: string,
-  collName: string,
-  pipeline: Document[],
-  limit: number,
+  opts: AggregateOpts,
 ): Promise<{ documents: Record<string, unknown>[]; count: number }> {
-  validatePipeline(pipeline);
+  validatePipeline(opts.pipeline);
 
-  const hasLimitStage = pipeline.some((s) => "$limit" in s);
-  const effectivePipeline = hasLimitStage ? pipeline : [...pipeline, { $limit: limit }];
+  const hasLimitStage = opts.pipeline.some((s) => "$limit" in s);
+  const effectivePipeline = hasLimitStage ? opts.pipeline : [...opts.pipeline, { $limit: opts.limit }];
 
   const timeout = getTimeout();
-  const collection = client.db(dbName).collection(collName);
+  const collection = client.db(opts.dbName).collection(opts.collName);
   const docs = await collection.aggregate(effectivePipeline, { maxTimeMS: timeout }).toArray();
 
   return {
