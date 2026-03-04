@@ -1,6 +1,6 @@
 {
   "name": "agent-mongo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MongoDB CLI for AI agents",
   "license": "MIT",
   "type": "module",
