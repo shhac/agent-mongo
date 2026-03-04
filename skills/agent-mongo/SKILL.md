@@ -102,6 +102,15 @@ agent-mongo --expand description query find myapp posts  # expand specific field
 
 These are global flags — place them before or after the command.
 
+## Timeout
+
+Default timeout is 30s (configurable via `query.timeout`). Override per-command:
+
+```bash
+agent-mongo --timeout 60000 query find myapp large_collection --filter '{"status":"active"}'
+agent-mongo --timeout 120000 collection schema myapp events
+```
+
 ## Configuration
 
 ```bash
@@ -118,7 +127,7 @@ Key settings: `defaults.limit` (20), `defaults.sampleSize` (5), `defaults.schema
 - **Read-only**: No write operations exist
 - **Aggregation**: `$out` and `$merge` stages rejected
 - **Result cap**: `query.maxDocuments` (default 100)
-- **Timeout**: `query.timeout` (default 30s)
+- **Timeout**: `query.timeout` (default 30s), override per-command with `--timeout <ms>`
 
 ## Per-command usage docs
 

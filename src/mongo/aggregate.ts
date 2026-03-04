@@ -1,5 +1,5 @@
 import type { MongoClient, Document } from "mongodb";
-import { getSettings } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 import { serializeDocuments } from "./serialize.ts";
 
 const WRITE_STAGES = new Set(["$out", "$merge"]);
@@ -29,7 +29,7 @@ export async function runAggregate(
   const hasLimitStage = pipeline.some((s) => "$limit" in s);
   const effectivePipeline = hasLimitStage ? pipeline : [...pipeline, { $limit: limit }];
 
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
   const docs = await collection.aggregate(effectivePipeline, { maxTimeMS: timeout }).toArray();
 

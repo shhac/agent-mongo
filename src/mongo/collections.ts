@@ -1,5 +1,5 @@
 import type { MongoClient } from "mongodb";
-import { getSettings } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 
 export async function validateCollectionExists(
   client: MongoClient,
@@ -33,7 +33,7 @@ export async function getCollectionStats(
   dbName: string,
   collName: string,
 ): Promise<Record<string, unknown>> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const db = client.db(dbName);
   const result = await db.command({ collStats: collName, maxTimeMS: timeout });
 

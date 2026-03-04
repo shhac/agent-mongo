@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getPackageVersion } from "./lib/version.ts";
 import { configureTruncation } from "./lib/truncation.ts";
+import { configureTimeout } from "./lib/timeout.ts";
 import { getSettings } from "./lib/config.ts";
 import { registerConnectionCommand } from "./cli/connection/index.ts";
 import { registerCredentialCommand } from "./cli/credential/index.ts";
@@ -15,6 +16,7 @@ program.name("agent-mongo").description("MongoDB CLI for AI agents").version(get
 program.option("--expand <fields>", "Expand truncated fields (comma-separated field names)");
 program.option("--full", "Show full content for all truncated fields");
 program.option("-c, --connection <alias>", "Connection alias to use");
+program.option("--timeout <ms>", "Query timeout in milliseconds (overrides config)");
 program.hook("preAction", (thisCommand) => {
   const opts = thisCommand.opts();
   const settings = getSettings();
@@ -23,6 +25,13 @@ program.hook("preAction", (thisCommand) => {
     full: opts.full,
     maxLength: settings.truncation?.maxLength,
   });
+  if (opts.timeout) {
+    const ms = parseInt(opts.timeout, 10);
+    if (!Number.isFinite(ms) || ms < 1) {
+      throw new Error(`Invalid --timeout: "${opts.timeout}". Must be a positive integer (milliseconds).`);
+    }
+    configureTimeout(ms);
+  }
 });
 
 registerConnectionCommand({ program });

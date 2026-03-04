@@ -22,7 +22,7 @@ COMMANDS:
   query distinct <database> <collection> <field>              Distinct field values
   query aggregate <database> <collection> [pipeline] [--pipeline <json>]   Aggregation pipeline
 
-GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full
+GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full, --timeout <ms>
 
 CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
   Connections can reference stored credentials via --credential for shared auth.

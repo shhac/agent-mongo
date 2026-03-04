@@ -1,5 +1,5 @@
 import { MongoServerError } from "mongodb";
-import { getSettings } from "./config.ts";
+import { getTimeout } from "./timeout.ts";
 
 type ErrorContext = {
   database?: string;
@@ -8,10 +8,10 @@ type ErrorContext = {
 
 export function enhanceErrorMessage(err: Error, context?: ErrorContext): string {
   if (err instanceof MongoServerError && err.code === 50) {
-    const timeout = getSettings().query?.timeout ?? 30000;
+    const timeout = getTimeout();
     const hints = [
       `Query timed out after ${timeout}ms.`,
-      `Increase with: agent-mongo config set query.timeout <ms>`,
+      `Increase with: --timeout <ms> or agent-mongo config set query.timeout <ms>`,
     ];
     if (context?.database && context?.collection) {
       hints.push(

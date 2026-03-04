@@ -20,6 +20,7 @@ src/
 │   ├── output.ts                # printJson, printJsonRaw, printPaginated, printError, resolvePageSize
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
 │   ├── errors.ts                # enhanceErrorMessage — timeout hints, index suggestions
+│   ├── timeout.ts               # CLI --timeout override + getTimeout() helper
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
 │   └── version.ts               # Version from build-time define / env / package.json
 └── mongo/
@@ -45,7 +46,8 @@ src/
 - **Read-only safety**: No write operations exist. `mongo/aggregate.ts` rejects `$out`/`$merge` stages. Results capped at `query.maxDocuments`.
 - **Usage subcommands**: Each command group has a `usage` subcommand providing LLM-friendly docs. When modifying a command's behavior, options, or flags, update its usage text too.
 - **Collection validation**: `mongo/collections.ts` validates collection existence before operations like schema inference. Error messages include a hint to list available collections.
-- **Timeout hints**: `lib/errors.ts` detects MongoDB timeout errors (code 50) and enhances messages with timeout config and index check suggestions.
+- **Timeout**: `lib/timeout.ts` provides `getTimeout()` — checks CLI `--timeout` override first, then config `query.timeout`, then default 30s. All mongo operations use this helper.
+- **Timeout hints**: `lib/errors.ts` detects MongoDB timeout errors (code 50) and enhances messages with `--timeout` flag and config suggestions.
 - **Config validation**: `cli/config/valid-keys.ts` defines all valid keys with types, defaults, and min/max ranges. Invalid keys or out-of-range values produce errors listing valid options.
 
 ## Commands
@@ -71,6 +73,12 @@ bun run build:release        # cross-platform binaries in release/
 ```
 
 Then create GitHub release and update homebrew-tap formula with new sha256s.
+
+## Keeping docs in sync
+
+- **Skill** (`skills/agent-mongo/SKILL.md`): The Claude Code skill that agents use to discover and operate `agent-mongo`. Update it when commands, flags, output shapes, or usage patterns change.
+- **README** (`README.md`): The public-facing docs. Update the command map, config table, and examples when commands or behavior change.
+- **Release steps**: Scripts like `bun run release` and `bun run build:release` may change your working directory. After running release steps, verify your `pwd` before operating on files — paths will be relative to wherever you end up.
 
 ## Conventions
 

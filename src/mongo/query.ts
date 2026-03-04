@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import type { MongoClient, Document, Filter, Sort } from "mongodb";
-import { getSettings } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 import { serializeDocuments, serializeDocument } from "./serialize.ts";
 
 type FindOptions = {
@@ -27,7 +27,7 @@ export async function findDocuments(
   collName: string,
   opts: FindOptions,
 ): Promise<FindResult> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
   const filter = (opts.filter ?? {}) as Filter<Document>;
 
@@ -69,7 +69,7 @@ export async function findById(
   idType?: string,
   projection?: Document,
 ): Promise<Record<string, unknown> | null> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
   const id = parseId(rawId, idType);
   const doc = await collection.findOne({ _id: id } as Filter<Document>, {
@@ -85,7 +85,7 @@ export async function countDocuments(
   collName: string,
   filter?: Document,
 ): Promise<number> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
   const f = (filter ?? {}) as Filter<Document>;
   const isEmpty = Object.keys(f).length === 0;
@@ -101,7 +101,7 @@ export async function getDistinctValues(
   field: string,
   filter?: Document,
 ): Promise<unknown[]> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
   const f = (filter ?? {}) as Filter<Document>;
   const values = await collection.distinct(field, f, { maxTimeMS: timeout });

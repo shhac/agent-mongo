@@ -55,7 +55,7 @@ agent-mongo query distinct myapp orders status
 ## Command map
 
 ```text
-agent-mongo [-c <alias>] [--full] [--expand <fields>]
+agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 ├── connection
 │   ├── add <alias> <uri> [--database <db>] [--credential <name>] [--default]
 │   ├── update <alias> [--credential <name>] [--no-credential] [--database <db>]
@@ -168,7 +168,7 @@ agent-mongo is strictly read-only:
 - No insert, update, or delete operations
 - Aggregation pipelines reject `$out` and `$merge` stages
 - Results capped at `query.maxDocuments` (default 100)
-- Queries timeout after `query.timeout` (default 30s)
+- Queries timeout after `query.timeout` (default 30s), override per-command with `--timeout <ms>`
 
 ## Configuration
 

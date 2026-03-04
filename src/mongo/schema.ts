@@ -1,6 +1,6 @@
 import { ObjectId, Binary, Long, Decimal128, UUID } from "mongodb";
 import type { MongoClient, Document } from "mongodb";
-import { getSettings } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 import { validateCollectionExists } from "./collections.ts";
 
 type FieldInfo = {
@@ -26,7 +26,7 @@ export async function inferSchema(
 ): Promise<SchemaResult> {
   await validateCollectionExists(client, dbName, collName);
 
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const collection = client.db(dbName).collection(collName);
 
   const totalDocuments = await collection.estimatedDocumentCount({ maxTimeMS: timeout });

@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { Document } from "mongodb";
 import { printJson, printError } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
+import { getTimeout } from "../../lib/timeout.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { serializeDocuments } from "../../mongo/serialize.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
@@ -40,7 +41,7 @@ export function registerSample(parent: Command): void {
           }
           pipeline.push({ $sample: { size } });
 
-          const timeout = getSettings().query?.timeout ?? 30000;
+          const timeout = getTimeout();
           const coll = client.db(database).collection(collection);
           const docs = await coll.aggregate<Document>(pipeline, { maxTimeMS: timeout }).toArray();
 

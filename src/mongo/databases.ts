@@ -1,11 +1,11 @@
 import type { MongoClient } from "mongodb";
-import { getSettings } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 
 export async function listDatabases(client: MongoClient): Promise<{
   databases: { name: string; sizeOnDisk: number; empty: boolean }[];
   totalSize: number;
 }> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const result = await client.db("admin").admin().listDatabases({ maxTimeMS: timeout });
 
   const databases = result.databases.map((db) => ({
@@ -21,7 +21,7 @@ export async function getDatabaseStats(
   client: MongoClient,
   dbName: string,
 ): Promise<Record<string, unknown>> {
-  const timeout = getSettings().query?.timeout ?? 30000;
+  const timeout = getTimeout();
   const result = await client.db(dbName).command({ dbStats: 1, maxTimeMS: timeout });
 
   return {

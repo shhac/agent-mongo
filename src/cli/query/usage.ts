@@ -29,7 +29,7 @@ COMMANDS:
 JSON ARGS: All --filter, --sort, --projection, --pipeline values must be valid JSON.
 
 LIMITS: Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).
-  On timeout, hints suggest increasing timeout or checking indexes.
+  Override per-command with --timeout <ms>. On timeout, hints suggest increasing timeout or checking indexes.
 
 EXAMPLES:
   agent-mongo query find myapp users --filter '{"age":{"$gte":21}}' --limit 10
