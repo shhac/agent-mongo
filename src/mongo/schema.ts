@@ -80,7 +80,14 @@ function walkDocument({ doc, prefix, seen, fields, depth, maxDepth }: WalkOpts):
     }
 
     if (isPlainObject(value)) {
-      walkDocument({ doc: value as Document, prefix: path, seen, fields, depth: depth + 1, maxDepth });
+      walkDocument({
+        doc: value as Document,
+        prefix: path,
+        seen,
+        fields,
+        depth: depth + 1,
+        maxDepth,
+      });
     } else if (Array.isArray(value)) {
       walkArrayElements({ arr: value, parentPath: path, seen, fields, depth, maxDepth });
     }
@@ -96,7 +103,14 @@ type WalkArrayOpts = {
   maxDepth?: number;
 };
 
-function walkArrayElements({ arr, parentPath, seen, fields, depth, maxDepth }: WalkArrayOpts): void {
+function walkArrayElements({
+  arr,
+  parentPath,
+  seen,
+  fields,
+  depth,
+  maxDepth,
+}: WalkArrayOpts): void {
   const elemPath = `${parentPath}.$`;
   for (const elem of arr) {
     recordFieldType({ path: elemPath, typeName: getTypeName(elem), fields });

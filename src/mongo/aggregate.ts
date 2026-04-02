@@ -31,7 +31,9 @@ export async function runAggregate(
   validatePipeline(opts.pipeline);
 
   const hasLimitStage = opts.pipeline.some((s) => "$limit" in s);
-  const effectivePipeline = hasLimitStage ? opts.pipeline : [...opts.pipeline, { $limit: opts.limit }];
+  const effectivePipeline = hasLimitStage
+    ? opts.pipeline
+    : [...opts.pipeline, { $limit: opts.limit }];
 
   const timeout = getTimeout();
   const collection = client.db(opts.dbName).collection(opts.collName);

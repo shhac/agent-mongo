@@ -103,7 +103,10 @@ type DistinctOpts = {
   filter?: Document;
 };
 
-export async function getDistinctValues(client: MongoClient, opts: DistinctOpts): Promise<unknown[]> {
+export async function getDistinctValues(
+  client: MongoClient,
+  opts: DistinctOpts,
+): Promise<unknown[]> {
   const timeout = getTimeout();
   const collection = client.db(opts.dbName).collection(opts.collName);
   const f = (opts.filter ?? {}) as Filter<Document>;
