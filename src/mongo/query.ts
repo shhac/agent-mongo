@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import type { MongoClient, Document, Filter, Sort } from "mongodb";
+import type { MongoClient, Document, Filter, FindCursor, Sort } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
 import { serializeDocuments, serializeDocument } from "./serialize.ts";
 
@@ -56,6 +56,29 @@ export async function findDocuments(client: MongoClient, opts: FindOpts): Promis
     hasMore,
     totalMatching,
   };
+}
+
+type StreamFindOpts = {
+  dbName: string;
+  collName: string;
+  filter?: Document;
+  sort?: Sort;
+  projection?: Document;
+};
+
+export function streamFind(client: MongoClient, opts: StreamFindOpts): FindCursor<Document> {
+  const timeout = getTimeout();
+  const collection = client.db(opts.dbName).collection(opts.collName);
+  const filter = (opts.filter ?? {}) as Filter<Document>;
+
+  const cursor = collection.find(filter, { maxTimeMS: timeout });
+  if (opts.sort) {
+    cursor.sort(opts.sort);
+  }
+  if (opts.projection) {
+    cursor.project(opts.projection);
+  }
+  return cursor;
 }
 
 type FindByIdOpts = {

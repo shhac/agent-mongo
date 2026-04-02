@@ -1,6 +1,8 @@
+import type { Document } from "mongodb";
 import { applyTruncation } from "./truncation.ts";
 import { pruneEmpty } from "./compact-json.ts";
 import { getSettings } from "./config.ts";
+import { serializeDocument } from "../mongo/serialize.ts";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -32,6 +34,22 @@ export function printPaginated(
     };
   }
   console.log(JSON.stringify(payload, null, 2));
+}
+
+/**
+ * Stream documents as NDJSON (one JSON object per line).
+ * Each document is serialized, pruned, and truncated individually.
+ * Returns the number of documents streamed.
+ */
+export async function printNdjsonStream(cursor: AsyncIterable<Document>): Promise<number> {
+  let count = 0;
+  for await (const doc of cursor) {
+    const serialized = serializeDocument(doc as Record<string, unknown>);
+    const processed = applyTruncation(pruneEmpty(serialized));
+    process.stdout.write(`${JSON.stringify(processed)}\n`);
+    count++;
+  }
+  return count;
 }
 
 export function printError(message: string): void {

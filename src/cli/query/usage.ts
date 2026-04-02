@@ -3,9 +3,10 @@ import type { Command } from "commander";
 const USAGE_TEXT = `query — Document retrieval (read-only)
 
 COMMANDS:
-  query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]
+  query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [--stream] [-c <alias>]
     Find documents matching a filter. Default sort: { _id: -1 }. Default limit: 20.
     Returns documents, count, hasMore flag, and totalMatching count.
+    --stream: output NDJSON (one JSON object per line), bypasses limit for large result sets.
 
   query get <database> <collection> <id> [--type objectid|string|number] [--projection <json>] [-c <alias>]
     Get a single document by _id. Auto-detects ObjectId (24-char hex) vs string.
@@ -22,9 +23,10 @@ COMMANDS:
   query distinct <database> <collection> <field> [--filter <json>] [-c <alias>]
     Get distinct values for a field. Supports dot notation (e.g. address.city).
 
-  query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]
+  query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [--stream] [-c <alias>]
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
     Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
+    --stream: output NDJSON (one JSON object per line), bypasses limit for large result sets.
 
 JSON ARGS: All --filter, --sort, --projection, --pipeline values accept MongoDB Extended JSON (EJSON).
   Use {"$date":"2026-01-01T00:00:00Z"} for dates, {"$oid":"..."} for ObjectIds, etc.

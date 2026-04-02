@@ -24,6 +24,8 @@ export function parseJsonArray(value: string, name: string): unknown[] {
     if (err instanceof Error && err.message.startsWith("--")) {
       throw err;
     }
-    throw new Error(`Invalid JSON for --${name}: ${value.slice(0, 100)}${value.length > 100 ? "..." : ""}`);
+    throw new Error(
+      `Invalid JSON for --${name}: ${value.slice(0, 100)}${value.length > 100 ? "..." : ""}`,
+    );
   }
 }

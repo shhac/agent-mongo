@@ -1,4 +1,4 @@
-import type { MongoClient, Document } from "mongodb";
+import type { AggregationCursor, MongoClient, Document } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
 import { serializeDocuments } from "./serialize.ts";
 
@@ -43,4 +43,21 @@ export async function runAggregate(
     documents: serializeDocuments(docs),
     count: docs.length,
   };
+}
+
+type StreamAggregateOpts = {
+  dbName: string;
+  collName: string;
+  pipeline: Document[];
+};
+
+export function streamAggregate(
+  client: MongoClient,
+  opts: StreamAggregateOpts,
+): AggregationCursor<Document> {
+  validatePipeline(opts.pipeline);
+
+  const timeout = getTimeout();
+  const collection = client.db(opts.dbName).collection(opts.collName);
+  return collection.aggregate(opts.pipeline, { maxTimeMS: timeout });
 }

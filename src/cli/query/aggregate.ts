@@ -1,15 +1,16 @@
 import type { Command } from "commander";
 import type { Document } from "mongodb";
-import { printJson, printError, resolvePageSize } from "../../lib/output.ts";
+import { printJson, printError, printNdjsonStream, resolvePageSize } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
-import { runAggregate } from "../../mongo/aggregate.ts";
+import { runAggregate, streamAggregate } from "../../mongo/aggregate.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
 import { parseJsonArray } from "../../lib/parse-json.ts";
 
 type AggregateOpts = {
   pipeline?: string;
   limit?: string;
+  stream?: boolean;
 };
 
 export function registerAggregate(parent: Command): void {
@@ -21,6 +22,7 @@ export function registerAggregate(parent: Command): void {
     .argument("[pipeline]", "Aggregation pipeline as JSON array")
     .option("--pipeline <json>", "Aggregation pipeline as JSON array (or pipe via stdin)")
     .option("--limit <n>", "Max results if pipeline has no $limit stage")
+    .option("--stream", "Stream results as NDJSON (one JSON object per line, no limit)")
     .action(
       async (
         database: string,
@@ -34,17 +36,27 @@ export function registerAggregate(parent: Command): void {
           const { client } = await getMongoClient(alias);
 
           const pipeline = await resolvePipeline(pipelineArg, opts.pipeline);
-          const maxDocs = getSettings().query?.maxDocuments ?? 100;
-          const requestedLimit = resolvePageSize(opts);
-          const limit = Math.min(requestedLimit, maxDocs);
 
-          const result = await runAggregate(client, {
-            dbName: database,
-            collName: collection,
-            pipeline,
-            limit,
-          });
-          printJson({ database, collection, ...result });
+          if (opts.stream) {
+            const cursor = streamAggregate(client, {
+              dbName: database,
+              collName: collection,
+              pipeline,
+            });
+            await printNdjsonStream(cursor);
+          } else {
+            const maxDocs = getSettings().query?.maxDocuments ?? 100;
+            const requestedLimit = resolvePageSize(opts);
+            const limit = Math.min(requestedLimit, maxDocs);
+
+            const result = await runAggregate(client, {
+              dbName: database,
+              collName: collection,
+              pipeline,
+              limit,
+            });
+            printJson({ database, collection, ...result });
+          }
         } catch (err) {
           printError(
             err instanceof Error

@@ -15,12 +15,12 @@ COMMANDS:
   collection indexes <database> <collection>      List indexes
   collection stats <database> <collection>        Collection statistics
 
-  query find <database> <collection> [--filter] [--sort]      Find documents
+  query find <database> <collection> [--filter] [--sort] [--stream]   Find documents
   query get <database> <collection> <id> [--projection]        Get document by _id
   query count <database> <collection> [--filter]              Count documents
   query sample <database> <collection> [--size] [--filter]    Random documents
   query distinct <database> <collection> <field>              Distinct field values
-  query aggregate <database> <collection> [pipeline] [--pipeline <json>]   Aggregation pipeline
+  query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--stream]   Aggregation pipeline
 
 GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full, --timeout <ms>
 
