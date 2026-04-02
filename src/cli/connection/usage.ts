@@ -21,8 +21,8 @@ COMMANDS:
   connection list
     List all saved connections with credential names.
 
-  connection test [-c <alias>]
-    Ping MongoDB to verify connectivity. Uses default connection if -c omitted.
+  connection test [alias] [-c <alias>]
+    Ping MongoDB to verify connectivity. Alias as argument or -c flag. Uses default if omitted.
 
   connection set-default <alias>
     Set which connection is used when -c is not specified.

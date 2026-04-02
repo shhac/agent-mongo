@@ -6,9 +6,10 @@ export function registerTest(connection: Command): void {
   connection
     .command("test")
     .description("Test a MongoDB connection (ping)")
-    .action(async (_opts: unknown, command: Command) => {
+    .argument("[alias]", "Connection alias to test (overrides -c flag)")
+    .action(async (aliasArg: string | undefined, _opts: unknown, command: Command) => {
       try {
-        const alias = command.optsWithGlobals().connection;
+        const alias = aliasArg ?? command.optsWithGlobals().connection;
         const { client, alias: resolved } = await getMongoClient(alias);
         try {
           const result = await client.db("admin").command({ ping: 1 });

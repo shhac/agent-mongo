@@ -68,7 +68,7 @@ function resolveAlias(flag?: string): string {
 
   const available = Object.keys(getConnections());
   throw new Error(
-    `No connection specified. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo connection add <alias> <connection-string>`,
+    `No connection specified. Use -c <alias> or set a default. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo connection add <alias> <connection-string>`,
   );
 }
 

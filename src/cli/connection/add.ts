@@ -51,7 +51,7 @@ export function registerAdd(connection: Command): void {
           database: opts.database ?? parseDbFromUri(connectionString),
           credential: opts.credential,
           isDefault: opts.default ?? false,
-          hint: "Test with: agent-mongo connection test",
+          hint: `Test with: agent-mongo connection test ${alias}`,
         });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to add connection");
