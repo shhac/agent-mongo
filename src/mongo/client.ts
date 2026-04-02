@@ -6,6 +6,7 @@ import {
   getDefaultConnectionAlias,
   getConnections,
 } from "../lib/config.ts";
+import { getTimeout } from "../lib/timeout.ts";
 
 type MongoContext = {
   client: MongoClient;
@@ -40,7 +41,8 @@ export async function getMongoClient(aliasFlag?: string): Promise<MongoContext> 
     return { client: existing, db: existing.db(dbName), alias };
   }
 
-  const opts = resolveClientOptions(conn.credential);
+  const timeout = getTimeout();
+  const opts = resolveClientOptions(conn.credential, timeout);
   const client = new MongoClient(conn.connection_string, opts);
   await client.connect();
   activeClients.set(alias, client);
@@ -70,9 +72,16 @@ function resolveAlias(flag?: string): string {
   );
 }
 
-export function resolveClientOptions(credentialAlias?: string): MongoClientOptions {
+export function resolveClientOptions(
+  credentialAlias?: string,
+  timeout?: number,
+): MongoClientOptions {
+  const timeoutOpts: MongoClientOptions = timeout
+    ? { connectTimeoutMS: timeout, socketTimeoutMS: timeout }
+    : {};
+
   if (!credentialAlias) {
-    return {};
+    return timeoutOpts;
   }
   const cred = getCredential(credentialAlias);
   if (!cred) {
@@ -81,7 +90,7 @@ export function resolveClientOptions(credentialAlias?: string): MongoClientOptio
       `Credential "${credentialAlias}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
     );
   }
-  return { auth: { username: cred.username, password: cred.password } };
+  return { ...timeoutOpts, auth: { username: cred.username, password: cred.password } };
 }
 
 export function parseDbFromUri(uri: string): string | undefined {
