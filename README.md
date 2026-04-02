@@ -52,6 +52,24 @@ agent-mongo query sample myapp users --size 5
 agent-mongo query distinct myapp orders status
 ```
 
+### Extended JSON (EJSON)
+
+All JSON arguments (`--filter`, `--sort`, `--projection`, `--pipeline`) accept MongoDB Extended JSON for BSON types:
+
+```bash
+agent-mongo query find myapp events --filter '{"createdAt":{"$gt":{"$date":"2026-01-01T00:00:00Z"}}}'
+agent-mongo query find myapp users --filter '{"_id":{"$oid":"665a1b2c3d4e5f6a7b8c9d0e"}}'
+```
+
+### Streaming large result sets
+
+`query find` and `query aggregate` support `--stream` for NDJSON output (one JSON object per line). Streaming bypasses the `query.maxDocuments` limit:
+
+```bash
+agent-mongo query find myapp events --filter '{"type":"click"}' --stream
+agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]' --stream
+```
+
 ## Command map
 
 ```text
@@ -61,7 +79,7 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 │   ├── update <alias> [--credential <name>] [--no-credential] [--database <db>]
 │   ├── remove <alias>
 │   ├── list
-│   ├── test
+│   ├── test [alias]
 │   ├── set-default <alias>
 │   └── usage
 ├── credential
@@ -86,12 +104,12 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 │   ├── stats <database> <collection>
 │   └── usage
 ├── query
-│   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip]
+│   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip] [--stream]
 │   ├── get <database> <collection> <id> [--type objectid|string|number] [--projection <json>]
 │   ├── count <database> <collection> [--filter]
 │   ├── sample <database> <collection> [--size <n>] [--filter <json>]
 │   ├── distinct <database> <collection> <field> [--filter]
-│   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>]
+│   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [--stream]
 │   └── usage
 └── usage                              # LLM-optimized docs
 ```
@@ -108,7 +126,8 @@ agent-mongo connection add staging "mongodb+srv://user:pass@cluster.mongodb.net/
 agent-mongo connection set-default staging
 agent-mongo connection list
 agent-mongo connection test            # pings default connection
-agent-mongo connection test -c local   # pings specific connection
+agent-mongo connection test staging    # pings specific connection
+agent-mongo connection test -c local   # also works with -c flag
 ```
 
 Or set an environment variable:
@@ -167,8 +186,8 @@ agent-mongo is strictly read-only:
 
 - No insert, update, or delete operations
 - Aggregation pipelines reject `$out` and `$merge` stages
-- Results capped at `query.maxDocuments` (default 100)
-- Queries timeout after `query.timeout` (default 30s), override per-command with `--timeout <ms>`
+- Results capped at `query.maxDocuments` (default 100) — use `--stream` to bypass
+- Timeout applies to both connections and queries (default 30s), override per-command with `--timeout <ms>`
 
 ## Configuration
 

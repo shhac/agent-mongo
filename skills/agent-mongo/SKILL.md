@@ -56,6 +56,20 @@ agent-mongo query sample myapp users --size 10 --filter '{"status":"active"}'  #
 agent-mongo query distinct myapp orders status                    # unique values
 ```
 
+All JSON arguments (`--filter`, `--sort`, `--projection`, `--pipeline`) accept MongoDB Extended JSON for BSON types:
+
+```bash
+agent-mongo query find myapp events --filter '{"createdAt":{"$gt":{"$date":"2026-01-01T00:00:00Z"}}}'
+agent-mongo query find myapp users --filter '{"_id":{"$oid":"665a1b2c3d4e5f6a7b8c9d0e"}}'
+```
+
+For large result sets, use `--stream` for NDJSON output (one JSON object per line), which bypasses `query.maxDocuments`:
+
+```bash
+agent-mongo query find myapp events --filter '{"type":"click"}' --stream
+agent-mongo query aggregate myapp orders '[{"$group":{"_id":"$status","count":{"$sum":1}}}]' --stream
+```
+
 ## Aggregation
 
 ```bash
@@ -76,7 +90,8 @@ agent-mongo connection add staging "mongodb://..." --credential acme
 agent-mongo connection update prod --credential new-cred
 agent-mongo connection set-default staging
 agent-mongo connection remove old-conn
-agent-mongo connection test -c prod                      # verify connectivity
+agent-mongo connection test prod                         # verify connectivity (positional alias)
+agent-mongo connection test -c prod                      # also works with -c flag
 ```
 
 Connection resolution: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections.
@@ -104,7 +119,7 @@ These are global flags — place them before or after the command.
 
 ## Timeout
 
-Default timeout is 30s (configurable via `query.timeout`). Override per-command:
+Default timeout is 30s (configurable via `query.timeout`). Applies to both connection and query phases. Override per-command:
 
 ```bash
 agent-mongo --timeout 60000 query find myapp large_collection --filter '{"status":"active"}'
@@ -126,8 +141,8 @@ Key settings: `defaults.limit` (20), `defaults.sampleSize` (5), `defaults.schema
 
 - **Read-only**: No write operations exist
 - **Aggregation**: `$out` and `$merge` stages rejected
-- **Result cap**: `query.maxDocuments` (default 100)
-- **Timeout**: `query.timeout` (default 30s), override per-command with `--timeout <ms>`
+- **Result cap**: `query.maxDocuments` (default 100) — use `--stream` to bypass
+- **Timeout**: applies to both connections and queries (default 30s), override per-command with `--timeout <ms>`
 
 ## Per-command usage docs
 
