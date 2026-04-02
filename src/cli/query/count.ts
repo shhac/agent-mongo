@@ -3,6 +3,7 @@ import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { countDocuments } from "../../mongo/query.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
+import { parseJson } from "../../lib/parse-json.ts";
 
 export function registerCount(parent: Command): void {
   parent
@@ -16,7 +17,7 @@ export function registerCount(parent: Command): void {
         try {
           const alias = command.optsWithGlobals().connection;
           const { client } = await getMongoClient(alias);
-          const filter = opts.filter ? parseJson(opts.filter) : undefined;
+          const filter = opts.filter ? parseJson(opts.filter, "filter") : undefined;
           const count = await countDocuments(client, {
             dbName: database,
             collName: collection,
@@ -34,12 +35,4 @@ export function registerCount(parent: Command): void {
         }
       },
     );
-}
-
-function parseJson(value: string): Record<string, unknown> {
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    throw new Error(`Invalid JSON for --filter: ${value}`);
-  }
 }

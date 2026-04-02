@@ -6,6 +6,7 @@ import { getTimeout } from "../../lib/timeout.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { serializeDocuments } from "../../mongo/serialize.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
+import { parseJson } from "../../lib/parse-json.ts";
 
 export function registerSample(parent: Command): void {
   parent
@@ -34,7 +35,7 @@ export function registerSample(parent: Command): void {
           }
           const size = Math.min(requestedSize, maxDocs);
 
-          const filter = opts.filter ? parseJson(opts.filter) : undefined;
+          const filter = opts.filter ? parseJson(opts.filter, "filter") : undefined;
           const pipeline: Document[] = [];
           if (filter) {
             pipeline.push({ $match: filter });
@@ -63,12 +64,4 @@ export function registerSample(parent: Command): void {
         }
       },
     );
-}
-
-function parseJson(value: string): Record<string, unknown> {
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    throw new Error(`Invalid JSON for --filter: ${value}`);
-  }
 }

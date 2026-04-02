@@ -5,6 +5,7 @@ import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { findDocuments } from "../../mongo/query.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
+import { parseJson } from "../../lib/parse-json.ts";
 
 type FindOpts = {
   filter?: string;
@@ -56,12 +57,4 @@ export function registerFind(parent: Command): void {
         await closeAllClients();
       }
     });
-}
-
-function parseJson(value: string, name: string): Record<string, unknown> {
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    throw new Error(`Invalid JSON for --${name}: ${value}`);
-  }
 }

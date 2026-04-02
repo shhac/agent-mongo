@@ -26,7 +26,8 @@ COMMANDS:
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
     Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
 
-JSON ARGS: All --filter, --sort, --projection, --pipeline values must be valid JSON.
+JSON ARGS: All --filter, --sort, --projection, --pipeline values accept MongoDB Extended JSON (EJSON).
+  Use {"$date":"2026-01-01T00:00:00Z"} for dates, {"$oid":"..."} for ObjectIds, etc.
 
 LIMITS: Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).
   Override per-command with --timeout <ms>. On timeout, hints suggest increasing timeout or checking indexes.

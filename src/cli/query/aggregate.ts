@@ -5,6 +5,7 @@ import { getSettings } from "../../lib/config.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { runAggregate } from "../../mongo/aggregate.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
+import { parseJsonArray } from "../../lib/parse-json.ts";
 
 type AggregateOpts = {
   pipeline?: string;
@@ -72,18 +73,7 @@ async function resolvePipeline(positionalArg?: string, pipelineFlag?: string): P
     );
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error(`Invalid JSON pipeline: ${raw.slice(0, 100)}${raw.length > 100 ? "..." : ""}`);
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new Error("Pipeline must be a JSON array of stage objects.");
-  }
-
-  return parsed as Document[];
+  return parseJsonArray(raw, "pipeline") as Document[];
 }
 
 async function readStdin(): Promise<string> {
