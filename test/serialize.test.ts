@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { ObjectId, Binary, Long, Decimal128, UUID } from "mongodb";
-import { serialize, serializeDocument, serializeDocuments } from "../src/mongo/serialize.ts";
+import { serialize, serializeDocument, serializeDocuments } from "../src/lib/serialize.ts";
 
 describe("serialize", () => {
   test("ObjectId → 24-char hex string", () => {

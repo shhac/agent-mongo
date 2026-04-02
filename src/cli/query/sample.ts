@@ -4,7 +4,7 @@ import { printJson, printError } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
 import { getTimeout } from "../../lib/timeout.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
-import { serializeDocuments } from "../../mongo/serialize.ts";
+import { serializeDocuments } from "../../lib/serialize.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
 import { parseJson } from "../../lib/parse-json.ts";
 

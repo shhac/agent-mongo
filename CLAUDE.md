@@ -17,9 +17,11 @@ src/
 │   └── usage/                   # LLM-optimized top-level usage text
 ├── lib/
 │   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
-│   ├── output.ts                # printJson, printJsonRaw, printPaginated, printError, resolvePageSize
+│   ├── output.ts                # printJson, printJsonRaw, printPaginated, printNdjsonStream, printError
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
 │   ├── errors.ts                # enhanceErrorMessage — timeout hints, index suggestions
+│   ├── parse-json.ts            # EJSON-aware JSON parsing for --filter, --sort, --projection, --pipeline
+│   ├── serialize.ts             # BSON → JSON-safe conversion (ObjectId, Date, Binary, Long, etc.)
 │   ├── timeout.ts               # CLI --timeout override + getTimeout() helper
 │   ├── truncation.ts            # Generic string truncation with {field}Length companion
 │   └── version.ts               # Version from build-time define / env / package.json
@@ -29,9 +31,8 @@ src/
     ├── collections.ts           # listCollections, getCollectionStats, validateCollectionExists
     ├── schema.ts                # inferSchema — sample-based field/type discovery
     ├── indexes.ts               # listIndexes
-    ├── query.ts                 # findDocuments, findById, countDocuments, getDistinctValues
-    ├── aggregate.ts             # runAggregate with $out/$merge rejection
-    └── serialize.ts             # BSON → JSON-safe conversion (ObjectId, Date, Binary, Long, etc.)
+    ├── query.ts                 # findDocuments, streamFind, findById, countDocuments, getDistinctValues
+    ├── aggregate.ts             # runAggregate, streamAggregate with $out/$merge rejection
 ```
 
 ## Key patterns

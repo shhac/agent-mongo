@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { ObjectId } from "mongodb";
+import type { ObjectId } from "mongodb";
 import { parseJson, parseJsonArray } from "../src/lib/parse-json.ts";
 
 describe("parseJson", () => {
@@ -9,7 +9,10 @@ describe("parseJson", () => {
   });
 
   test("converts $date to Date instance", () => {
-    const result = parseJson('{"createdAt": {"$gte": {"$date": "2026-01-01T00:00:00Z"}}}', "filter");
+    const result = parseJson(
+      '{"createdAt": {"$gte": {"$date": "2026-01-01T00:00:00Z"}}}',
+      "filter",
+    );
     expect(result.createdAt).toEqual({ $gte: new Date("2026-01-01T00:00:00Z") });
   });
 

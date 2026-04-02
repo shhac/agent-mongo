@@ -1,6 +1,6 @@
 import type { AggregationCursor, MongoClient, Document } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
-import { serializeDocuments } from "./serialize.ts";
+import { serializeDocuments } from "../lib/serialize.ts";
 
 const WRITE_STAGES = new Set(["$out", "$merge"]);
 

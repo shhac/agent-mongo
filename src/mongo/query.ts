@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import type { MongoClient, Document, Filter, FindCursor, Sort } from "mongodb";
 import { getTimeout } from "../lib/timeout.ts";
-import { serializeDocuments, serializeDocument } from "./serialize.ts";
+import { serializeDocuments, serializeDocument } from "../lib/serialize.ts";
 
 type FindOpts = {
   dbName: string;

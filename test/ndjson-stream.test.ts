@@ -17,16 +17,21 @@ function captureStdout(fn: () => Promise<unknown>): Promise<string> {
     return true;
   }) as typeof process.stdout.write;
 
-  return fn().finally(() => {
-    process.stdout.write = originalWrite;
-  }).then(() => chunks.join(""));
+  return fn()
+    .finally(() => {
+      process.stdout.write = originalWrite;
+    })
+    .then(() => chunks.join(""));
 }
 
 describe("printNdjsonStream", () => {
   beforeEach(() => configureTruncation({}));
 
   test("outputs one JSON line per document", async () => {
-    const docs = [{ name: "Alice", age: 30 }, { name: "Bob", age: 25 }];
+    const docs = [
+      { name: "Alice", age: 30 },
+      { name: "Bob", age: 25 },
+    ];
     const output = await captureStdout(() => printNdjsonStream(asyncGen(docs)));
 
     const lines = output.trim().split("\n");

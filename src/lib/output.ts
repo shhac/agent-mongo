@@ -2,7 +2,7 @@ import type { Document } from "mongodb";
 import { applyTruncation } from "./truncation.ts";
 import { pruneEmpty } from "./compact-json.ts";
 import { getSettings } from "./config.ts";
-import { serializeDocument } from "../mongo/serialize.ts";
+import { serializeDocument } from "./serialize.ts";
 
 const DEFAULT_PAGE_SIZE = 20;
 
