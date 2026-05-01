@@ -17,6 +17,7 @@ export function registerSample(parent: Command): void {
     .option("--size <n>", "Number of random documents")
     .option("--filter <json>", "MongoDB query filter (JSON)")
     .action(
+      // oxlint-disable-next-line max-params -- commander dictates this signature
       async (
         database: string,
         collection: string,

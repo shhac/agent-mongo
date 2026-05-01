@@ -14,6 +14,7 @@ export function registerDistinct(parent: Command): void {
     .argument("<field>", "Field path (supports dot notation: address.city)")
     .option("--filter <json>", "MongoDB query filter (JSON)")
     .action(
+      // oxlint-disable-next-line max-params -- commander dictates this signature
       async (
         database: string,
         collection: string,

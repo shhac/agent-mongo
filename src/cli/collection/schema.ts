@@ -22,6 +22,7 @@ export function registerSchema(parent: Command): void {
     .option("--depth <n>", "Max nesting depth for fields (1 = top-level only)")
     .option("--limit <n>", "Max fields to return (for pagination)")
     .option("--skip <n>", "Number of fields to skip (for pagination)")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (database: string, collection: string, opts: SchemaOpts, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;

@@ -13,6 +13,7 @@ export function registerCount(parent: Command): void {
     .argument("<collection>", "Collection name")
     .option("--filter <json>", "MongoDB query filter (JSON)")
     .action(
+      // oxlint-disable-next-line max-params -- commander dictates this signature
       async (database: string, collection: string, opts: { filter?: string }, command: Command) => {
         try {
           const alias = command.optsWithGlobals().connection;

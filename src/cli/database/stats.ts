@@ -8,6 +8,7 @@ export function registerStats(database: Command): void {
     .command("stats")
     .description("Get database statistics")
     .argument("<database>", "Database name")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (database: string, _opts: unknown, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;

@@ -28,6 +28,7 @@ export function registerFind(parent: Command): void {
     .option("--limit <n>", "Max documents to return")
     .option("--skip <n>", "Number of documents to skip", "0")
     .option("--stream", "Stream results as NDJSON (one JSON object per line, no limit)")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (database: string, collection: string, opts: FindOpts, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;

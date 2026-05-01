@@ -15,6 +15,7 @@ export function registerGet(parent: Command): void {
     .option("--type <type>", "Force ID type: objectid, string, number (auto-detected by default)")
     .option("--projection <json>", 'Field projection (e.g. {"name": 1, "email": 1})')
     .action(
+      // oxlint-disable-next-line max-params -- commander dictates this signature
       async (
         database: string,
         collection: string,

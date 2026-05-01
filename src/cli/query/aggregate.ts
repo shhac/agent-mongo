@@ -24,6 +24,7 @@ export function registerAggregate(parent: Command): void {
     .option("--limit <n>", "Max results if pipeline has no $limit stage")
     .option("--stream", "Stream results as NDJSON (one JSON object per line, no limit)")
     .action(
+      // oxlint-disable-next-line max-params -- commander dictates this signature
       async (
         database: string,
         collection: string,

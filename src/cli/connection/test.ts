@@ -7,6 +7,7 @@ export function registerTest(connection: Command): void {
     .command("test")
     .description("Test a MongoDB connection (ping)")
     .argument("[alias]", "Connection alias to test (overrides -c flag)")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (aliasArg: string | undefined, _opts: unknown, command: Command) => {
       try {
         const alias = aliasArg ?? command.optsWithGlobals().connection;

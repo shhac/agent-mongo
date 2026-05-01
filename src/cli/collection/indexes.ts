@@ -9,6 +9,7 @@ export function registerIndexes(parent: Command): void {
     .description("List indexes on a collection")
     .argument("<database>", "Database name")
     .argument("<collection>", "Collection name")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (database: string, collection: string, _opts: unknown, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;

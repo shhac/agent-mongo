@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, spyOn } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 import { ObjectId } from "mongodb";
 import { printNdjsonStream } from "../src/lib/output.ts";
 import { configureTruncation } from "../src/lib/truncation.ts";

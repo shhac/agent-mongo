@@ -9,6 +9,7 @@ export function registerStats(parent: Command): void {
     .description("Get collection statistics")
     .argument("<database>", "Database name")
     .argument("<collection>", "Collection name")
+    // oxlint-disable-next-line max-params -- commander dictates this signature
     .action(async (database: string, collection: string, _opts: unknown, command: Command) => {
       try {
         const alias = command.optsWithGlobals().connection;
