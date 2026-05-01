@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { storeCredential } from "../../lib/config.ts";
-import { printError, printJsonRaw } from "../../lib/output.ts";
+import { printError, printErrorObject, printJsonRaw } from "../../lib/output.ts";
 import { FormError, promptMissingViaDialog } from "./form.ts";
 
 type AddOpts = {
@@ -36,14 +36,12 @@ export function registerAdd(credential: Command): void {
         });
       } catch (err) {
         if (err instanceof FormError) {
-          printError(
-            JSON.stringify({
-              error: err.message,
-              fixableBy: err.fixableBy,
-              hint: err.hint,
-              credential: name,
-            }),
-          );
+          printErrorObject({
+            error: err.message,
+            fixableBy: err.fixableBy,
+            hint: err.hint,
+            credential: name,
+          });
           return;
         }
         printError(err instanceof Error ? err.message : "Failed to add credential");

@@ -57,6 +57,16 @@ export function printError(message: string): void {
   process.exitCode = 1;
 }
 
+/**
+ * Emit a structured error payload as a single JSON layer. Use this when the
+ * error has fields beyond `message` (e.g. `fixableBy`, `hint`). The payload
+ * must already include an `error` key — this helper does not wrap it again.
+ */
+export function printErrorObject(payload: Record<string, unknown>): void {
+  console.error(JSON.stringify(payload));
+  process.exitCode = 1;
+}
+
 export function resolvePageSize(opts: { limit?: string }): number {
   if (opts.limit !== undefined) {
     return parseInt(opts.limit, 10);
