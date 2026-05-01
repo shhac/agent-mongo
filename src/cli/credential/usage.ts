@@ -7,6 +7,13 @@ COMMANDS:
     Store a named credential. Overwrites if name already exists.
     Credentials are referenced by connections via --credential.
 
+  credential add <name> --form
+    Same, but prompts for any missing --username / --password via a native
+    OS dialog (osascript on macOS, zenity/kdialog on Linux, PowerShell on
+    Windows). The agent never sees the secret — input goes directly into
+    the OS dialog. Fails with fixableBy=human if no GUI is available
+    (e.g. SSH session); fixableBy=retry if the user cancels the dialog.
+
   credential remove <name>
     Remove a stored credential. Fails if any connection references it.
     --force removes anyway and clears credential refs from those connections.

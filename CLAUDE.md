@@ -55,6 +55,7 @@ src/
 - **Timeout**: `lib/timeout.ts` provides `getTimeout()` — checks CLI `--timeout` override first, then config `query.timeout`, then default 30s. All mongo operations use this helper.
 - **Timeout hints**: `lib/errors.ts` detects MongoDB timeout errors (code 50) and enhances messages with `--timeout` flag and config suggestions.
 - **Config validation**: `cli/config/valid-keys.ts` defines all valid keys with types, defaults, and min/max ranges. Invalid keys or out-of-range values produce errors listing valid options.
+- **LLM-safe secret entry**: `lib/dialog/` is a self-contained wrapper. Consumers (e.g. `cli/credential/form.ts`) import only `lib/dialog/index.ts` — never the spawn backend or platform availability files directly. Replacing the backend (e.g. with an Electron sidecar) is a one-file swap. The `Prompter` interface, `setDefault()` test hook, and sentinel→category mapping (`classifyError`) mirror agent-sql's `internal/dialog` package.
 
 ## Commands
 

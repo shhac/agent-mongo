@@ -106,6 +106,20 @@ agent-mongo credential remove acme --force               # even if connections r
 
 Credentials are stored separately from connections. When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
 
+### LLM-safe entry with `--form`
+
+When you (the agent) are driving the CLI on a user's local machine, do not put a real password on the command line — you'll see it in your own argv. Use `--form` to escalate the secret to a native OS dialog instead. The user types into the OS popup; the secret never enters the agent's context.
+
+```bash
+agent-mongo credential add acme --form                              # both fields prompted
+agent-mongo credential add acme --username deploy --form            # only password prompted
+```
+
+Failure modes return a structured error with `fixableBy`:
+
+- `human` — no GUI session available (SSH, headless host). Ask the user to run on their local machine, or fall back to non-interactive `--username <u> --password <secret>`.
+- `retry` — user cancelled the dialog. Re-running the same command is the right next step.
+
 ## Truncation
 
 Any string field exceeding `truncation.maxLength` (default 200) gets truncated with `…` and a companion `{field}Length` key showing original length.

@@ -83,7 +83,7 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 │   ├── set-default <alias>
 │   └── usage
 ├── credential
-│   ├── add <name> --username <user> --password <pass>
+│   ├── add <name> [--username <user>] [--password <pass>] [--form]
 │   ├── remove <name> [--force]
 │   ├── list
 │   └── usage
@@ -162,6 +162,20 @@ agent-mongo connection update legacy --no-credential
 ```
 
 Connections without a `--credential` use the connection string as-is (backward compatible).
+
+### LLM-safe credential entry (`--form`)
+
+When an agent is driving the CLI, putting a password on the command line means the agent sees it. `credential add --form` prompts for any missing `--username` / `--password` via a native OS dialog (osascript on macOS, zenity/kdialog on Linux, PowerShell on Windows). The value is typed directly into the OS popup — agent-mongo only receives the result, and the agent never sees the keystrokes.
+
+```bash
+# Both fields prompted via OS dialog
+agent-mongo credential add acme --form
+
+# Username on the command line, password prompted
+agent-mongo credential add acme --username deploy --form
+```
+
+If no GUI session is available (SSH, headless host), the command exits with a structured error: `fixableBy: "human"` and a hint to run on the user's local machine or fall back to non-interactive flags. If the user cancels the dialog, the result is `fixableBy: "retry"`.
 
 ## Output
 
