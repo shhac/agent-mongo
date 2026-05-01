@@ -19,7 +19,12 @@ src/
 │   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
 │   ├── output.ts                # printJson, printJsonRaw, printPaginated, printNdjsonStream, printError
 │   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
+│   ├── dialog/                  # native OS dialog wrapper for LLM-safe secret entry
+│   │   ├── index.ts             #   Prompter interface, sentinels, classifyError, setDefault
+│   │   ├── spawn-backend.ts     #   Bun.spawn → osascript / zenity / kdialog / PowerShell
+│   │   └── available.ts         #   per-platform GUI availability pre-flight
 │   ├── errors.ts                # enhanceErrorMessage — timeout hints, index suggestions
+│   ├── keychain.ts              # macOS keychain read/write/delete for credentials
 │   ├── parse-json.ts            # EJSON-aware JSON parsing for --filter, --sort, --projection, --pipeline
 │   ├── serialize.ts             # BSON → JSON-safe conversion (ObjectId, Date, Binary, Long, etc.)
 │   ├── timeout.ts               # CLI --timeout override + getTimeout() helper
