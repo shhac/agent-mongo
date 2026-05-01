@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { storeCredential } from "../../lib/config.ts";
 import { printError, printJsonRaw } from "../../lib/output.ts";
-import { promptMissingViaDialog } from "./form.ts";
+import { FormError, promptMissingViaDialog } from "./form.ts";
 
 type AddOpts = {
   username?: string;
@@ -35,6 +35,17 @@ export function registerAdd(credential: Command): void {
           hint: `Use with: agent-mongo connection add <alias> <uri> --credential ${name}`,
         });
       } catch (err) {
+        if (err instanceof FormError) {
+          printError(
+            JSON.stringify({
+              error: err.message,
+              fixableBy: err.fixableBy,
+              hint: err.hint,
+              credential: name,
+            }),
+          );
+          return;
+        }
         printError(err instanceof Error ? err.message : "Failed to add credential");
       }
     });
@@ -44,17 +55,16 @@ async function resolveCredentials(
   name: string,
   opts: AddOpts,
 ): Promise<{ username: string; password: string } | null> {
-  let username = opts.username ?? "";
-  let password = opts.password ?? "";
+  const initialUsername = opts.username ?? "";
+  const initialPassword = opts.password ?? "";
 
-  if (opts.form) {
-    const result = await promptMissingViaDialog({ name, username, password });
-    if (result.error) {
-      printError(JSON.stringify({ ...result.error, credential: name }));
-      return null;
-    }
-    ({ username, password } = result);
-  }
+  const { username, password } = opts.form
+    ? await promptMissingViaDialog({
+        name,
+        username: initialUsername,
+        password: initialPassword,
+      })
+    : { username: initialUsername, password: initialPassword };
 
   if (!username || !password) {
     printError(

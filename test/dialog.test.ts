@@ -2,14 +2,11 @@ import { describe, test, expect } from "bun:test";
 import {
   type Prompter,
   type Spec,
+  DialogError,
   classifyError,
-  ErrCancelled,
-  ErrNoGUI,
-  ErrUnsupported,
   getDefault,
   setDefault,
   validateSpec,
-  wrapSentinel,
 } from "../src/lib/dialog/index.ts";
 
 describe("classifyError", () => {
@@ -17,32 +14,32 @@ describe("classifyError", () => {
     expect(classifyError(null)).toEqual(["agent", ""]);
   });
 
-  test("ErrCancelled directly → retry", () => {
-    const [cat] = classifyError(ErrCancelled);
-    expect(cat).toBe("retry");
-  });
-
-  test("wrapped ErrCancelled → retry", () => {
-    const wrapped = wrapSentinel(ErrCancelled, "Database password");
-    const [cat, hint] = classifyError(wrapped);
+  test("DialogError cancelled → retry", () => {
+    const [cat, hint] = classifyError(new DialogError("cancelled", "Database password"));
     expect(cat).toBe("retry");
     expect(hint).toContain("Re-run");
   });
 
-  test("wrapped ErrNoGUI → human", () => {
-    const wrapped = wrapSentinel(ErrNoGUI, "no $DISPLAY set");
-    const [cat, hint] = classifyError(wrapped);
+  test("DialogError no-gui → human", () => {
+    const [cat, hint] = classifyError(new DialogError("no-gui", "no $DISPLAY set"));
     expect(cat).toBe("human");
     expect(hint).toContain("graphical desktop session");
   });
 
-  test("wrapped ErrUnsupported → human", () => {
-    const [cat] = classifyError(wrapSentinel(ErrUnsupported, "haiku"));
+  test("DialogError unsupported → human", () => {
+    const [cat] = classifyError(new DialogError("unsupported", "haiku"));
     expect(cat).toBe("human");
   });
 
-  test("arbitrary Error → agent", () => {
+  test("plain Error → agent (not a DialogError)", () => {
     expect(classifyError(new Error("something else"))).toEqual(["agent", ""]);
+  });
+
+  test("DialogError survives instanceof through cause-chain wrap", () => {
+    const inner = new DialogError("cancelled", "x");
+    const wrapper = new Error("outer", { cause: inner });
+    expect(classifyError(wrapper)).toEqual(["agent", ""]);
+    expect(classifyError(inner)).toEqual(["retry", "User cancelled the dialog. Re-run to retry."]);
   });
 });
 
@@ -92,11 +89,11 @@ describe("setDefault / getDefault", () => {
     expect(getDefault()).not.toBe(stub);
   });
 
-  test("stub that throws ErrCancelled propagates as retry category", async () => {
+  test("stub that throws DialogError propagates as retry category", async () => {
     const stub: Prompter = {
       available: () => null,
       async prompt() {
-        throw wrapSentinel(ErrCancelled, "Password");
+        throw new DialogError("cancelled", "Password");
       },
     };
     const restore = setDefault(stub);
@@ -115,5 +112,16 @@ describe("setDefault / getDefault", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("DialogError", () => {
+  test("has name and code fields", () => {
+    const err = new DialogError("no-gui", "test");
+    expect(err.name).toBe("DialogError");
+    expect(err.code).toBe("no-gui");
+    expect(err.message).toBe("test");
+    expect(err instanceof Error).toBe(true);
+    expect(err instanceof DialogError).toBe(true);
   });
 });
