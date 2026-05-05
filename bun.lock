@@ -6,7 +6,7 @@
       "name": "agent-mongo",
       "dependencies": {
         "mongodb": "^6.16.0",
-        "vipvot": "^0.3.0",
+        "vipvot": "^0.3.1",
       },
       "devDependencies": {
         "@types/node": "^24",
@@ -109,7 +109,7 @@
 
     "undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
 
-    "vipvot": ["vipvot@0.3.0", "", {}, "sha512-s6h3nMnK+OANl6uIc4dXvUWJYO4Oa0j3snBl5h8yGfijRnSDpHH0PlmTc8ua7npd4VbaLYERMG4GjWyinohLOg=="],
+    "vipvot": ["vipvot@0.3.1", "", {}, "sha512-mgu0NovRXmnJXYlS5/gvDQPvEesF2krR4j0znTyRC2SBcHxYSwj3myI08bkyy3eCayNlUvTZ2LDC9I27kHuRCQ=="],
 
     "webidl-conversions": ["webidl-conversions@7.0.0", "", {}, "sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g=="],
 
