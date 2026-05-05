@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "mongodb": "^6.16.0",
-    "vipvot": "^0.3.1"
+    "vipvot": "^0.3.2"
   },
   "devDependencies": {
     "@types/node": "^24",
