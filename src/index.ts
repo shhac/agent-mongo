@@ -14,6 +14,7 @@ const root = Command({
   use: "agent-mongo",
   short: "MongoDB CLI for AI agents",
   long: `agent-mongo ${getPackageVersion()} — MongoDB CLI for AI agents`,
+  version: getPackageVersion(),
   silenceErrors: true,
   silenceUsage: true,
   persistentPreRun: applyGlobals,
