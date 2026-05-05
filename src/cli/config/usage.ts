@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `config — Manage CLI settings
 
@@ -22,11 +22,13 @@ EXAMPLES:
   agent-mongo config reset
 `;
 
-export function registerUsage(config: Command): void {
-  config
-    .command("usage")
-    .description("Print config command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print config command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

@@ -1,19 +1,23 @@
-import type { Command } from "commander";
-import { registerFind } from "./find.ts";
-import { registerGet } from "./get.ts";
-import { registerCount } from "./count.ts";
-import { registerSample } from "./sample.ts";
-import { registerDistinct } from "./distinct.ts";
-import { registerAggregate } from "./aggregate.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildFindCommand } from "./find.ts";
+import { buildGetCommand } from "./get.ts";
+import { buildCountCommand } from "./count.ts";
+import { buildSampleCommand } from "./sample.ts";
+import { buildDistinctCommand } from "./distinct.ts";
+import { buildAggregateCommand } from "./aggregate.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerQueryCommand({ program }: { program: Command }): void {
-  const query = program.command("query").description("Query documents (read-only)");
-  registerFind(query);
-  registerGet(query);
-  registerCount(query);
-  registerSample(query);
-  registerDistinct(query);
-  registerAggregate(query);
-  registerUsage(query);
+export function buildQueryCommand(): Command {
+  const cmd = Command({
+    use: "query",
+    short: "Query documents (read-only)",
+  });
+  cmd.addCommand(buildFindCommand());
+  cmd.addCommand(buildGetCommand());
+  cmd.addCommand(buildCountCommand());
+  cmd.addCommand(buildSampleCommand());
+  cmd.addCommand(buildDistinctCommand());
+  cmd.addCommand(buildAggregateCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `agent-mongo — MongoDB CLI for AI agents (JSON output, read-only)
 
@@ -35,11 +35,13 @@ OUTPUT: JSON to stdout. Errors: { "error": "..." } to stderr, exit code 1.
 DETAIL: Run "<command> usage" for per-command docs.
 `;
 
-export function registerUsageCommand({ program }: { program: Command }): void {
-  program
-    .command("usage")
-    .description("Print concise documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print concise documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

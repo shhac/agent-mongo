@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `credential — Manage stored credentials for MongoDB authentication
 
@@ -41,11 +41,13 @@ KEYCHAIN (macOS):
 CONFIG: ~/.config/agent-mongo/config.json (respects XDG_CONFIG_HOME)
 `;
 
-export function registerUsage(credential: Command): void {
-  credential
-    .command("usage")
-    .description("Print credential command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print credential command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

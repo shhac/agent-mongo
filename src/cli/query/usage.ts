@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `query — Document retrieval (read-only)
 
@@ -26,7 +26,7 @@ COMMANDS:
   query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [--stream] [-c <alias>]
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
     Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
-    --stream: output NDJSON (one JSON object per line), bypasses limit for large result sets.
+    --stream: output NDJSON (one JSON object per line, no limit), bypasses limit for large result sets.
 
 JSON ARGS: All --filter, --sort, --projection, --pipeline values accept MongoDB Extended JSON (EJSON).
   Use {"$date":"2026-01-01T00:00:00Z"} for dates, {"$oid":"..."} for ObjectIds, etc.
@@ -44,11 +44,13 @@ EXAMPLES:
   agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
 `;
 
-export function registerUsage(parent: Command): void {
-  parent
-    .command("usage")
-    .description("Print query command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print query command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

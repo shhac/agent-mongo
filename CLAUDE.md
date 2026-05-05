@@ -6,7 +6,7 @@ Read-only MongoDB CLI for AI agents. TypeScript + Bun, compiled to standalone bi
 
 ```
 src/
-├── index.ts                     # CLI entry — registers all commands via commander
+├── index.ts                     # CLI entry — assembles the root vipvot Command and dispatches
 ├── cli/
 │   ├── connection/              # connection add/remove/update/list/test/set-default
 │   ├── credential/              # credential add/remove/list
@@ -42,7 +42,8 @@ src/
 
 ## Key patterns
 
-- **Command registration**: Each `cli/*/index.ts` exports `registerXyzCommand({ program })` called from `index.ts`. Subcommands are in separate files within each directory.
+- **Command registration**: Each `cli/*/index.ts` exports `buildXyzCommand(): Command` returning a constructed vipvot `Command` with its leaves attached. `src/index.ts` builds the root and `addCommand`s each group. Each leaf file exports a `buildXCommand(): Command` factory.
+- **Persistent flags / globals**: `cli/_globals.ts` owns module-scoped `Ref`s for the persistent flags (`-c/--connection`, `--expand`, `--full`, `--timeout`) plus the `applyGlobals` `persistentPreRun` handler. Subcommands import `resolveConnectionAlias()` rather than walking the parent chain — the cobra-idiomatic pattern.
 - **Output**: All commands use `printJson()` or `printPaginated()` from `lib/output.ts`. Admin/config commands use `printJsonRaw()` (no truncation). Errors use `printError()`. All output is JSON, empty/null fields auto-pruned via `pruneEmpty()`.
 - **Truncation**: Any string field exceeding `truncation.maxLength` gets truncated with `…` and a companion `{field}Length` key. Controlled by `--expand` and `--full` global flags. Unlike lin (which only truncates preset field names), this truncates any string over the limit.
 - **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections. Connections can reference named credentials for shared auth.

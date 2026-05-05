@@ -1,13 +1,17 @@
-import type { Command } from "commander";
-import { registerAdd } from "./add.ts";
-import { registerRemove } from "./remove.ts";
-import { registerList } from "./list.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildAddCommand } from "./add.ts";
+import { buildRemoveCommand } from "./remove.ts";
+import { buildListCommand } from "./list.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerCredentialCommand({ program }: { program: Command }): void {
-  const credential = program.command("credential").description("Manage stored credentials");
-  registerAdd(credential);
-  registerRemove(credential);
-  registerList(credential);
-  registerUsage(credential);
+export function buildCredentialCommand(): Command {
+  const cmd = Command({
+    use: "credential",
+    short: "Manage stored credentials",
+  });
+  cmd.addCommand(buildAddCommand());
+  cmd.addCommand(buildRemoveCommand());
+  cmd.addCommand(buildListCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

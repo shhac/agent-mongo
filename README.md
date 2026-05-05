@@ -76,7 +76,7 @@ agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status"
 agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 ├── connection
 │   ├── add <alias> <uri> [--database <db>] [--credential <name>] [--default]
-│   ├── update <alias> [--credential <name>] [--no-credential] [--database <db>]
+│   ├── update <alias> [--credential <name>] [--clear-credential] [--database <db>]
 │   ├── remove <alias>
 │   ├── list
 │   ├── test [alias]
@@ -158,7 +158,7 @@ agent-mongo credential list
 
 # Attach/detach credentials from existing connections
 agent-mongo connection update prod --credential acme
-agent-mongo connection update legacy --no-credential
+agent-mongo connection update legacy --clear-credential
 ```
 
 Connections without a `--credential` use the connection string as-is (backward compatible).

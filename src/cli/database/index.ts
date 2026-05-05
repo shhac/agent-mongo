@@ -1,11 +1,15 @@
-import type { Command } from "commander";
-import { registerList } from "./list.ts";
-import { registerStats } from "./stats.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildListCommand } from "./list.ts";
+import { buildStatsCommand } from "./stats.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerDatabaseCommand({ program }: { program: Command }): void {
-  const database = program.command("database").description("Database discovery");
-  registerList(database);
-  registerStats(database);
-  registerUsage(database);
+export function buildDatabaseCommand(): Command {
+  const cmd = Command({
+    use: "database",
+    short: "Database discovery",
+  });
+  cmd.addCommand(buildListCommand());
+  cmd.addCommand(buildStatsCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

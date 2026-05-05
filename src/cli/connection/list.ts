@@ -1,12 +1,13 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 import { getConnections, getDefaultConnectionAlias } from "../../lib/config.ts";
 import { printJsonRaw } from "../../lib/output.ts";
 
-export function registerList(connection: Command): void {
-  connection
-    .command("list")
-    .description("List saved connections")
-    .action(() => {
+export function buildListCommand(): Command {
+  return Command({
+    use: "list",
+    short: "List saved connections",
+    args: NoArgs,
+    run: () => {
       const connections = getConnections();
       const defaultAlias = getDefaultConnectionAlias();
 
@@ -19,5 +20,6 @@ export function registerList(connection: Command): void {
       }));
 
       printJsonRaw({ connections: items });
-    });
+    },
+  });
 }

@@ -1,28 +1,31 @@
-import type { Command } from "commander";
+import { Command, ExactArgs, ref } from "vipvot";
 import { storeCredential } from "../../lib/config.ts";
 import { printError, printErrorObject, printJsonRaw } from "../../lib/output.ts";
 import { FormError, promptMissingViaDialog } from "./form.ts";
 
 type AddOpts = {
-  username?: string;
-  password?: string;
-  form?: boolean;
+  username: string;
+  password: string;
+  form: boolean;
 };
 
-export function registerAdd(credential: Command): void {
-  credential
-    .command("add")
-    .description("Add or update a stored credential")
-    .argument("<name>", "Short name for this credential (e.g. acme, globex)")
-    .option("--username <user>", "MongoDB username")
-    .option("--password <pass>", "MongoDB password")
-    .option(
-      "--form",
-      "Prompt for missing username/password via a native OS dialog (LLM-safe; the secret is typed directly into the OS, never seen by the agent)",
-    )
-    .action(async (name: string, opts: AddOpts) => {
+export function buildAddCommand(): Command {
+  const username = ref<string>("");
+  const password = ref<string>("");
+  const form = ref<boolean>(false);
+
+  const cmd = Command({
+    use: "add <name>",
+    short: "Add or update a stored credential",
+    args: ExactArgs(1),
+    run: async (_cmd, args) => {
+      const [name] = args as [string];
       try {
-        const resolved = await resolveCredentials(name, opts);
+        const resolved = await resolveCredentials(name, {
+          username: username.value,
+          password: password.value,
+          form: form.value,
+        });
         if (!resolved) {
           return;
         }
@@ -46,23 +49,35 @@ export function registerAdd(credential: Command): void {
         }
         printError(err instanceof Error ? err.message : "Failed to add credential");
       }
-    });
+    },
+  });
+
+  cmd.flags().stringVarP(username, "username", "", "", "MongoDB username");
+  cmd.flags().stringVarP(password, "password", "", "", "MongoDB password");
+  cmd
+    .flags()
+    .boolVarP(
+      form,
+      "form",
+      "",
+      false,
+      "Prompt for missing username/password via a native OS dialog (LLM-safe; the secret is typed directly into the OS, never seen by the agent)",
+    );
+
+  return cmd;
 }
 
 async function resolveCredentials(
   name: string,
   opts: AddOpts,
 ): Promise<{ username: string; password: string } | null> {
-  const initialUsername = opts.username ?? "";
-  const initialPassword = opts.password ?? "";
-
   const { username, password } = opts.form
     ? await promptMissingViaDialog({
         name,
-        username: initialUsername,
-        password: initialPassword,
+        username: opts.username,
+        password: opts.password,
       })
-    : { username: initialUsername, password: initialPassword };
+    : { username: opts.username, password: opts.password };
 
   if (!username || !password) {
     printError(

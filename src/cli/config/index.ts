@@ -1,15 +1,19 @@
-import type { Command } from "commander";
-import { registerGet } from "./get.ts";
-import { registerSet } from "./set.ts";
-import { registerReset } from "./reset.ts";
-import { registerListKeys } from "./list-keys.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildGetCommand } from "./get.ts";
+import { buildSetCommand } from "./set.ts";
+import { buildResetCommand } from "./reset.ts";
+import { buildListKeysCommand } from "./list-keys.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerConfigCommand({ program }: { program: Command }): void {
-  const config = program.command("config").description("Manage CLI settings");
-  registerGet(config);
-  registerSet(config);
-  registerReset(config);
-  registerListKeys(config);
-  registerUsage(config);
+export function buildConfigCommand(): Command {
+  const cmd = Command({
+    use: "config",
+    short: "Manage CLI settings",
+  });
+  cmd.addCommand(buildGetCommand());
+  cmd.addCommand(buildSetCommand());
+  cmd.addCommand(buildResetCommand());
+  cmd.addCommand(buildListKeysCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

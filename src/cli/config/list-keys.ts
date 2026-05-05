@@ -1,12 +1,13 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 import { printJsonRaw } from "../../lib/output.ts";
 import { KEY_DEFINITIONS } from "./valid-keys.ts";
 
-export function registerListKeys(config: Command): void {
-  config
-    .command("list-keys")
-    .description("List all valid config keys with defaults")
-    .action(() => {
+export function buildListKeysCommand(): Command {
+  return Command({
+    use: "list-keys",
+    short: "List all valid config keys with defaults",
+    args: NoArgs,
+    run: () => {
       printJsonRaw({
         keys: KEY_DEFINITIONS.map((k) => ({
           key: k.key,
@@ -15,5 +16,6 @@ export function registerListKeys(config: Command): void {
           description: k.description,
         })),
       });
-    });
+    },
+  });
 }

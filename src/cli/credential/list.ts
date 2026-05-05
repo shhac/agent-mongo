@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 import {
   getCredentials,
   getConnectionsUsingCredential,
@@ -6,11 +6,12 @@ import {
 } from "../../lib/config.ts";
 import { printJsonRaw } from "../../lib/output.ts";
 
-export function registerList(credential: Command): void {
-  credential
-    .command("list")
-    .description("List stored credentials (passwords redacted)")
-    .action(() => {
+export function buildListCommand(): Command {
+  return Command({
+    use: "list",
+    short: "List stored credentials (passwords redacted)",
+    args: NoArgs,
+    run: () => {
       const credentials = getCredentials();
 
       const items = Object.entries(credentials).map(([name, cred]) => ({
@@ -22,5 +23,6 @@ export function registerList(credential: Command): void {
       }));
 
       printJsonRaw({ credentials: items });
-    });
+    },
+  });
 }

@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `connection — Manage MongoDB connections
 
@@ -10,10 +10,10 @@ COMMANDS:
     --credential references a stored credential for authentication.
     --default sets this connection as the default.
 
-  connection update <alias> [--credential <name>] [--no-credential] [--database <db>]
+  connection update <alias> [--credential <name>] [--clear-credential] [--database <db>]
     Update a saved connection. Only specified fields are changed.
     --credential sets or changes the credential reference.
-    --no-credential removes the credential from the connection.
+    --clear-credential removes the credential from the connection (mutually exclusive with --credential).
 
   connection remove <alias>
     Remove a saved connection.
@@ -34,11 +34,13 @@ RESOLUTION ORDER: -c flag > AGENT_MONGO_CONNECTION env > config default > error
 CONFIG: ~/.config/agent-mongo/config.json (respects XDG_CONFIG_HOME)
 `;
 
-export function registerUsage(connection: Command): void {
-  connection
-    .command("usage")
-    .description("Print connection command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print connection command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

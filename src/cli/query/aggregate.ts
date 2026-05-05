@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, RangeArgs, ref } from "vipvot";
 import type { Document } from "mongodb";
 import { printJson, printError, printNdjsonStream, resolvePageSize } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
@@ -6,69 +6,77 @@ import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { runAggregate, streamAggregate } from "../../mongo/aggregate.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
 import { parseJsonArray } from "../../lib/parse-json.ts";
+import { resolveConnectionAlias } from "../_globals.ts";
 
-type AggregateOpts = {
-  pipeline?: string;
-  limit?: string;
-  stream?: boolean;
-};
+export function buildAggregateCommand(): Command {
+  const pipelineFlag = ref<string>("");
+  const limit = ref<string>("");
+  const stream = ref<boolean>(false);
 
-export function registerAggregate(parent: Command): void {
-  parent
-    .command("aggregate")
-    .description("Run a read-only aggregation pipeline")
-    .argument("<database>", "Database name")
-    .argument("<collection>", "Collection name")
-    .argument("[pipeline]", "Aggregation pipeline as JSON array")
-    .option("--pipeline <json>", "Aggregation pipeline as JSON array (or pipe via stdin)")
-    .option("--limit <n>", "Max results if pipeline has no $limit stage")
-    .option("--stream", "Stream results as NDJSON (one JSON object per line, no limit)")
-    .action(
-      // oxlint-disable-next-line max-params -- commander dictates this signature
-      async (
-        database: string,
-        collection: string,
-        pipelineArg: string | undefined,
-        opts: AggregateOpts,
-        command: Command,
-      ) => {
-        try {
-          const alias = command.optsWithGlobals().connection;
-          const { client } = await getMongoClient(alias);
+  const cmd = Command({
+    use: "aggregate <database> <collection> [pipeline]",
+    short: "Run a read-only aggregation pipeline",
+    args: RangeArgs(2, 3),
+    run: async (_cmd, args) => {
+      const [database, collection, pipelineArg] = args as [string, string, string?];
+      try {
+        const { client } = await getMongoClient(resolveConnectionAlias());
 
-          const pipeline = await resolvePipeline(pipelineArg, opts.pipeline);
+        const pipeline = await resolvePipeline(pipelineArg, pipelineFlag.value || undefined);
 
-          if (opts.stream) {
-            const cursor = streamAggregate(client, {
-              dbName: database,
-              collName: collection,
-              pipeline,
-            });
-            await printNdjsonStream(cursor);
-          } else {
-            const maxDocs = getSettings().query?.maxDocuments ?? 100;
-            const requestedLimit = resolvePageSize(opts);
-            const limit = Math.min(requestedLimit, maxDocs);
+        if (stream.value) {
+          const cursor = streamAggregate(client, {
+            dbName: database,
+            collName: collection,
+            pipeline,
+          });
+          await printNdjsonStream(cursor);
+        } else {
+          const maxDocs = getSettings().query?.maxDocuments ?? 100;
+          const requestedLimit = resolvePageSize({ limit: limit.value || undefined });
+          const limitVal = Math.min(requestedLimit, maxDocs);
 
-            const result = await runAggregate(client, {
-              dbName: database,
-              collName: collection,
-              pipeline,
-              limit,
-            });
-            printJson({ database, collection, ...result });
-          }
-        } catch (err) {
-          printError(
-            err instanceof Error
-              ? enhanceErrorMessage(err, { database, collection })
-              : "Failed to run aggregation",
-          );
-        } finally {
-          await closeAllClients();
+          const result = await runAggregate(client, {
+            dbName: database,
+            collName: collection,
+            pipeline,
+            limit: limitVal,
+          });
+          printJson({ database, collection, ...result });
         }
-      },
+      } catch (err) {
+        printError(
+          err instanceof Error
+            ? enhanceErrorMessage(err, { database, collection })
+            : "Failed to run aggregation",
+        );
+      } finally {
+        await closeAllClients();
+      }
+    },
+  });
+
+  cmd
+    .flags()
+    .stringVarP(
+      pipelineFlag,
+      "pipeline",
+      "",
+      "",
+      "Aggregation pipeline as JSON array (or pipe via stdin)",
     );
+  cmd.flags().stringVarP(limit, "limit", "", "", "Max results if pipeline has no $limit stage");
+  cmd
+    .flags()
+    .boolVarP(
+      stream,
+      "stream",
+      "",
+      false,
+      "Stream results as NDJSON (one JSON object per line, no limit)",
+    );
+
+  return cmd;
 }
 
 async function resolvePipeline(positionalArg?: string, pipelineFlag?: string): Promise<Document[]> {

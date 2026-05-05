@@ -1,18 +1,20 @@
-import type { Command } from "commander";
+import { Command, ExactArgs } from "vipvot";
 import { removeConnection } from "../../lib/config.ts";
 import { printError, printJsonRaw } from "../../lib/output.ts";
 
-export function registerRemove(connection: Command): void {
-  connection
-    .command("remove")
-    .description("Remove a saved connection")
-    .argument("<alias>", "Connection alias to remove")
-    .action((alias: string) => {
+export function buildRemoveCommand(): Command {
+  return Command({
+    use: "remove <alias>",
+    short: "Remove a saved connection",
+    args: ExactArgs(1),
+    run: (_cmd, args) => {
+      const [alias] = args as [string];
       try {
         removeConnection(alias);
         printJsonRaw({ ok: true, removed: alias });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to remove connection");
       }
-    });
+    },
+  });
 }

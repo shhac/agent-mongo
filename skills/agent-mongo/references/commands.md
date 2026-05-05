@@ -6,7 +6,7 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 ## Connection
 
 - `agent-mongo connection add <alias> <uri> [--database <db>] [--credential <name>] [--default]` — save a MongoDB connection
-- `agent-mongo connection update <alias> [--credential <name>] [--no-credential] [--database <db>]` — update saved connection
+- `agent-mongo connection update <alias> [--credential <name>] [--clear-credential] [--database <db>]` — update saved connection
 - `agent-mongo connection remove <alias>` — remove a saved connection
 - `agent-mongo connection list` — list all saved connections with URIs, credential names, and default status
 - `agent-mongo connection test [-c <alias>]` — ping MongoDB to verify connectivity

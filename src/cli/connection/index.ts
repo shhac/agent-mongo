@@ -1,19 +1,23 @@
-import type { Command } from "commander";
-import { registerAdd } from "./add.ts";
-import { registerRemove } from "./remove.ts";
-import { registerList } from "./list.ts";
-import { registerTest } from "./test.ts";
-import { registerUpdate } from "./update.ts";
-import { registerSetDefault } from "./set-default.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildAddCommand } from "./add.ts";
+import { buildRemoveCommand } from "./remove.ts";
+import { buildUpdateCommand } from "./update.ts";
+import { buildListCommand } from "./list.ts";
+import { buildTestCommand } from "./test.ts";
+import { buildSetDefaultCommand } from "./set-default.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerConnectionCommand({ program }: { program: Command }): void {
-  const connection = program.command("connection").description("Manage MongoDB connections");
-  registerAdd(connection);
-  registerRemove(connection);
-  registerUpdate(connection);
-  registerList(connection);
-  registerTest(connection);
-  registerSetDefault(connection);
-  registerUsage(connection);
+export function buildConnectionCommand(): Command {
+  const cmd = Command({
+    use: "connection",
+    short: "Manage MongoDB connections",
+  });
+  cmd.addCommand(buildAddCommand());
+  cmd.addCommand(buildRemoveCommand());
+  cmd.addCommand(buildUpdateCommand());
+  cmd.addCommand(buildListCommand());
+  cmd.addCommand(buildTestCommand());
+  cmd.addCommand(buildSetDefaultCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

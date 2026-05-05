@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, ExactArgs, ref } from "vipvot";
 import {
   storeConnection,
   setDefaultConnection,
@@ -8,28 +8,24 @@ import {
 import { parseDbFromUri } from "../../mongo/client.ts";
 import { printError, printJsonRaw } from "../../lib/output.ts";
 
-export function registerAdd(connection: Command): void {
-  connection
-    .command("add")
-    .description("Add a MongoDB connection")
-    .argument("<alias>", "Short name for this connection (e.g. local, staging, prod)")
-    .argument("<connection-string>", "MongoDB connection URI (mongodb:// or mongodb+srv://)")
-    .option("--database <db>", "Override database name from URI")
-    .option("--credential <name>", "Credential alias for authentication")
-    .option("--default", "Set as default connection")
-    .action((...args: unknown[]) => {
-      const [alias, connectionString, opts] = args as [
-        string,
-        string,
-        { database?: string; credential?: string; default?: boolean },
-      ];
+export function buildAddCommand(): Command {
+  const database = ref<string>("");
+  const credential = ref<string>("");
+  const setDefault = ref<boolean>(false);
+
+  const cmd = Command({
+    use: "add <alias> <connection-string>",
+    short: "Add a MongoDB connection",
+    args: ExactArgs(2),
+    run: (_cmd, args) => {
+      const [alias, connectionString] = args as [string, string];
       try {
-        if (opts.credential) {
-          const cred = getCredential(opts.credential);
+        if (credential.value) {
+          const cred = getCredential(credential.value);
           if (!cred) {
             const available = Object.keys(getCredentials());
             throw new Error(
-              `Credential "${opts.credential}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
+              `Credential "${credential.value}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
             );
           }
         }
@@ -37,24 +33,31 @@ export function registerAdd(connection: Command): void {
         storeConnection(alias, {
           connection_string: connectionString,
           name: alias,
-          database: opts.database,
-          credential: opts.credential,
+          database: database.value || undefined,
+          credential: credential.value || undefined,
         });
 
-        if (opts.default) {
+        if (setDefault.value) {
           setDefaultConnection(alias);
         }
 
         printJsonRaw({
           ok: true,
           alias,
-          database: opts.database ?? parseDbFromUri(connectionString),
-          credential: opts.credential,
-          isDefault: opts.default ?? false,
+          database: database.value || parseDbFromUri(connectionString),
+          credential: credential.value || undefined,
+          isDefault: setDefault.value,
           hint: `Test with: agent-mongo connection test ${alias}`,
         });
       } catch (err) {
         printError(err instanceof Error ? err.message : "Failed to add connection");
       }
-    });
+    },
+  });
+
+  cmd.flags().stringVarP(database, "database", "", "", "Override database name from URI");
+  cmd.flags().stringVarP(credential, "credential", "", "", "Credential alias for authentication");
+  cmd.flags().boolVarP(setDefault, "default", "", false, "Set as default connection");
+
+  return cmd;
 }

@@ -1,50 +1,47 @@
-import { Command } from "commander";
+import { Command, helpString, VipvotError } from "vipvot";
 import { getPackageVersion } from "./lib/version.ts";
-import { configureTruncation } from "./lib/truncation.ts";
-import { configureTimeout } from "./lib/timeout.ts";
-import { getSettings } from "./lib/config.ts";
-import { registerConnectionCommand } from "./cli/connection/index.ts";
-import { registerCredentialCommand } from "./cli/credential/index.ts";
-import { registerConfigCommand } from "./cli/config/index.ts";
-import { registerDatabaseCommand } from "./cli/database/index.ts";
-import { registerCollectionCommand } from "./cli/collection/index.ts";
-import { registerQueryCommand } from "./cli/query/index.ts";
-import { registerUsageCommand } from "./cli/usage/index.ts";
+import { applyGlobals, connectionRef, expandRef, fullRef, timeoutRef } from "./cli/_globals.ts";
+import { buildConnectionCommand } from "./cli/connection/index.ts";
+import { buildCredentialCommand } from "./cli/credential/index.ts";
+import { buildConfigCommand } from "./cli/config/index.ts";
+import { buildDatabaseCommand } from "./cli/database/index.ts";
+import { buildCollectionCommand } from "./cli/collection/index.ts";
+import { buildQueryCommand } from "./cli/query/index.ts";
+import { buildUsageCommand } from "./cli/usage/index.ts";
+import { printError } from "./lib/output.ts";
 
-const program = new Command();
-program.name("agent-mongo").description("MongoDB CLI for AI agents").version(getPackageVersion());
-program.option("--expand <fields>", "Expand truncated fields (comma-separated field names)");
-program.option("--full", "Show full content for all truncated fields");
-program.option("-c, --connection <alias>", "Connection alias to use");
-program.option("--timeout <ms>", "Query timeout in milliseconds (overrides config)");
-program.hook("preAction", (thisCommand) => {
-  const opts = thisCommand.opts();
-  const settings = getSettings();
-  configureTruncation({
-    expand: opts.expand,
-    full: opts.full,
-    maxLength: settings.truncation?.maxLength,
-  });
-  if (opts.timeout) {
-    const ms = parseInt(opts.timeout, 10);
-    if (!Number.isFinite(ms) || ms < 1) {
-      throw new Error(
-        `Invalid --timeout: "${opts.timeout}". Must be a positive integer (milliseconds).`,
-      );
-    }
-    configureTimeout(ms);
-  }
+const root = Command({
+  use: "agent-mongo",
+  short: "MongoDB CLI for AI agents",
+  long: `agent-mongo ${getPackageVersion()} — MongoDB CLI for AI agents`,
+  silenceErrors: true,
+  silenceUsage: true,
+  persistentPreRun: applyGlobals,
+  run: (cmd) => {
+    cmd.out()(`${helpString(cmd)}\n`);
+  },
 });
 
-registerConnectionCommand({ program });
-registerCredentialCommand({ program });
-registerConfigCommand({ program });
-registerDatabaseCommand({ program });
-registerCollectionCommand({ program });
-registerQueryCommand({ program });
-registerUsageCommand({ program });
+root.persistentFlags().stringVarP(connectionRef, "connection", "c", "", "Connection alias to use");
+root
+  .persistentFlags()
+  .stringVarP(expandRef, "expand", "", "", "Expand truncated fields (comma-separated field names)");
+root
+  .persistentFlags()
+  .boolVarP(fullRef, "full", "", false, "Show full content for all truncated fields");
+root
+  .persistentFlags()
+  .stringVarP(timeoutRef, "timeout", "", "", "Query timeout in milliseconds (overrides config)");
 
-program.parse(process.argv);
-if (!process.argv.slice(2).length) {
-  program.outputHelp();
+root.addCommand(buildConnectionCommand());
+root.addCommand(buildCredentialCommand());
+root.addCommand(buildConfigCommand());
+root.addCommand(buildDatabaseCommand());
+root.addCommand(buildCollectionCommand());
+root.addCommand(buildQueryCommand());
+root.addCommand(buildUsageCommand());
+
+const result = await root.execute(process.argv.slice(2));
+if (result instanceof VipvotError || result instanceof Error) {
+  printError(result.message);
 }

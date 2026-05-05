@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `database — Database discovery
 
@@ -15,11 +15,13 @@ EXAMPLES:
   agent-mongo database stats myapp
 `;
 
-export function registerUsage(database: Command): void {
-  database
-    .command("usage")
-    .description("Print database command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print database command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

@@ -1,15 +1,19 @@
-import type { Command } from "commander";
-import { registerList } from "./list.ts";
-import { registerSchema } from "./schema.ts";
-import { registerIndexes } from "./indexes.ts";
-import { registerStats } from "./stats.ts";
-import { registerUsage } from "./usage.ts";
+import { Command } from "vipvot";
+import { buildListCommand } from "./list.ts";
+import { buildSchemaCommand } from "./schema.ts";
+import { buildIndexesCommand } from "./indexes.ts";
+import { buildStatsCommand } from "./stats.ts";
+import { buildUsageCommand } from "./usage.ts";
 
-export function registerCollectionCommand({ program }: { program: Command }): void {
-  const collection = program.command("collection").description("Collection discovery");
-  registerList(collection);
-  registerSchema(collection);
-  registerIndexes(collection);
-  registerStats(collection);
-  registerUsage(collection);
+export function buildCollectionCommand(): Command {
+  const cmd = Command({
+    use: "collection",
+    short: "Collection discovery",
+  });
+  cmd.addCommand(buildListCommand());
+  cmd.addCommand(buildSchemaCommand());
+  cmd.addCommand(buildIndexesCommand());
+  cmd.addCommand(buildStatsCommand());
+  cmd.addCommand(buildUsageCommand());
+  return cmd;
 }

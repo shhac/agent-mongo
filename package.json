@@ -20,8 +20,8 @@
     "release": "sh ./scripts/release.sh"
   },
   "dependencies": {
-    "commander": "^14.0.1",
-    "mongodb": "^6.16.0"
+    "mongodb": "^6.16.0",
+    "vipvot": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^24",

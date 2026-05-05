@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, NoArgs } from "vipvot";
 
 const USAGE_TEXT = `collection — Collection discovery
 
@@ -33,11 +33,13 @@ EXAMPLES:
   agent-mongo collection stats myapp orders
 `;
 
-export function registerUsage(parent: Command): void {
-  parent
-    .command("usage")
-    .description("Print collection command documentation (LLM-optimized)")
-    .action(() => {
+export function buildUsageCommand(): Command {
+  return Command({
+    use: "usage",
+    short: "Print collection command documentation (LLM-optimized)",
+    args: NoArgs,
+    run: () => {
       console.log(USAGE_TEXT.trim());
-    });
+    },
+  });
 }

@@ -1,19 +1,18 @@
-import type { Command } from "commander";
+import { Command, ExactArgs } from "vipvot";
 import { printJson, printError } from "../../lib/output.ts";
 import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { getCollectionStats } from "../../mongo/collections.ts";
+import { resolveConnectionAlias } from "../_globals.ts";
 
-export function registerStats(parent: Command): void {
-  parent
-    .command("stats")
-    .description("Get collection statistics")
-    .argument("<database>", "Database name")
-    .argument("<collection>", "Collection name")
-    // oxlint-disable-next-line max-params -- commander dictates this signature
-    .action(async (database: string, collection: string, _opts: unknown, command: Command) => {
+export function buildStatsCommand(): Command {
+  return Command({
+    use: "stats <database> <collection>",
+    short: "Get collection statistics",
+    args: ExactArgs(2),
+    run: async (_cmd, args) => {
+      const [database, collection] = args as [string, string];
       try {
-        const alias = command.optsWithGlobals().connection;
-        const { client } = await getMongoClient(alias);
+        const { client } = await getMongoClient(resolveConnectionAlias());
         const result = await getCollectionStats(client, { dbName: database, collName: collection });
         printJson(result);
       } catch (err) {
@@ -21,5 +20,6 @@ export function registerStats(parent: Command): void {
       } finally {
         await closeAllClients();
       }
-    });
+    },
+  });
 }

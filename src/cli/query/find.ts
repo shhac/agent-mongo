@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Command, ExactArgs, ref } from "vipvot";
 import type { Sort } from "mongodb";
 import { printJson, printError, printNdjsonStream, resolvePageSize } from "../../lib/output.ts";
 import { getSettings } from "../../lib/config.ts";
@@ -6,61 +6,54 @@ import { getMongoClient, closeAllClients } from "../../mongo/client.ts";
 import { findDocuments, streamFind } from "../../mongo/query.ts";
 import { enhanceErrorMessage } from "../../lib/errors.ts";
 import { parseJson } from "../../lib/parse-json.ts";
+import { resolveConnectionAlias } from "../_globals.ts";
 
-type FindOpts = {
-  filter?: string;
-  sort?: string;
-  projection?: string;
-  limit?: string;
-  skip?: string;
-  stream?: boolean;
-};
+export function buildFindCommand(): Command {
+  const filter = ref<string>("");
+  const sort = ref<string>("");
+  const projection = ref<string>("");
+  const limit = ref<string>("");
+  const skip = ref<string>("0");
+  const stream = ref<boolean>(false);
 
-export function registerFind(parent: Command): void {
-  parent
-    .command("find")
-    .description("Find documents matching a filter")
-    .argument("<database>", "Database name")
-    .argument("<collection>", "Collection name")
-    .option("--filter <json>", "MongoDB query filter (JSON)")
-    .option("--sort <json>", 'Sort specification (e.g. {"createdAt": -1})')
-    .option("--projection <json>", 'Field projection (e.g. {"name": 1, "email": 1})')
-    .option("--limit <n>", "Max documents to return")
-    .option("--skip <n>", "Number of documents to skip", "0")
-    .option("--stream", "Stream results as NDJSON (one JSON object per line, no limit)")
-    // oxlint-disable-next-line max-params -- commander dictates this signature
-    .action(async (database: string, collection: string, opts: FindOpts, command: Command) => {
+  const cmd = Command({
+    use: "find <database> <collection>",
+    short: "Find documents matching a filter",
+    args: ExactArgs(2),
+    run: async (_cmd, args) => {
+      const [database, collection] = args as [string, string];
       try {
-        const alias = command.optsWithGlobals().connection;
-        const { client } = await getMongoClient(alias);
+        const { client } = await getMongoClient(resolveConnectionAlias());
 
-        const filter = opts.filter ? parseJson(opts.filter, "filter") : undefined;
-        const sort = (opts.sort ? parseJson(opts.sort, "sort") : { _id: -1 }) as Sort;
-        const projection = opts.projection ? parseJson(opts.projection, "projection") : undefined;
+        const filterDoc = filter.value ? parseJson(filter.value, "filter") : undefined;
+        const sortDoc = (sort.value ? parseJson(sort.value, "sort") : { _id: -1 }) as Sort;
+        const projectionDoc = projection.value
+          ? parseJson(projection.value, "projection")
+          : undefined;
 
-        if (opts.stream) {
+        if (stream.value) {
           const cursor = streamFind(client, {
             dbName: database,
             collName: collection,
-            filter,
-            sort,
-            projection,
+            filter: filterDoc,
+            sort: sortDoc,
+            projection: projectionDoc,
           });
           await printNdjsonStream(cursor);
         } else {
           const maxDocs = getSettings().query?.maxDocuments ?? 100;
-          const requestedLimit = resolvePageSize(opts);
-          const limit = Math.min(requestedLimit, maxDocs);
-          const skip = parseInt(opts.skip ?? "0", 10);
+          const requestedLimit = resolvePageSize({ limit: limit.value || undefined });
+          const limitVal = Math.min(requestedLimit, maxDocs);
+          const skipVal = parseInt(skip.value || "0", 10);
 
           const result = await findDocuments(client, {
             dbName: database,
             collName: collection,
-            filter,
-            sort,
-            projection,
-            limit,
-            skip,
+            filter: filterDoc,
+            sort: sortDoc,
+            projection: projectionDoc,
+            limit: limitVal,
+            skip: skipVal,
           });
 
           printJson(result);
@@ -74,5 +67,31 @@ export function registerFind(parent: Command): void {
       } finally {
         await closeAllClients();
       }
-    });
+    },
+  });
+
+  cmd.flags().stringVarP(filter, "filter", "", "", "MongoDB query filter (JSON)");
+  cmd.flags().stringVarP(sort, "sort", "", "", 'Sort specification (e.g. {"createdAt": -1})');
+  cmd
+    .flags()
+    .stringVarP(
+      projection,
+      "projection",
+      "",
+      "",
+      'Field projection (e.g. {"name": 1, "email": 1})',
+    );
+  cmd.flags().stringVarP(limit, "limit", "", "", "Max documents to return");
+  cmd.flags().stringVarP(skip, "skip", "", "0", "Number of documents to skip");
+  cmd
+    .flags()
+    .boolVarP(
+      stream,
+      "stream",
+      "",
+      false,
+      "Stream results as NDJSON (one JSON object per line, no limit)",
+    );
+
+  return cmd;
 }
