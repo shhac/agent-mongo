@@ -72,6 +72,13 @@ function resolveAlias(flag?: string): string {
   );
 }
 
+const CLI_POOL_OPTS: MongoClientOptions = {
+  maxPoolSize: 1,
+  minPoolSize: 0,
+  maxIdleTimeMS: 5_000,
+  serverSelectionTimeoutMS: 10_000,
+};
+
 export function resolveClientOptions(
   credentialAlias?: string,
   timeout?: number,
@@ -81,7 +88,7 @@ export function resolveClientOptions(
     : {};
 
   if (!credentialAlias) {
-    return timeoutOpts;
+    return { ...CLI_POOL_OPTS, ...timeoutOpts };
   }
   const cred = getCredential(credentialAlias);
   if (!cred) {
@@ -90,7 +97,7 @@ export function resolveClientOptions(
       `Credential "${credentialAlias}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
     );
   }
-  return { ...timeoutOpts, auth: { username: cred.username, password: cred.password } };
+  return { ...CLI_POOL_OPTS, ...timeoutOpts, auth: { username: cred.username, password: cred.password } };
 }
 
 export function parseDbFromUri(uri: string): string | undefined {
@@ -106,7 +113,7 @@ export function parseDbFromUri(uri: string): string | undefined {
 export async function closeAllClients(): Promise<void> {
   for (const client of activeClients.values()) {
     try {
-      await client.close();
+      await client.close(true);
     } catch {
       // ignore close errors
     }

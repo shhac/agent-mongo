@@ -155,15 +155,19 @@ describe("resolveClientOptions", () => {
     delete process.env.XDG_CONFIG_HOME;
   });
 
-  test("returns empty options when no credential alias", () => {
-    expect(resolveClientOptions()).toEqual({});
-    expect(resolveClientOptions(undefined)).toEqual({});
+  test("returns pool options when no credential alias", () => {
+    const opts = resolveClientOptions();
+    expect(opts.maxPoolSize).toBe(1);
+    expect(opts.minPoolSize).toBe(0);
+    expect(opts.auth).toBeUndefined();
+    expect(resolveClientOptions(undefined)).toEqual(opts);
   });
 
-  test("returns auth options for valid credential", () => {
+  test("returns auth + pool options for valid credential", () => {
     storeCredential("acme", { username: "deploy", password: "secret123" });
     const opts = resolveClientOptions("acme");
     expect(opts.auth).toEqual({ username: "deploy", password: "secret123" });
+    expect(opts.maxPoolSize).toBe(1);
   });
 
   test("throws for unknown credential alias", () => {
