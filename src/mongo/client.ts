@@ -97,7 +97,11 @@ export function resolveClientOptions(
       `Credential "${credentialAlias}" not found. Available: ${available.join(", ") || "(none)"}. Run: agent-mongo credential add <alias> --username <user> --password <pass>`,
     );
   }
-  return { ...CLI_POOL_OPTS, ...timeoutOpts, auth: { username: cred.username, password: cred.password } };
+  return {
+    ...CLI_POOL_OPTS,
+    ...timeoutOpts,
+    auth: { username: cred.username, password: cred.password },
+  };
 }
 
 export function parseDbFromUri(uri: string): string | undefined {
