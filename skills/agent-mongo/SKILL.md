@@ -7,6 +7,7 @@ description: |
   - Managing MongoDB connections or credentials
   - Checking database or collection statistics
   Triggers: "mongodb", "mongo query", "mongo find", "mongo schema", "mongo collection", "mongo database", "mongo connection", "mongo aggregate", "query mongodb", "mongo stats"
+allowed-tools: Bash(agent-mongo *) Read Grep Glob
 ---
 
 # MongoDB exploration with `agent-mongo`
