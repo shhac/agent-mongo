@@ -36,7 +36,6 @@ func (g *rootFlags) shared() *shared.GlobalFlags {
 		Full:       g.Full,
 		Format:     g.Format,
 		TimeoutMS:  g.TimeoutMS,
-		Debug:      g.Debug,
 	}
 }
 

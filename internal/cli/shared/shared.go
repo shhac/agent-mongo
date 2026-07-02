@@ -18,7 +18,6 @@ type GlobalFlags struct {
 	Full       bool   // --full
 	Format     string // -f/--format
 	TimeoutMS  int    // -t/--timeout > settings query.timeout > 30000
-	Debug      bool   // -d/--debug
 }
 
 // Timeout returns the effective operation timeout.

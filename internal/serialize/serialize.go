@@ -7,7 +7,6 @@ package serialize
 import (
 	"encoding/base64"
 	"fmt"
-	"math"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -108,10 +107,4 @@ func Documents(docs []bson.D) []map[string]any {
 		out[i] = Document(doc)
 	}
 	return out
-}
-
-// IsSafeInteger reports whether a float64 holds an integral value (used by
-// schema type naming to mirror JS Number.isInteger).
-func IsSafeInteger(f float64) bool {
-	return f == math.Trunc(f) && !math.IsInf(f, 0) && !math.IsNaN(f)
 }
