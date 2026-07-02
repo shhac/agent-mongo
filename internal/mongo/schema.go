@@ -69,7 +69,19 @@ func (s *Session) InferSchema(ctx context.Context, opts SchemaOpts) (SchemaResul
 		return SchemaResult{}, err
 	}
 
-	w := &walker{fields: map[string]*fieldAgg{}, maxDepth: opts.MaxDepth}
+	return SchemaResult{
+		Database:       opts.DB,
+		Collection:     opts.Collection,
+		SampleSize:     len(docs),
+		TotalDocuments: totalDocuments,
+		Fields:         InferFields(docs, opts.MaxDepth),
+	}, nil
+}
+
+// InferFields aggregates field paths, types, and presence rates from sampled
+// documents — the pure core of schema inference.
+func InferFields(docs []bson.D, maxDepth int) []FieldInfo {
+	w := &walker{fields: map[string]*fieldAgg{}, maxDepth: maxDepth}
 	for _, doc := range docs {
 		w.seen = map[string]bool{}
 		w.walkDocument(doc, "", 1)
@@ -89,14 +101,7 @@ func (s *Session) InferSchema(ctx context.Context, opts SchemaOpts) (SchemaResul
 		fields = append(fields, FieldInfo{Path: path, Types: types, Presence: presence})
 	}
 	sort.Slice(fields, func(i, j int) bool { return fields[i].Path < fields[j].Path })
-
-	return SchemaResult{
-		Database:       opts.DB,
-		Collection:     opts.Collection,
-		SampleSize:     len(docs),
-		TotalDocuments: totalDocuments,
-		Fields:         fields,
-	}, nil
+	return fields
 }
 
 func (w *walker) walkDocument(doc bson.D, prefix string, depth int) {

@@ -10,8 +10,16 @@ build:
 test:
 	go test ./... -count=1
 
+MONGO_TEST_PORT ?= 27099
+
 test-integration:
-	go test ./internal/integration/ -count=1 -tags=integration
+	@docker inspect agent-mongo-test >/dev/null 2>&1 || \
+		docker run -d --rm --name agent-mongo-test -p 127.0.0.1:$(MONGO_TEST_PORT):27017 mongo:8
+	AGENT_MONGO_TEST_URI=mongodb://localhost:$(MONGO_TEST_PORT) \
+		go test ./internal/integration/ -count=1 -tags=integration -v
+
+test-integration-down:
+	docker stop agent-mongo-test
 
 lint:
 	golangci-lint run ./...
