@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/shhac/agent-mongo/internal/serialize"
 )
 
 type FieldInfo struct {
@@ -137,22 +139,26 @@ func (w *walker) walkArrayElements(arr bson.A, parentPath string, depth int) {
 		}
 	}
 
-	if len(arr) > 0 && !w.seen[elemPath] {
-		w.seen[elemPath] = true
-		if field, ok := w.fields[elemPath]; ok {
-			field.count++
-		}
+	if len(arr) > 0 {
+		w.markPresent(elemPath)
+	}
+}
+
+// markPresent bumps a path's per-document presence count, at most once per
+// walked document.
+func (w *walker) markPresent(path string) {
+	if w.seen[path] {
+		return
+	}
+	w.seen[path] = true
+	if field, ok := w.fields[path]; ok {
+		field.count++
 	}
 }
 
 func (w *walker) recordField(path, tn string) {
 	w.recordFieldType(path, tn)
-	if !w.seen[path] {
-		w.seen[path] = true
-		if field, ok := w.fields[path]; ok {
-			field.count++
-		}
-	}
+	w.markPresent(path)
 }
 
 func (w *walker) recordFieldType(path, tn string) {
@@ -163,8 +169,6 @@ func (w *walker) recordFieldType(path, tn string) {
 	}
 	field.types[tn] = true
 }
-
-const maxSafeInteger = 1<<53 - 1
 
 func typeName(value any) string {
 	switch v := value.(type) {
@@ -192,7 +196,7 @@ func typeName(value any) string {
 	case int64:
 		// Safe int64s read as plain integers to JSON consumers, so report
 		// "int"; only magnitudes a double cannot hold surface as "long".
-		if v >= -maxSafeInteger && v <= maxSafeInteger {
+		if serialize.IsSafeInt64(v) {
 			return "int"
 		}
 		return "long"

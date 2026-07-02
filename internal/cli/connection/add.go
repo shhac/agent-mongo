@@ -1,9 +1,6 @@
 package connection
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -11,16 +8,6 @@ import (
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 )
-
-func unknownCredentialError(alias string) error {
-	valid := strings.Join(credential.Aliases(), ", ")
-	if valid == "" {
-		valid = "(none)"
-	}
-	return fmt.Errorf(
-		"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
-		alias, valid)
-}
 
 func registerAdd(parent *cobra.Command) {
 	var database, credentialAlias string
@@ -35,7 +22,7 @@ func registerAdd(parent *cobra.Command) {
 
 			if credentialAlias != "" {
 				if _, ok := credential.Get(credentialAlias); !ok {
-					return unknownCredentialError(credentialAlias)
+					return credential.NotFoundError(credentialAlias)
 				}
 			}
 

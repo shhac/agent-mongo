@@ -5,9 +5,7 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -66,12 +64,8 @@ func store() creds.Store { return creds.Store{Path: filePath()} }
 // or unparseable — a corrupt file behaves like an empty one rather than
 // wedging every command.
 func Read() Config {
-	data, err := os.ReadFile(filePath())
-	if err != nil {
-		return Config{}
-	}
 	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	if err := store().Load(&cfg); err != nil {
 		return Config{}
 	}
 	return cfg
@@ -115,17 +109,21 @@ func StoreConnection(alias string, conn Connection) error {
 	return Write(cfg)
 }
 
+// JoinOrNone renders a valid-values list for self-correcting error messages.
+func JoinOrNone(values []string) string {
+	if len(values) == 0 {
+		return "(none)"
+	}
+	return strings.Join(values, ", ")
+}
+
 func unknownConnectionError(alias string, cfg Config) error {
 	valid := make([]string, 0, len(cfg.Connections))
 	for a := range cfg.Connections {
 		valid = append(valid, a)
 	}
 	sort.Strings(valid)
-	list := strings.Join(valid, ", ")
-	if list == "" {
-		list = "(none)"
-	}
-	return fmt.Errorf("Unknown connection: %q. Valid: %s", alias, list)
+	return fmt.Errorf("Unknown connection: %q. Valid: %s", alias, JoinOrNone(valid))
 }
 
 func RemoveConnection(alias string) error {

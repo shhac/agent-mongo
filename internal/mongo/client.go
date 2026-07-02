@@ -38,11 +38,7 @@ type ConnectOpts struct {
 }
 
 func availableConnections() string {
-	list := strings.Join(config.ConnectionAliases(), ", ")
-	if list == "" {
-		list = "(none)"
-	}
-	return list
+	return config.JoinOrNone(config.ConnectionAliases())
 }
 
 // ResolveAlias resolves the connection to use:
@@ -83,13 +79,7 @@ func clientOptions(
 	}
 	cred, ok := credential.Get(conn.Credential)
 	if !ok {
-		available := strings.Join(credential.Aliases(), ", ")
-		if available == "" {
-			available = "(none)"
-		}
-		return nil, fmt.Errorf(
-			"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
-			conn.Credential, available)
+		return nil, credential.NotFoundError(conn.Credential)
 	}
 	return clientOpts.SetAuth(options.Credential{
 		Username: cred.Username,

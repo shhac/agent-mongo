@@ -26,7 +26,16 @@ const (
 	StorageConfig   = "config"
 )
 
-var keychain = creds.NewKeychain(Service)
+// keychainStore is the seam over the OS keychain — satisfied by
+// *keyring.Keyring in production and by a fake in tests.
+type keychainStore interface {
+	Available() bool
+	Get(account string) (string, bool)
+	Set(account, secret string) error
+	Delete(account string) error
+}
+
+var keychain keychainStore = creds.NewKeychain(Service)
 
 func usernameAccount(alias string) string { return "username:" + alias }
 func passwordAccount(alias string) string { return "password:" + alias }
@@ -127,14 +136,18 @@ func ConnectionsUsing(credentialAlias string) []string {
 	return used
 }
 
+// NotFoundError is the shared self-correcting error for a missing credential
+// reference (used by connection add/update validation and connect).
+func NotFoundError(alias string) error {
+	return fmt.Errorf(
+		"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
+		alias, config.JoinOrNone(Aliases()))
+}
+
 func Remove(alias string) error {
 	cfg := config.Read()
 	if _, ok := cfg.Credentials[alias]; !ok {
-		valid := strings.Join(Aliases(), ", ")
-		if valid == "" {
-			valid = "(none)"
-		}
-		return fmt.Errorf("Unknown credential: %q. Valid: %s", alias, valid)
+		return fmt.Errorf("Unknown credential: %q. Valid: %s", alias, config.JoinOrNone(Aliases()))
 	}
 	if used := ConnectionsUsing(alias); len(used) > 0 {
 		return fmt.Errorf(

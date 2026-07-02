@@ -21,7 +21,7 @@ func registerUpdate(parent *cobra.Command) {
 
 			if credentialAlias != "" {
 				if _, ok := credential.Get(credentialAlias); !ok {
-					return unknownCredentialError(credentialAlias)
+					return credential.NotFoundError(credentialAlias)
 				}
 			}
 

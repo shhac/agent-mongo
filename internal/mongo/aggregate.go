@@ -11,7 +11,9 @@ import (
 
 var writeStages = map[string]bool{"$out": true, "$merge": true}
 
-// ValidatePipeline rejects write stages — agent-mongo is read-only.
+// ValidatePipeline rejects write stages — agent-mongo is read-only. Stages
+// carrying sub-pipelines ($facet, $lookup, $unionWith) are checked
+// recursively so a nested write stage fails here rather than at the server.
 func ValidatePipeline(pipeline bson.A) error {
 	for _, stage := range pipeline {
 		doc, ok := stage.(bson.D)
@@ -21,6 +23,42 @@ func ValidatePipeline(pipeline bson.A) error {
 		for _, elem := range doc {
 			if writeStages[elem.Key] {
 				return fmt.Errorf("Write stage %q is not allowed. agent-mongo is read-only.", elem.Key)
+			}
+			if err := validateSubPipelines(elem); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateSubPipelines(elem bson.E) error {
+	switch elem.Key {
+	case "$facet":
+		facets, ok := elem.Value.(bson.D)
+		if !ok {
+			return nil
+		}
+		for _, facet := range facets {
+			if sub, ok := facet.Value.(bson.A); ok {
+				if err := ValidatePipeline(sub); err != nil {
+					return err
+				}
+			}
+		}
+	case "$lookup", "$unionWith":
+		spec, ok := elem.Value.(bson.D)
+		if !ok {
+			return nil
+		}
+		for _, field := range spec {
+			if field.Key != "pipeline" {
+				continue
+			}
+			if sub, ok := field.Value.(bson.A); ok {
+				if err := ValidatePipeline(sub); err != nil {
+					return err
+				}
 			}
 		}
 	}

@@ -15,6 +15,10 @@ import (
 
 const maxSafeInteger = 1<<53 - 1 // JS Number.MAX_SAFE_INTEGER
 
+// IsSafeInt64 reports whether v is exactly representable in a double — the
+// boundary between emitting a JSON number and a string.
+func IsSafeInt64(v int64) bool { return v >= -maxSafeInteger && v <= maxSafeInteger }
+
 const isoMillis = "2006-01-02T15:04:05.000Z"
 
 func uuidString(data []byte) string {
@@ -40,7 +44,7 @@ func Value(value any) any {
 	case int64:
 		// Numbers only when exactly representable in a double (what JSON
 		// consumers can trust), strings otherwise.
-		if v >= -maxSafeInteger && v <= maxSafeInteger {
+		if IsSafeInt64(v) {
 			return v
 		}
 		return fmt.Sprintf("%d", v)
