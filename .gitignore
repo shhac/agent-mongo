@@ -26,5 +26,5 @@ yarn-error.log*
 .claude/*.local.json
 CLAUDE.local.md
 
-# design docs
-design-docs/
+# design docs — tracked, except the archive of stale/internal notes
+design-docs/archive/
