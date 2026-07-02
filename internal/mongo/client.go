@@ -1,3 +1,5 @@
+// Package mongo is the driver-facing domain layer: connection resolution,
+// database/collection discovery, schema inference, and read-only queries.
 package mongo
 
 import (

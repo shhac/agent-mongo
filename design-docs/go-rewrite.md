@@ -139,53 +139,53 @@ All pure Go — cross-compilation stays trivial.
 
 ### Phase 1: Scaffold
 
-- [ ] `go mod init github.com/shhac/agent-mongo`
-- [ ] `cmd/agent-mongo/main.go` (`cli.Run`) + `internal/cli/root.go` via `cli.NewRoot`
-- [ ] Domain persistent flags: `-c/--connection`, `--expand`, `--full`
-- [ ] Makefile: build/test/lint/release targets (crib agent-sql)
-- [ ] TS project still builds/tests alongside
+- [x] `go mod init github.com/shhac/agent-mongo`
+- [x] `cmd/agent-mongo/main.go` (`cli.Run`) + `internal/cli/root.go` via `cli.NewRoot`
+- [x] Domain persistent flags: `-c/--connection`, `--expand`, `--full`
+- [x] Makefile: build/test/lint/release targets (crib agent-sql)
+- [x] TS project still builds/tests alongside
 
 ### Phase 2: Config + credentials (no mongo yet)
 
-- [ ] `internal/config/` — read/write the existing config.json
-- [ ] `internal/credential/` — `__KEYCHAIN__` sentinel via lib-agent-keyring
-- [ ] CLI: `config`, `connection` (except `test`), `credential` groups
-- [ ] `credential add --form` via lib-agent-cli `dialog` (+ `dialogtest.Recorder` tests)
-- [ ] Red-green: port config.test.ts, credential.test.ts, credential-form.test.ts
+- [x] `internal/config/` — read/write the existing config.json
+- [x] `internal/credential/` — `__KEYCHAIN__` sentinel via lib-agent-keyring
+- [x] CLI: `config`, `connection` (except `test`), `credential` groups
+- [x] `credential add --form` via lib-agent-cli `dialog` (+ `dialogtest.Recorder` tests)
+- [x] Red-green: port config.test.ts, credential.test.ts, credential-form.test.ts
 
 ### Phase 3: Domain libraries
 
-- [ ] serialize, truncation, compactjson, ejson, errors packages
-- [ ] Red-green: serialize.test.ts, truncation.test.ts, compact-json.test.ts,
+- [x] serialize, truncation, compactjson, ejson, errors packages
+- [x] Red-green: serialize.test.ts, truncation.test.ts, compact-json.test.ts,
       parse-json.test.ts, output.test.ts, ndjson-stream.test.ts equivalents
 
 ### Phase 4: Mongo layer + commands
 
-- [ ] `internal/mongo/` — client factory (pool opts, alias resolution), databases,
+- [x] `internal/mongo/` — client factory (pool opts, alias resolution), databases,
       collections (+existence validation), indexes, schema inference, query
       (find/get/count/sample/distinct), aggregate (validatePipeline)
-- [ ] CLI: `database`, `collection`, `query` groups + `connection test`
-- [ ] Red-green: schema.test.ts, aggregate.test.ts equivalents
-- [ ] Timeout plumbing: `-t/--timeout` (lib flag) > `query.timeout` > 30s via maxTimeMS
+- [x] CLI: `database`, `collection`, `query` groups + `connection test`
+- [x] Red-green: schema.test.ts, aggregate.test.ts equivalents
+- [x] Timeout plumbing: `-t/--timeout` (lib flag) > `query.timeout` > 30s via maxTimeMS
 
 ### Phase 5: Integration parity
 
-- [ ] `internal/integration/` — seeded throwaway mongod (docker `mongo:8`);
+- [x] `internal/integration/` — seeded throwaway mongod (docker `mongo:8`);
       never runs against configured real connections
-- [ ] Golden comparison: TS binary vs Go binary on the same seeded data —
+- [x] Golden comparison: TS binary vs Go binary on the same seeded data —
       domain fields must match; output framing asserted against the new contract
 
 ### Phase 6: MCP + docs
 
-- [ ] `agent-mongo mcp` via `agentmcp.Command(root)`; `ReadOnly` annotations on
+- [x] `agent-mongo mcp` via `agentmcp.Command(root)`; `ReadOnly` annotations on
       query/collection/database tools, `Skip` on credential/config
-- [ ] All `usage` subcommand texts ported (updated for NDJSON framing)
-- [ ] SKILL.md + README + CLAUDE.md updated for Go + new output contract
+- [x] All `usage` subcommand texts ported (updated for NDJSON framing)
+- [x] SKILL.md + README + CLAUDE.md updated for Go + new output contract
 
 ### Phase 7: Cleanup
 
-- [ ] Remove `src/`, `test/`, package.json, bun/oxlint/oxfmt config; hooks → Go equivalents
-- [ ] Release: `.goreleaser.yml` + tag-triggered reusable workflow
+- [x] Remove `src/`, `test/`, package.json, bun/oxlint/oxfmt config; hooks → Go equivalents
+- [x] Release: `.goreleaser.yml` + tag-triggered reusable workflow
       (`shhac/homebrew-tap/.github/workflows/go-release.yml`) as in agent-sql;
       releasing becomes `git tag vX.Y.Z && git push origin vX.Y.Z`
 - [ ] Merge to main; release as v1.0.0

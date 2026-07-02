@@ -2,13 +2,39 @@
 
 ## General
 
-All commands print JSON to stdout. Errors print `{ "error": "..." }` to stderr with non-zero exit.
+Default output is **NDJSON** (`-f jsonl`) — one JSON record per line on stdout.
 
-Empty/null fields are pruned automatically — missing keys mean no value, not `null`.
+- **List commands** emit one record per item, then trailing `@`-prefixed metadata lines:
+  - `{"@meta": {...}}` — command context (database, collection, sampleSize, totals — varies by command).
+  - `{"@pagination": {...}}` — `has_more`, `total_items`, and `next_cursor` when more results exist.
+- **Single results** (stats, `query get`, `count`, `distinct`, receipts) print as one JSON line.
 
-Error messages include valid values when input is invalid (e.g., `Connection "x" not found. Available: local, staging`).
+Empty/null fields are pruned automatically — a missing key means no value, not `null`.
 
-Timeout errors include hints to increase `query.timeout` and check collection indexes. Collection-not-found errors suggest using `collection list` to discover available collections.
+Errors print one JSON line to **stderr** with exit code 1:
+
+```json
+{ "error": "Connection \"x\" not found. Available: local, staging. ...", "fixable_by": "agent" }
+```
+
+`fixable_by` tells the caller who resolves it: `agent` (fix input and retry), `human` (needs the user — auth, GUI dialog), `retry` (transient). Errors include valid values when input is invalid, so an agent can self-correct. Timeout errors (MongoDB code 50) carry a `hint` to increase `query.timeout` and check indexes; collection-not-found errors suggest `collection list`.
+
+## Format flag
+
+`-f/--format` switches the shape:
+
+- `jsonl` (default) — NDJSON as above.
+- `json` — a single pretty envelope. Lists become `{"data": [...], "@meta": {...}, "@pagination": {...}}`; single objects print pretty and bare.
+- `yaml` — the same structure rendered as YAML.
+
+**List as `-f json`:**
+
+```json
+{
+  "@meta": { "totalSize": 348160 },
+  "data": [{ "empty": false, "name": "testdb", "sizeOnDisk": 122880 }]
+}
+```
 
 ## Truncation
 
@@ -17,162 +43,104 @@ Any string field exceeding `truncation.maxLength` (default 200) gets truncated w
 **Default (truncated):**
 
 ```json
-{
-  "description": "This is the beginning of a long document that goes on for many paragraphs…",
-  "descriptionLength": 1847
-}
+{ "longBio": "xxxxxxxx…", "longBioLength": 500 }
 ```
 
-**With `--full` or `--expand description` (expanded):**
+**With `--full` or `--expand longBio` (expanded):**
 
 ```json
-{
-  "description": "This is the beginning of a long document that goes on for many paragraphs and includes detailed content...",
-  "descriptionLength": 1847
-}
+{ "longBio": "xxxxxxxx...(full 500 chars)...", "longBioLength": 500 }
 ```
 
-Unlike lin (which only truncates preset field names), agent-mongo truncates **any** string over the limit. The `{field}Length` companion key is present whenever the original exceeded `truncation.maxLength`.
-
-Global flags: `--expand <field,...>` or `--full`.
+Unlike lin (which only truncates preset field names), agent-mongo truncates **any** string over the limit. The `{field}Length` companion key is present whenever the original exceeded `truncation.maxLength`. Global flags: `--expand <field,...>` or `--full`.
 
 ## BSON serialization
 
 All BSON types are converted to JSON-safe values:
 
-| BSON type  | JSON output                        |
-| ---------- | ---------------------------------- |
-| ObjectId   | 24-character hex string            |
-| Date       | ISO 8601 string                    |
-| Binary     | Base64-encoded string              |
-| Long       | Number (if safe integer) or string |
-| Decimal128 | String                             |
-| Timestamp  | String representation              |
-| RegExp     | String (e.g. `/pattern/flags`)     |
-| UUID       | String representation              |
+| BSON type  | JSON output                                          |
+| ---------- | ---------------------------------------------------- |
+| ObjectId   | 24-character hex string                              |
+| Date       | ISO 8601 string                                      |
+| Binary     | Base64-encoded string (UUID subtype → `uuid` string) |
+| int64      | Number if ≤ 2^53−1, otherwise string                 |
+| Decimal128 | String                                               |
+| Timestamp  | String representation                                |
+| Regex      | `/pattern/flags` string                              |
+
+In `collection schema`, the `types` array reports BSON type names as MongoDB names them: `ObjectId`, `string`, `int`, `long`, `double`, `decimal`, `boolean`, `date`, `binary`, `regex`, `object`, `array`, `null`.
 
 ## Database list (`database list`)
 
-```json
-{
-  "databases": [{ "name": "myapp", "sizeOnDisk": 1048576, "empty": false }],
-  "totalSize": 2097152
-}
+```
+{"empty":false,"name":"admin","sizeOnDisk":40960}
+{"empty":false,"name":"testdb","sizeOnDisk":122880}
+{"@meta":{"totalSize":348160}}
 ```
 
 ## Database stats (`database stats`)
 
 ```json
-{
-  "database": "myapp",
-  "collections": 12,
-  "documents": 45000,
-  "dataSize": 15728640,
-  "storageSize": 8388608,
-  "indexes": 24,
-  "indexSize": 2097152
-}
+{"collections":3,"dataSize":10834,"database":"testdb","documents":154,"indexSize":61440,"indexes":3,"storageSize":61440}
 ```
 
 ## Collection list (`collection list`)
 
-```json
-[
-  { "name": "users", "type": "collection" },
-  { "name": "user_summary", "type": "view" }
-]
+```
+{"name":"users","type":"collection"}
+{"name":"activeUsers","type":"view"}
+{"@meta":{"database":"testdb"}}
 ```
 
 ## Collection schema (`collection schema`)
 
-```json
-{
-  "database": "myapp",
-  "collection": "users",
-  "sampleSize": 100,
-  "totalDocuments": 15000,
-  "totalFields": 12,
-  "fields": [
-    { "path": "_id", "types": ["ObjectId"], "presence": 1.0 },
-    { "path": "name", "types": ["string"], "presence": 1.0 },
-    { "path": "tags", "types": ["array"], "presence": 0.85 },
-    { "path": "tags.$", "types": ["string"], "presence": 0.85 },
-    { "path": "address.city", "types": ["string"], "presence": 0.72 }
-  ]
-}
+```
+{"path":"_id","presence":1,"types":["ObjectId"]}
+{"path":"name","presence":1,"types":["string"]}
+{"path":"tags","presence":0.67,"types":["array"]}
+{"path":"tags.$","presence":0.33,"types":["string"]}
+{"path":"profile.bio","presence":0.33,"types":["string"]}
+{"@meta":{"collection":"users","database":"testdb","sampleSize":3,"totalDocuments":3,"totalFields":21}}
 ```
 
-With `--limit`/`--skip` pagination:
+Array element types appear as `path.$` entries. Nested objects use dot notation. `presence` is 0.0–1.0 (fraction of sampled documents containing the field). Errors if the collection does not exist.
 
-```json
-{
-  "database": "myapp",
-  "collection": "events",
-  "sampleSize": 100,
-  "totalDocuments": 10000000,
-  "totalFields": 150,
-  "fields": ["... first 50 fields ..."],
-  "pagination": { "hasMore": true, "nextSkip": 50 }
-}
+With `--limit`/`--skip` pagination, a `@pagination` line carries `next_cursor` (the next skip value):
+
 ```
-
-Array element types appear as `path.$` entries. Nested objects use dot notation. `presence` is 0.0-1.0 (fraction of sampled documents containing the field). Errors if collection does not exist.
+{"@meta":{"collection":"users","database":"testdb","sampleSize":3,"totalDocuments":3,"totalFields":21}}
+{"@pagination":{"has_more":true,"next_cursor":"3","total_items":21}}
+```
 
 ## Collection indexes (`collection indexes`)
 
-```json
-[
-  { "name": "_id_", "key": { "_id": 1 }, "unique": true },
-  { "name": "email_1", "key": { "email": 1 }, "unique": true, "sparse": true }
-]
 ```
+{"key":{"_id":1},"name":"_id_"}
+{"@meta":{"collection":"users","database":"testdb"}}
+```
+
+Indexes also carry `unique`, `sparse`, and other properties when set.
 
 ## Collection stats (`collection stats`)
 
 ```json
-{
-  "database": "myapp",
-  "collection": "users",
-  "documentCount": 15000,
-  "dataSize": 5242880,
-  "avgDocumentSize": 349,
-  "storageSize": 2097152,
-  "indexes": 3,
-  "indexSize": 524288,
-  "capped": false
-}
+{"avgDocumentSize":329,"capped":false,"collection":"users","dataSize":988,"database":"testdb","documentCount":3,"indexSize":20480,"indexes":1,"storageSize":20480}
 ```
 
 ## Query find (`query find`)
 
-```json
-{
-  "database": "myapp",
-  "collection": "users",
-  "filter": { "age": { "$gte": 21 } },
-  "documents": [{ "_id": "665a...", "name": "Alice", "age": 30 }],
-  "count": 1,
-  "hasMore": true,
-  "totalMatching": 42
-}
+```
+{"_id":"6a46...","age":35,"name":"carol","status":"active"}
+{"@meta":{"collection":"users","database":"testdb"}}
+{"@pagination":{"has_more":true,"total_items":3}}
 ```
 
-`hasMore` indicates more documents match beyond the limit. `totalMatching` is the full count.
+`has_more` indicates more documents match beyond the limit. `total_items` is the full matching count.
 
 ## Query get (`query get`)
 
 ```json
-{
-  "database": "myapp",
-  "collection": "users",
-  "fieldCount": 4,
-  "document": {
-    "_id": "665a1b2c3d4e5f6a7b8c9d0e",
-    "name": "Alice",
-    "email": "alice@example.com",
-    "createdAt": "2024-06-01T12:00:00.000Z"
-  }
-}
+{"collection":"users","database":"testdb","document":{"_id":"6a46...","age":35,"name":"carol","status":"active"},"fieldCount":4}
 ```
 
 `fieldCount` shows the number of top-level fields in the document. Use it to decide if `--projection` is needed.
@@ -180,82 +148,51 @@ Array element types appear as `path.$` entries. Nested objects use dot notation.
 ## Query count (`query count`)
 
 ```json
-{
-  "database": "myapp",
-  "collection": "orders",
-  "filter": { "status": "pending" },
-  "count": 42
-}
+{"collection":"users","count":3,"database":"testdb"}
 ```
 
 ## Query sample (`query sample`)
 
-```json
-{
-  "database": "myapp",
-  "collection": "users",
-  "filter": {},
-  "sampleSize": 2,
-  "documents": [
-    { "_id": "...", "name": "Alice" },
-    { "_id": "...", "name": "Bob" }
-  ]
-}
+```
+{"_id":"6a46...","age":25,"name":"bob"}
+{"_id":"665a...","age":30,"name":"alice"}
+{"@meta":{"collection":"users","database":"testdb","sampleSize":2}}
 ```
 
 ## Query distinct (`query distinct`)
 
 ```json
-{
-  "database": "myapp",
-  "collection": "orders",
-  "field": "status",
-  "values": ["pending", "shipped", "delivered"],
-  "count": 3
-}
+{"collection":"users","count":1,"database":"testdb","field":"status","values":["active"]}
 ```
 
 ## Query aggregate (`query aggregate`)
 
-```json
-{
-  "database": "myapp",
-  "collection": "orders",
-  "documents": [
-    { "_id": "pending", "count": 15 },
-    { "_id": "shipped", "count": 27 }
-  ],
-  "count": 2
-}
+```
+{"_id":"done","count":100}
+{"_id":"pending","count":50}
+{"@meta":{"collection":"orders","count":2,"database":"testdb"}}
 ```
 
 ## Connection list (`connection list`)
 
+```
+{"alias":"local","connection_string":"mongodb://localhost:27017/testdb","default":false}
+{"alias":"staging","connection_string":"mongodb://db.example.com/app","credential":"ldt","default":false}
+{"alias":"test","connection_string":"mongodb://localhost:27099/testdb","default":true}
+```
+
+`credential` appears only when the connection references a stored credential.
+
+## Connection test (`connection test`)
+
 ```json
-{
-  "connections": [
-    {
-      "alias": "local",
-      "connection_string": "mongodb://localhost:27017/myapp",
-      "database": "myapp",
-      "default": true
-    },
-    {
-      "alias": "prod",
-      "connection_string": "mongodb+srv://cluster.example.net/myapp",
-      "database": "myapp",
-      "credential": "acme"
-    }
-  ]
-}
+{"alias":"test","ok":true,"ping":{"ok":1}}
 ```
 
 ## Credential list (`credential list`)
 
-```json
-{
-  "credentials": [{ "name": "acme", "username": "deploy", "connections": ["prod", "staging"] }]
-}
+```
+{"name":"ldt","password":"***","storage":"config","usedBy":["staging"],"username":"deploy"}
 ```
 
-Passwords are always redacted.
+Passwords are always redacted (`***`). `storage` is `keychain` or `config`; `usedBy` lists connections referencing the credential.

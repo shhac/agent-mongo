@@ -2,11 +2,12 @@
 
 Read-only MongoDB CLI for AI agents.
 
-- **Structured JSON output** — all output is JSON to stdout, errors to stderr
+- **NDJSON output** — one JSON record per line to stdout, errors to stderr
 - **LLM-optimized** — `agent-mongo usage` prints concise docs for agent consumption
 - **Read-only by design** — no write operations, aggregation rejects `$out`/`$merge`
 - **Schema inference** — sample documents to discover collection structure
-- **Zero runtime deps** — single compiled binary via `bun build --compile`
+- **MCP server** — expose the read-only data commands as MCP tools (`agent-mongo mcp`)
+- **Zero runtime deps** — single compiled Go binary
 
 **Website:** [agent-mongo.paulie.app](https://agent-mongo.paulie.app/)
 
@@ -14,6 +15,16 @@ Read-only MongoDB CLI for AI agents.
 
 ```bash
 brew install shhac/tap/agent-mongo
+```
+
+### Build from source
+
+Requires Go 1.26+.
+
+```bash
+make build                       # builds ./agent-mongo (version stamped from git tags)
+# or
+go build ./cmd/agent-mongo
 ```
 
 ### Claude Code / AI agent skill
@@ -61,19 +72,38 @@ agent-mongo query find myapp events --filter '{"createdAt":{"$gt":{"$date":"2026
 agent-mongo query find myapp users --filter '{"_id":{"$oid":"665a1b2c3d4e5f6a7b8c9d0e"}}'
 ```
 
-### Streaming large result sets
+## Output
 
-`query find` and `query aggregate` support `--stream` for NDJSON output (one JSON object per line). Streaming bypasses the `query.maxDocuments` limit:
+Default output is **NDJSON** — one JSON record per line on stdout.
+
+- List commands emit one record per item, followed by `@`-prefixed metadata lines: `{"@meta": {...}}` carries command context (database, collection, sample size, totals) and `{"@pagination": {...}}` carries `has_more`, `total_items`, and a `next_cursor` when applicable.
+- Single results (stats, `query get`, `count`, `distinct`, write receipts) print as one JSON line.
+- Empty/null fields are pruned automatically — a missing key means no value, not `null`.
+- Errors go to stderr as one JSON line with exit code 1: `{"error": "...", "fixable_by": "agent"|"human"|"retry", "hint": "..."}`. `fixable_by` tells the caller who can resolve it — `agent` (fix the input and retry), `human` (needs the user, e.g. auth or a GUI dialog), or `retry` (transient).
+
+Use `-f/--format` to change the shape:
 
 ```bash
-agent-mongo query find myapp events --filter '{"type":"click"}' --stream
-agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]' --stream
+agent-mongo database list -f json     # pretty envelope: lists become {"data": [...], ...meta}
+agent-mongo query count myapp users -f yaml
+```
+
+`-f json` prints a pretty envelope (`{"data": [...]}` for lists, bare pretty object for single results); `-f yaml` prints YAML; `-f jsonl` (the default) is NDJSON.
+
+## Truncation
+
+Any string field exceeding `truncation.maxLength` (default 200) is truncated with a `…` suffix. A companion `{field}Length` key shows the full character count.
+
+```bash
+agent-mongo --full query find myapp users                        # expand all fields
+agent-mongo --expand name,bio query find myapp users             # expand specific fields
+agent-mongo config set truncation.maxLength 500                  # change default
 ```
 
 ## Command map
 
 ```text
-agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
+agent-mongo [-c <alias>] [-f <fmt>] [-F/--full] [-e/--expand <fields>] [-t/--timeout <ms>]
 ├── connection
 │   ├── add <alias> <uri> [--database <db>] [--credential <name>] [--default]
 │   ├── update <alias> [--credential <name>] [--clear-credential] [--database <db>]
@@ -104,17 +134,30 @@ agent-mongo [-c <alias>] [--full] [--expand <fields>] [--timeout <ms>]
 │   ├── stats <database> <collection>
 │   └── usage
 ├── query
-│   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip] [--stream]
+│   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip]
 │   ├── get <database> <collection> <id> [--type objectid|string|number] [--projection <json>]
 │   ├── count <database> <collection> [--filter]
 │   ├── sample <database> <collection> [--size <n>] [--filter <json>]
 │   ├── distinct <database> <collection> <field> [--filter]
-│   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [--stream]
+│   ├── aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>]
 │   └── usage
-└── usage                              # LLM-optimized docs
+├── mcp [--http <addr>] [--oauth local] ...    # run as an MCP server
+└── usage                                       # LLM-optimized docs
 ```
 
 Each top-level command has a `usage` subcommand for detailed, LLM-friendly documentation (e.g., `agent-mongo query usage`). The top-level `agent-mongo usage` gives a broad overview.
+
+### Global flags
+
+| Flag                         | Description                                                    |
+| ---------------------------- | ------------------------------------------------------------- |
+| `-c, --connection <alias>`   | Connection alias (overrides env/default)                      |
+| `-f, --format <jsonl\|json\|yaml>` | Output format (default `jsonl` — NDJSON)                 |
+| `-e, --expand <field,...>`   | Expand specific truncated fields                              |
+| `-F, --full`                 | Expand all truncated fields                                   |
+| `-t, --timeout <ms>`         | Request timeout in milliseconds (overrides `query.timeout`)   |
+| `-d, --debug`                | Log debug diagnostics to stderr                               |
+| `--color <auto\|always\|never>` | Colorize output (default `auto`)                          |
 
 ## Connection management
 
@@ -163,6 +206,8 @@ agent-mongo connection update legacy --clear-credential
 
 Connections without a `--credential` use the connection string as-is (backward compatible).
 
+Credentials are stored in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) and fall back to plaintext config otherwise. `credential list` shows the `storage` source (`keychain` or `config`) per credential. Set `AGENT_MONGO_NO_KEYCHAIN=1` to force plaintext config storage.
+
 ### LLM-safe credential entry (`--form`)
 
 When an agent is driving the CLI, putting a password on the command line means the agent sees it. `credential add --form` prompts for any missing `--username` / `--password` via a native OS dialog (osascript on macOS, zenity/kdialog on Linux, PowerShell on Windows). The value is typed directly into the OS popup — agent-mongo only receives the result, and the agent never sees the keystrokes.
@@ -175,24 +220,24 @@ agent-mongo credential add acme --form
 agent-mongo credential add acme --username deploy --form
 ```
 
-If no GUI session is available (SSH, headless host), the command exits with a structured error: `fixableBy: "human"` and a hint to run on the user's local machine or fall back to non-interactive flags. If the user cancels the dialog, the result is `fixableBy: "retry"`.
+If no GUI session is available (SSH, headless host), the command exits with a structured error: `fixable_by: "human"` and a hint to run on the user's local machine or fall back to non-interactive flags. If the user cancels the dialog, the result is `fixable_by: "retry"`.
 
-## Output
+## MCP server
 
-- All output is JSON to stdout
-- Errors go to stderr as `{ "error": "..." }` with non-zero exit code
-- Empty/null fields are pruned automatically
-- Long strings are truncated with companion `*Length` fields
-
-## Truncation
-
-Any string field exceeding `truncation.maxLength` (default 200) is truncated with a `…` suffix. A companion `{field}Length` key shows the full size.
+`agent-mongo mcp` runs the read-only data commands (`database`, `collection`, `query`, `connection`) as [Model Context Protocol](https://modelcontextprotocol.io) tools. Credential and config commands are not exposed.
 
 ```bash
-agent-mongo --full query find myapp users                        # expand all fields
-agent-mongo --expand name,bio query find myapp users             # expand specific fields
-agent-mongo config set truncation.maxLength 500                  # change default
+# stdio transport (launched by an MCP client)
+agent-mongo mcp
+
+# register with Claude Code
+claude mcp add agent-mongo -- agent-mongo mcp
+
+# Streamable HTTP transport
+agent-mongo mcp --http :8000
 ```
+
+The HTTP transport is unauthenticated unless `--oauth local` is set (self-contained OAuth 2.1) — bind to loopback or front it with an auth proxy. Run `agent-mongo mcp usage` for the full transport, registration, OAuth, and Tailscale details.
 
 ## Safety
 
@@ -200,21 +245,21 @@ agent-mongo is strictly read-only:
 
 - No insert, update, or delete operations
 - Aggregation pipelines reject `$out` and `$merge` stages
-- Results capped at `query.maxDocuments` (default 100) — use `--stream` to bypass
-- Timeout applies to both connections and queries (default 30s), override per-command with `--timeout <ms>`
+- Results capped at `query.maxDocuments` (default 100)
+- Timeout applies to both connections and queries (default 30s), override per-command with `-t/--timeout <ms>`
 
 ## Configuration
 
 Persistent settings via `agent-mongo config`:
 
-| Key                         | Default | Description                                  |
-| --------------------------- | ------- | -------------------------------------------- |
-| `defaults.limit`            | 20      | Default result limit for list/query commands |
-| `defaults.sampleSize`       | 5       | Default sample size for query sample         |
-| `defaults.schemaSampleSize` | 100     | Default sample size for schema inference     |
-| `query.timeout`             | 30000   | Query timeout in milliseconds                |
-| `query.maxDocuments`        | 100     | Maximum documents returned per query         |
-| `truncation.maxLength`      | 200     | Max string length before truncation          |
+| Key                         | Default | Range       | Description                                  |
+| --------------------------- | ------- | ----------- | -------------------------------------------- |
+| `defaults.limit`            | 20      | 1-1000      | Default result limit for list/query commands |
+| `defaults.sampleSize`       | 5       | 1-100       | Default sample size for query sample         |
+| `defaults.schemaSampleSize` | 100     | 1-1000      | Default sample size for schema inference     |
+| `query.timeout`             | 30000   | 1000-300000 | Query timeout in milliseconds                |
+| `query.maxDocuments`        | 100     | 1-10000     | Maximum documents returned per query         |
+| `truncation.maxLength`      | 200     | 50-100000   | Max string length before truncation          |
 
 ```bash
 agent-mongo config set defaults.limit 50
@@ -225,20 +270,23 @@ agent-mongo config reset               # reset all to defaults
 
 ## Environment variables
 
-| Variable                 | Description                                      |
-| ------------------------ | ------------------------------------------------ |
-| `AGENT_MONGO_CONNECTION` | Default connection alias                         |
-| `XDG_CONFIG_HOME`        | Override config directory (default: `~/.config`) |
+| Variable                  | Description                                              |
+| ------------------------- | ------------------------------------------------------- |
+| `AGENT_MONGO_CONNECTION`  | Default connection alias                                |
+| `AGENT_MONGO_NO_KEYCHAIN` | Set to `1` to store credentials in plaintext config     |
+| `XDG_CONFIG_HOME`         | Override config directory (default: `~/.config`)        |
 
 ## Development
 
 ```bash
-bun install
-bun run dev -- --help        # run in dev mode
-bun run typecheck             # type check
-bun test                      # run tests
-bun run lint                  # lint
+make dev ARGS="database list"    # go run ./cmd/agent-mongo database list
+make test                         # go test ./...
+make test-integration             # integration tests against a dockerised mongod
+make lint                         # golangci-lint
+make build                        # build the binary
 ```
+
+The version string is stamped at build time from git tags via `-ldflags` (`git describe --tags`), so a built binary reports its release; a plain `go build` reports `dev`.
 
 ## License
 

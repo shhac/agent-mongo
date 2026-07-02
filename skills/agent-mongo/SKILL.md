@@ -12,7 +12,9 @@ allowed-tools: Bash(agent-mongo *) Read Grep Glob
 
 # MongoDB exploration with `agent-mongo`
 
-`agent-mongo` is a read-only CLI binary on `$PATH`. All output is JSON to stdout. Errors go to stderr as `{ "error": "..." }` with non-zero exit.
+`agent-mongo` is a read-only CLI binary on `$PATH`. Default output is **NDJSON** — one JSON record per line on stdout. List commands emit one record per item, then `@`-prefixed metadata lines (`{"@meta": ...}` for context, `{"@pagination": ...}` for paging). Errors go to stderr as one JSON line `{"error": "...", "fixable_by": "agent"|"human"|"retry", "hint": "..."}` with a non-zero exit.
+
+`fixable_by` tells you who resolves the error: `agent` — fix your input and retry; `human` — needs the user (auth, a GUI dialog); `retry` — transient, run it again.
 
 ## Quick start (connections)
 
@@ -57,18 +59,13 @@ agent-mongo query sample myapp users --size 10 --filter '{"status":"active"}'  #
 agent-mongo query distinct myapp orders status                    # unique values
 ```
 
+`query find` emits one record per document, then a `{"@pagination": {"has_more": ..., "total_items": ...}}` line — `has_more` means more documents match beyond the limit, `total_items` is the full matching count.
+
 All JSON arguments (`--filter`, `--sort`, `--projection`, `--pipeline`) accept MongoDB Extended JSON for BSON types:
 
 ```bash
 agent-mongo query find myapp events --filter '{"createdAt":{"$gt":{"$date":"2026-01-01T00:00:00Z"}}}'
 agent-mongo query find myapp users --filter '{"_id":{"$oid":"665a1b2c3d4e5f6a7b8c9d0e"}}'
-```
-
-For large result sets, use `--stream` for NDJSON output (one JSON object per line), which bypasses `query.maxDocuments`:
-
-```bash
-agent-mongo query find myapp events --filter '{"type":"click"}' --stream
-agent-mongo query aggregate myapp orders '[{"$group":{"_id":"$status","count":{"$sum":1}}}]' --stream
 ```
 
 ## Aggregation
@@ -82,6 +79,17 @@ agent-mongo query aggregate myapp events '[{"$match":{"type":"purchase"}},{"$gro
 Pipeline can be passed as a positional argument, via `--pipeline` flag, or piped via stdin.
 
 Write stages (`$out`, `$merge`) are rejected — the CLI is strictly read-only.
+
+## Output format
+
+Default is NDJSON (`-f jsonl`). Switch with `-f/--format`:
+
+```bash
+agent-mongo database list -f json     # pretty {"data": [...], ...meta} envelope for lists
+agent-mongo query count myapp users -f yaml
+```
+
+`-f json` gives a single pretty envelope (`{"data": [...]}` for lists, a bare pretty object for single results) — easier to eyeball than NDJSON when you're reading output yourself.
 
 ## Connection management
 
@@ -105,7 +113,7 @@ agent-mongo credential list                              # passwords always reda
 agent-mongo credential remove acme --force               # even if connections reference it
 ```
 
-Credentials are stored separately from connections. When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
+Credentials are stored separately from connections, in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) with plaintext-config fallback. `credential list` shows the `storage` source per credential. When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
 
 ### LLM-safe entry with `--form`
 
@@ -116,7 +124,7 @@ agent-mongo credential add acme --form                              # both field
 agent-mongo credential add acme --username deploy --form            # only password prompted
 ```
 
-Failure modes return a structured error with `fixableBy`:
+Failure modes return a structured error with `fixable_by`:
 
 - `human` — no GUI session available (SSH, headless host). Ask the user to run on their local machine, or fall back to non-interactive `--username <u> --password <secret>`.
 - `retry` — user cancelled the dialog. Re-running the same command is the right next step.
@@ -134,12 +142,14 @@ These are global flags — place them before or after the command.
 
 ## Timeout
 
-Default timeout is 30s (configurable via `query.timeout`). Applies to both connection and query phases. Override per-command:
+Default timeout is 30s (configurable via `query.timeout`). Applies to both connection and query phases. Override per-command with `-t/--timeout <ms>`:
 
 ```bash
 agent-mongo --timeout 60000 query find myapp large_collection --filter '{"status":"active"}'
 agent-mongo --timeout 120000 collection schema myapp events
 ```
+
+On timeout (MongoDB code 50), the error hint suggests increasing the timeout or checking indexes.
 
 ## Configuration
 
@@ -152,12 +162,16 @@ agent-mongo config reset                                 # restore defaults
 
 Key settings: `defaults.limit` (20), `defaults.sampleSize` (5), `defaults.schemaSampleSize` (100), `query.timeout` (30000ms), `query.maxDocuments` (100), `truncation.maxLength` (200).
 
+## MCP server
+
+`agent-mongo mcp` runs the read-only data commands (`database`, `collection`, `query`, `connection`) as MCP tools over stdio (or Streamable HTTP with `--http <addr>`). Credential and config commands are not exposed. See `agent-mongo mcp usage` for registration, OAuth, and Tailscale details.
+
 ## Safety
 
 - **Read-only**: No write operations exist
 - **Aggregation**: `$out` and `$merge` stages rejected
-- **Result cap**: `query.maxDocuments` (default 100) — use `--stream` to bypass
-- **Timeout**: applies to both connections and queries (default 30s), override per-command with `--timeout <ms>`
+- **Result cap**: `query.maxDocuments` (default 100)
+- **Timeout**: applies to both connections and queries (default 30s), override per-command with `-t/--timeout <ms>`
 
 ## Per-command usage docs
 
@@ -165,12 +179,13 @@ Every command group has a `usage` subcommand with detailed, LLM-optimized docs:
 
 ```bash
 agent-mongo usage                  # top-level overview
-agent-mongo connection usage       # connection + credential commands
+agent-mongo connection usage       # connection commands
 agent-mongo credential usage       # credential management
 agent-mongo database usage          # database commands
 agent-mongo collection usage       # collection commands
 agent-mongo query usage            # all query commands
 agent-mongo config usage           # settings keys, defaults, validation
+agent-mongo mcp usage              # MCP server transports and registration
 ```
 
 Use `agent-mongo <command> usage` when you need deep detail on a specific domain before acting.
@@ -178,4 +193,4 @@ Use `agent-mongo <command> usage` when you need deep detail on a specific domain
 ## References
 
 - [references/commands.md](references/commands.md): full command map + all flags
-- [references/output.md](references/output.md): JSON output shapes + field details
+- [references/output.md](references/output.md): NDJSON output shapes + field details
