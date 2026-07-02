@@ -65,6 +65,7 @@ func newRootCmd(version string) *cobra.Command {
 	clicollection.Register(root, g.shared)
 	cliquery.Register(root, g.shared)
 	registerUsage(root)
+	registerMCP(root)
 
 	return root
 }

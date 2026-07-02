@@ -10,6 +10,8 @@ github.com/dchest/jsmin v0.0.0-20220218165748-59f39799265f h1:OGqDDftRTwrvUoL6pO
 github.com/dchest/jsmin v0.0.0-20220218165748-59f39799265f/go.mod h1:Dv9D0NUlAsaQcGQZa5kc5mqR9ua72SmA8VXi4cd+cBw=
 github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
 github.com/godbus/dbus/v5 v5.2.2/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
+github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
+github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
@@ -29,6 +31,10 @@ github.com/randall77/makefat v0.0.0-20210315173500-7ddd0e42c844/go.mod h1:T1TLSf
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shhac/lib-agent-cli v0.17.0 h1:9Jwvpjg6YxxcJ9B2xmKE3fqPUjZ2m738e/vsor4ds6A=
 github.com/shhac/lib-agent-cli v0.17.0/go.mod h1:Yv/GpayyZLZmwY0HpIgm5WWnXxOz9yYM/bLMuKvIy7k=
+github.com/shhac/lib-agent-keyring v0.1.1 h1:cAwFr0UzlQ0xsgO0zY607lmwhvSamPN6Tp1DCNJO7hg=
+github.com/shhac/lib-agent-keyring v0.1.1/go.mod h1:nTk+YfRDc2dc8Nghd1o9w4c40xU8Pqx/UgToN0yGvZ8=
+github.com/shhac/lib-agent-mcp v0.12.0 h1:JVdlf6ny8k676c5wl3gNeQW4f4XbFnPBLu6Io3zzVUE=
+github.com/shhac/lib-agent-mcp v0.12.0/go.mod h1:Hx/X1hJagJP7HDt72hPd4yeoaEggLuH9eWQzmovVOAo=
 github.com/shhac/lib-agent-output v0.10.0 h1:m/o7/uxf3FLS7M+qcb4x+socjc7hEsvQM+tJilh2+7Y=
 github.com/shhac/lib-agent-output v0.10.0/go.mod h1:YyO2KSKAZxRrCJGanfB6qAyV0DvG+GSsZNShQoLslT0=
 github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
