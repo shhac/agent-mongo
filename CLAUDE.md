@@ -1,98 +1,121 @@
 # agent-mongo
 
-Read-only MongoDB CLI for AI agents. TypeScript + Bun, compiled to standalone binaries.
+Read-only MongoDB CLI for AI agents. Go + cobra on the `lib-agent-*` family
+libraries, compiled to standalone binaries.
 
 ## Architecture
 
 ```
-src/
-├── index.ts                     # CLI entry — assembles the root vipvot Command and dispatches
+cmd/agent-mongo/main.go        # entry point; version injected via -ldflags
+internal/
 ├── cli/
-│   ├── connection/              # connection add/remove/update/list/test/set-default
-│   ├── credential/              # credential add/remove/list
-│   ├── config/                  # config get/set/reset/list-keys
-│   ├── database/                # database list/stats
-│   ├── collection/              # collection list/schema/indexes/stats
-│   ├── query/                   # query find/get/count/sample/distinct/aggregate
-│   └── usage/                   # LLM-optimized top-level usage text
-├── lib/
-│   ├── config.ts                # ~/.config/agent-mongo/ config + connection + credential storage
-│   ├── output.ts                # printJson, printJsonRaw, printPaginated, printNdjsonStream, printError
-│   ├── compact-json.ts          # pruneEmpty() — strips null/empty/blank-string fields
-│   ├── dialog/                  # native OS dialog wrapper for LLM-safe secret entry
-│   │   ├── index.ts             #   Prompter interface, sentinels, classifyError, setDefault
-│   │   ├── spawn-backend.ts     #   Bun.spawn → osascript / zenity / kdialog / PowerShell
-│   │   └── available.ts         #   per-platform GUI availability pre-flight
-│   ├── errors.ts                # enhanceErrorMessage — timeout hints, index suggestions
-│   ├── keychain.ts              # macOS keychain read/write/delete for credentials
-│   ├── parse-json.ts            # EJSON-aware JSON parsing for --filter, --sort, --projection, --pipeline
-│   ├── serialize.ts             # BSON → JSON-safe conversion (ObjectId, Date, Binary, Long, etc.)
-│   ├── timeout.ts               # CLI --timeout override + getTimeout() helper
-│   ├── truncation.ts            # Generic string truncation with {field}Length companion
-│   └── version.ts               # Version from build-time define / env / package.json
-└── mongo/
-    ├── client.ts                # MongoClient factory (alias resolution, connection pool)
-    ├── databases.ts             # listDatabases, getDatabaseStats
-    ├── collections.ts           # listCollections, getCollectionStats, validateCollectionExists
-    ├── schema.ts                # inferSchema — sample-based field/type discovery
-    ├── indexes.ts               # listIndexes
-    ├── query.ts                 # findDocuments, streamFind, findById, countDocuments, getDistinctValues
-    ├── aggregate.ts             # runAggregate, streamAggregate with $out/$merge rejection
+│   ├── root.go                # lib-agent-cli NewRoot + domain flags -c/--expand/--full
+│   ├── usage.go               # top-level LLM reference card
+│   ├── conntest.go            # `connection test` (kept here for the driver dep)
+│   ├── mcp.go                 # `mcp` server via lib-agent-mcp (registered last)
+│   ├── shared/                # GlobalFlags DTO, WithSession, defaults, RegisterUsage
+│   ├── connection/            # connection add/remove/update/list/set-default
+│   ├── credential/            # credential add (--form dialog)/remove/list
+│   ├── configcmd/             # config get/set/reset/list-keys — keyDef table
+│   ├── database/              # database list/stats
+│   ├── collection/            # collection list/schema/indexes/stats
+│   └── query/                 # query find/get/count/sample/distinct/aggregate
+├── config/                    # ~/.config/agent-mongo/config.json I/O + settings
+├── credential/                # __KEYCHAIN__ sentinel store via lib-agent-keyring
+├── mongo/                     # client factory, databases, collections, indexes,
+│                              #   schema inference, query, aggregate
+├── serialize/                 # BSON → JSON-safe (ObjectId→hex, Date→ISO, …)
+├── truncation/                # any-string truncation + {field}Length companion
+├── ejson/                     # Extended JSON parsing for --filter/--sort/--pipeline
+├── errors/                    # fixable_by classification + timeout hints
+├── output/                    # lib-agent-output adapters (PrintResult/PrintRaw/PrintList)
+└── integration/               # end-to-end tests against a dockerised mongod
 ```
 
 ## Key patterns
 
-- **Command registration**: Each `cli/*/index.ts` exports `buildXyzCommand(): Command` returning a constructed vipvot `Command` with its leaves attached. `src/index.ts` builds the root and `addCommand`s each group. Each leaf file exports a `buildXCommand(): Command` factory.
-- **Persistent flags / globals**: `cli/_globals.ts` owns module-scoped `Ref`s for the persistent flags (`-c/--connection`, `--expand`, `--full`, `--timeout`) plus the `applyGlobals` `persistentPreRun` handler. Subcommands import `resolveConnectionAlias()` rather than walking the parent chain — the cobra-idiomatic pattern.
-- **Output**: All commands use `printJson()` or `printPaginated()` from `lib/output.ts`. Admin/config commands use `printJsonRaw()` (no truncation). Errors use `printError()`. All output is JSON, empty/null fields auto-pruned via `pruneEmpty()`.
-- **Truncation**: Any string field exceeding `truncation.maxLength` gets truncated with `…` and a companion `{field}Length` key. Controlled by `--expand` and `--full` global flags. Unlike lin (which only truncates preset field names), this truncates any string over the limit.
-- **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default > error listing available connections. Connections can reference named credentials for shared auth.
-- **Credential separation**: Credentials (username/password) stored separately from connections (host/options). Connections reference credentials by name via `credential` field. Backward compatible — connections without a credential use the URI as-is.
-- **Error messages**: Include valid values so LLMs can self-correct (e.g., `Connection "x" not found. Available: local, staging`).
-- **BSON serialization**: `mongo/serialize.ts` converts all BSON types to JSON-safe values before output. ObjectId → hex string, Date → ISO string, Binary → base64, Long → number (if safe) or string, Decimal128 → string, UUID → string, RegExp → string.
-- **Read-only safety**: No write operations exist. `mongo/aggregate.ts` rejects `$out`/`$merge` stages. Results capped at `query.maxDocuments`.
-- **Usage subcommands**: Each command group has a `usage` subcommand providing LLM-friendly docs. When modifying a command's behavior, options, or flags, update its usage text too.
-- **Collection validation**: `mongo/collections.ts` validates collection existence before operations like schema inference. Error messages include a hint to list available collections.
-- **Timeout**: `lib/timeout.ts` provides `getTimeout()` — checks CLI `--timeout` override first, then config `query.timeout`, then default 30s. All mongo operations use this helper.
-- **Timeout hints**: `lib/errors.ts` detects MongoDB timeout errors (code 50) and enhances messages with `--timeout` flag and config suggestions.
-- **Config validation**: `cli/config/valid-keys.ts` defines all valid keys with types, defaults, and min/max ranges. Invalid keys or out-of-range values produce errors listing valid options.
-- **LLM-safe secret entry**: `lib/dialog/` is a self-contained wrapper. Consumers (e.g. `cli/credential/form.ts`) import only `lib/dialog/index.ts` — never the spawn backend or platform availability files directly. Replacing the backend (e.g. with an Electron sidecar) is a one-file swap. The `Prompter` interface, `setDefault()` test hook, and sentinel→category mapping (`classifyError`) mirror agent-sql's `internal/dialog` package.
+- **Family libraries**: `lib-agent-cli` (root scaffolding, XDG paths, creds
+  store, secret dialog), `lib-agent-output` (NDJSON wire contract, errors,
+  pruning), `lib-agent-keyring` (OS secret store), `lib-agent-mcp` (`mcp`
+  command). Prefer these over hand-rolling; agent-sql and lin are the sibling
+  reference implementations.
+- **Command registration**: each group package exports
+  `Register(root, globals)`; leaves read live global flags through the
+  `func() *shared.GlobalFlags` closure — never by walking the cobra parent
+  chain. The MCP command is registered last so it reflects the full tree.
+- **Output contract**: NDJSON records on stdout; list metadata rides on
+  `@`-prefixed lines (`@meta`, `@pagination`); `-f json`/`-f yaml` produce a
+  `{"data": [...]}` envelope. Data-bearing output goes through
+  `output.PrintResult`/`PrintList` (prune + truncate); admin receipts through
+  `output.PrintRaw` (prune only). Errors: return them from `RunE` — libcli.Run
+  renders `{error, fixable_by, hint}` on stderr once, exit 1. Never pre-print
+  errors in commands.
+- **Truncation**: any string over `truncation.maxLength` is cut with `…` plus a
+  `{field}Length` companion key. Configured process-wide from the root
+  pre-run (`--expand`, `--full`, config), applied inside the output helpers.
+- **Connection resolution**: `-c` flag > `AGENT_MONGO_CONNECTION` env > config
+  default > error listing available aliases. Connections reference named
+  credentials; `__KEYCHAIN__` sentinel in config.json means the real values
+  live in the OS keychain (service `app.paulie.agent-mongo`, accounts
+  `username:<alias>` / `password:<alias>`).
+- **Error messages include valid values** so LLMs can self-correct (e.g.
+  `Connection "x" not found. Available: local, staging`).
+- **BSON serialization** (`internal/serialize`): ObjectId → hex, Date →
+  ISO-8601, Binary → base64 (UUID subtype → uuid string), int64 → number when
+  ≤2^53-1 else string, Decimal128 → string, Regex → `/pattern/flags`.
+- **Read-only safety**: no write operations; `$out`/`$merge` rejected in
+  pipelines; results capped at `query.maxDocuments`.
+- **Timeouts**: `-t/--timeout` (ms) > config `query.timeout` > 30s, applied as
+  the driver's client-level CSOT (`SetTimeout`); per-command contexts get a 5s
+  grace so server-side timeout errors (better hints) fire first.
+- **Usage subcommands**: every group has an LLM-optimized `usage` leaf. When
+  changing a command's behavior, options, or output shape, update its
+  usageText and the top-level card in `internal/cli/usage.go`.
+- **LLM-safe secret entry**: `credential add --form` uses
+  `lib-agent-cli/dialog`; tests swap the prompter via
+  `dialog.SetDefault(&dialogtest.Recorder{...})`.
 
 ## Commands
 
-Run `bun run dev -- usage` for the full command reference. Each command also supports `<command> usage` for detailed per-command docs.
+Run `make dev ARGS=usage` for the full command reference. Each command group
+also supports `<group> usage` for detailed per-command docs.
 
 ## Development
 
 ```bash
-bun install
-bun run dev -- <command>     # run in dev mode
-bun run typecheck            # tsc --noEmit
-bun test                     # bun:test
-bun run lint                 # oxlint
-bun run format               # oxfmt
+make build                   # build ./agent-mongo (version from git describe)
+make dev ARGS="usage"        # go run
+make test                    # unit tests
+make test-integration        # end-to-end vs throwaway docker mongo:8
+make lint                    # golangci-lint
 ```
+
+Tests are table-driven stdlib `testing`, no mocking libraries. Config-touching
+tests isolate with `t.Setenv("XDG_CONFIG_HOME", t.TempDir())` and
+`t.Setenv("AGENT_MONGO_NO_KEYCHAIN", "1")`. Integration tests seed and drop
+their own database — never point them at real data.
 
 ## Release
 
 ```bash
-bun run release patch        # bumps version, commits, tags, pushes
-bun run build:release        # cross-platform binaries in release/
+git tag vX.Y.Z && git push origin main vX.Y.Z
 ```
 
-Then create GitHub release and update homebrew-tap formula with new sha256s.
+The tag push triggers `.github/workflows/release.yml` (shared
+`shhac/homebrew-tap` go-release workflow): cross-builds, GitHub Release, and
+Homebrew formula update. No version file — `main.version` comes from ldflags.
 
 ## Keeping docs in sync
 
-- **Skill** (`skills/agent-mongo/SKILL.md`): The Claude Code skill that agents use to discover and operate `agent-mongo`. Update it when commands, flags, output shapes, or usage patterns change.
-- **README** (`README.md`): The public-facing docs. Update the command map, config table, and examples when commands or behavior change.
-- **Release steps**: Scripts like `bun run release` and `bun run build:release` may change your working directory. After running release steps, verify your `pwd` before operating on files — paths will be relative to wherever you end up.
+- **Skill** (`skills/agent-mongo/SKILL.md` + `references/`): what agents use to
+  operate the CLI. Update when commands, flags, or output shapes change.
+- **README** (`README.md`): public docs — command map, config table, examples.
+- **Design docs** (`design-docs/`): tracked; stale/internal notes go to
+  `design-docs/archive/` (gitignored).
 
 ## Conventions
 
-- TypeScript strict mode, ES2022 target, Bun bundler resolution
-- `type` over `interface` (enforced by oxlint)
-- kebab-case filenames (enforced by oxlint)
-- Max 350 lines per file, max 2 params per function (oxlint warnings)
-- Pre-commit hook: oxlint fix + oxfmt
-- Tests: bun:test, no mocking libraries, inline fixtures, pure functions preferred
+- Go 1.26, gofmt (pre-commit hook), `go vet` clean
+- Errors bubble; only the top-level renders them
+- Package names: domain packages are nouns (`serialize`, `truncation`);
+  `internal/cli/*` mirrors the command tree
