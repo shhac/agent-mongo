@@ -19,3 +19,4 @@ jobs:
       desc: "Read-only MongoDB CLI for AI agents"
       formula_class: AgentMongo
       help_match: "Read-only MongoDB CLI for AI agents"
+      license: "LicenseRef-PolyForm-Perimeter-1.0.0"
