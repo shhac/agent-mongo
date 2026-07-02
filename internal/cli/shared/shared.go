@@ -6,10 +6,9 @@ package shared
 import (
 	"context"
 	"time"
-)
 
-// DefaultTimeoutMS is the default query timeout (30s).
-const DefaultTimeoutMS = 30_000
+	"github.com/shhac/agent-mongo/internal/config"
+)
 
 // GlobalFlags is a snapshot of the root command's persistent flags, resolved
 // against persisted settings (timeout fallback applied in the root pre-run).
@@ -26,9 +25,22 @@ type GlobalFlags struct {
 func (g *GlobalFlags) Timeout() time.Duration {
 	ms := g.TimeoutMS
 	if ms <= 0 {
-		ms = DefaultTimeoutMS
+		ms = config.SettingOr("query.timeout")
 	}
 	return time.Duration(ms) * time.Millisecond
+}
+
+// EffectiveLimit resolves a --limit flag value against the configured default
+// page size, capped at query.maxDocuments.
+func EffectiveLimit(flagValue int) int {
+	limit := flagValue
+	if limit <= 0 {
+		limit = config.SettingOr("defaults.limit")
+	}
+	if max := config.SettingOr("query.maxDocuments"); limit > max {
+		return max
+	}
+	return limit
 }
 
 // MakeContext builds the per-command context. The deadline gets a small grace

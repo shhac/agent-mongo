@@ -1,6 +1,8 @@
 package query
 
 import (
+	"maps"
+
 	"github.com/spf13/cobra"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
@@ -51,20 +53,12 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 					return err
 				}
 
-				items := make([]any, len(result.Documents))
-				for i, doc := range result.Documents {
-					items[i] = doc
-				}
-				meta := map[string]any{
-					"@meta": map[string]any{"database": ref.DB, "collection": ref.Collection},
-				}
-				if result.HasMore || result.TotalMatching > 0 {
-					meta["@pagination"] = map[string]any{
-						"has_more":    result.HasMore,
-						"total_items": result.TotalMatching,
-					}
-				}
-				return output.PrintList(items, meta)
+				meta := output.Meta(map[string]any{
+					"database":   ref.DB,
+					"collection": ref.Collection,
+				})
+				maps.Copy(meta, output.PaginationMeta(result.HasMore, "", int(result.TotalMatching)))
+				return output.PrintList(result.Documents, meta)
 			})
 		},
 	}

@@ -1,12 +1,10 @@
 package query
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
+	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 )
@@ -54,15 +52,14 @@ func registerSample(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
 
-			requestedSize := shared.SampleSizeDefault()
-			if size != "" {
-				n, err := strconv.Atoi(size)
-				if err != nil || n < 1 {
-					return fmt.Errorf("Invalid --size: %q. Must be a positive integer.", size)
-				}
-				requestedSize = n
+			requestedSize, err := shared.ParsePositiveInt(size, "--size")
+			if err != nil {
+				return err
 			}
-			if max := shared.MaxDocuments(); requestedSize > max {
+			if requestedSize == 0 {
+				requestedSize = config.SettingOr("defaults.sampleSize")
+			}
+			if max := config.SettingOr("query.maxDocuments"); requestedSize > max {
 				requestedSize = max
 			}
 
@@ -76,17 +73,11 @@ func registerSample(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				if err != nil {
 					return err
 				}
-				items := make([]any, len(docs))
-				for i, doc := range docs {
-					items[i] = doc
-				}
-				return output.PrintList(items, map[string]any{
-					"@meta": map[string]any{
-						"database":   ref.DB,
-						"collection": ref.Collection,
-						"sampleSize": len(docs),
-					},
-				})
+				return output.PrintList(docs, output.Meta(map[string]any{
+					"database":   ref.DB,
+					"collection": ref.Collection,
+					"sampleSize": len(docs),
+				}))
 			})
 		},
 	}

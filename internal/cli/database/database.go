@@ -22,13 +22,9 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 				if err != nil {
 					return err
 				}
-				items := make([]any, len(result.Databases))
-				for i, db := range result.Databases {
-					items[i] = db
-				}
-				return output.PrintList(items, map[string]any{
-					"@meta": map[string]any{"totalSize": result.TotalSize},
-				})
+				return output.PrintList(result.Databases, output.Meta(map[string]any{
+					"totalSize": result.TotalSize,
+				}))
 			})
 		},
 	})

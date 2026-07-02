@@ -5,7 +5,6 @@ package configcmd
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,35 +14,11 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-type keyDef struct {
-	key          string
-	defaultValue int
-	description  string
-	min, max     int
-}
-
-var keyDefs = []keyDef{
-	{"defaults.limit", 20, "Default result limit for list/query commands", 1, 1000},
-	{"defaults.sampleSize", 5, "Default sample size for query sample", 1, 100},
-	{"defaults.schemaSampleSize", 100, "Default sample size for schema inference", 1, 1000},
-	{"query.timeout", 30000, "Query timeout in milliseconds", 1000, 300000},
-	{"query.maxDocuments", 100, "Maximum documents returned per query", 1, 10000},
-	{"truncation.maxLength", 200, "Max string length before truncation (any field)", 50, 100000},
-}
-
-func findKey(key string) (keyDef, bool) {
-	for _, def := range keyDefs {
-		if def.key == key {
-			return def, true
-		}
-	}
-	return keyDef{}, false
-}
-
 func validKeys() string {
-	names := make([]string, len(keyDefs))
-	for i, def := range keyDefs {
-		names[i] = def.key
+	defs := config.SettingDefs()
+	names := make([]string, len(defs))
+	for i, def := range defs {
+		names[i] = def.Key
 	}
 	sort.Strings(names)
 	return strings.Join(names, ", ")
@@ -51,20 +26,6 @@ func validKeys() string {
 
 func unknownKeyError(key string) error {
 	return fmt.Errorf("Unknown key: %q. Valid keys: %s", key, validKeys())
-}
-
-func parseValue(def keyDef, raw string) (int, error) {
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("%q must be an integer. Got: %q", def.key, raw)
-	}
-	if n < def.min {
-		return 0, fmt.Errorf("%q minimum is %d. Got: %d", def.key, def.min, n)
-	}
-	if n > def.max {
-		return 0, fmt.Errorf("%q maximum is %d. Got: %d", def.key, def.max, n)
-	}
-	return n, nil
 }
 
 func Register(root *cobra.Command) {
@@ -76,7 +37,7 @@ func Register(root *cobra.Command) {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			key := args[0]
-			if _, ok := findKey(key); !ok {
+			if _, ok := config.FindSetting(key); !ok {
 				return unknownKeyError(key)
 			}
 			result := map[string]any{"key": key}
@@ -93,11 +54,11 @@ func Register(root *cobra.Command) {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			key := args[0]
-			def, ok := findKey(key)
+			def, ok := config.FindSetting(key)
 			if !ok {
 				return unknownKeyError(key)
 			}
-			value, err := parseValue(def, args[1])
+			value, err := def.Parse(args[1])
 			if err != nil {
 				return err
 			}
@@ -125,13 +86,14 @@ func Register(root *cobra.Command) {
 		Short: "List all valid config keys with defaults",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			keys := make([]map[string]any, len(keyDefs))
-			for i, def := range keyDefs {
+			defs := config.SettingDefs()
+			keys := make([]map[string]any, len(defs))
+			for i, def := range defs {
 				keys[i] = map[string]any{
-					"key":         def.key,
+					"key":         def.Key,
 					"type":        "number",
-					"default":     def.defaultValue,
-					"description": def.description,
+					"default":     def.Default,
+					"description": def.Description,
 				}
 			}
 			return output.PrintRaw(map[string]any{"keys": keys})

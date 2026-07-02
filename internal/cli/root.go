@@ -73,20 +73,14 @@ func newRootCmd(version string) *cobra.Command {
 // applyConfigDefaults resolves persisted settings into the process-wide
 // singletons before any command runs.
 func applyConfigDefaults(g *rootFlags) {
-	settings := config.ReadSettings()
-
-	maxLength := 0
-	if settings.Truncation != nil {
-		maxLength = settings.Truncation.MaxLength
-	}
 	truncation.Configure(truncation.Options{
 		Expand:    g.Expand,
 		Full:      g.Full,
-		MaxLength: maxLength,
+		MaxLength: config.SettingOr("truncation.maxLength"),
 	})
 
-	if g.TimeoutMS == 0 && settings.Query != nil {
-		g.TimeoutMS = settings.Query.Timeout
+	if g.TimeoutMS == 0 {
+		g.TimeoutMS = config.SettingOr("query.timeout")
 	}
 
 	appoutput.ConfigureFormat(g.Format)

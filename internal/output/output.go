@@ -44,11 +44,26 @@ func PrintRaw(item any) error {
 
 // PrintList streams records with optional @-metadata (NDJSON) or a {"data":
 // [...]} envelope (json/yaml). Items are pruned + truncated.
-func PrintList(items []any, meta map[string]any) error {
-	return out.WriteList(os.Stdout, ResolveFormat(), items, meta, pruneTruncate)
+func PrintList[T any](items []T, meta map[string]any) error {
+	widened := make([]any, len(items))
+	for i, item := range items {
+		widened[i] = item
+	}
+	return out.WriteList(os.Stdout, ResolveFormat(), widened, meta, pruneTruncate)
 }
 
-// PaginationMeta builds the standard @pagination metadata entry.
+// MetaKeyMeta is the @-line key carrying per-command context (database,
+// collection, sample sizes, …).
+const MetaKeyMeta = "@meta"
+
+// Meta wraps command-context fields in the standard @meta metadata entry.
+// Compose with PaginationMeta via maps.Copy.
+func Meta(fields map[string]any) map[string]any {
+	return map[string]any{MetaKeyMeta: fields}
+}
+
+// PaginationMeta builds the standard @pagination metadata entry, or nil when
+// there is nothing to report.
 func PaginationMeta(hasMore bool, nextCursor string, totalItems int) map[string]any {
 	if !hasMore && totalItems == 0 {
 		return nil

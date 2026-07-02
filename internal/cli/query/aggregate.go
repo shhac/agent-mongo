@@ -46,17 +46,11 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 				if err != nil {
 					return err
 				}
-				items := make([]any, len(docs))
-				for i, doc := range docs {
-					items[i] = doc
-				}
-				return output.PrintList(items, map[string]any{
-					"@meta": map[string]any{
-						"database":   ref.DB,
-						"collection": ref.Collection,
-						"count":      len(docs),
-					},
-				})
+				return output.PrintList(docs, output.Meta(map[string]any{
+					"database":   ref.DB,
+					"collection": ref.Collection,
+					"count":      len(docs),
+				}))
 			})
 		},
 	}
