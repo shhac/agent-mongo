@@ -1,7 +1,7 @@
 # Go Rewrite Plan
 
-**Status: IN PROGRESS** — work happens on `paul/migrate-to-go`; merging that branch
-back to `main` should leave a pure Go CLI project.
+**Status: COMPLETE** — the repo is a pure Go CLI project; the Bun-era
+implementation was removed after the Go port reached verified parity.
 
 ## Why
 

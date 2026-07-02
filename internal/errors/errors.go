@@ -1,6 +1,6 @@
 // Package errors classifies MongoDB failures into the family error contract
 // ({error, fixable_by, hint}) and enhances timeout errors with actionable
-// hints, mirroring the TS enhanceErrorMessage behavior.
+// hints (raise the timeout, check indexes).
 package errors
 
 import (

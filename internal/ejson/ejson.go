@@ -27,8 +27,7 @@ func ParseArray(value, name string) (bson.A, error) {
 		if len(preview) > 100 {
 			preview = preview[:100] + "..."
 		}
-		// Distinguish "valid JSON but not an array" from unparseable input,
-		// matching the TS error messages.
+		// Distinguish "valid JSON but not an array" from unparseable input.
 		var doc bson.D
 		if docErr := bson.UnmarshalExtJSON([]byte(value), false, &doc); docErr == nil {
 			return nil, fmt.Errorf("--%s must be a JSON array", name)

@@ -1,7 +1,7 @@
 // Package serialize converts BSON-decoded values into JSON-safe values with
-// the same LLM-friendly mapping as the TS implementation: ObjectId → bare hex,
-// Date → ISO-8601, Binary → base64, int64 → number when safe else string,
-// Decimal128/UUID/RegExp → string.
+// an LLM-friendly mapping: ObjectId → bare hex, Date → ISO-8601, Binary →
+// base64, int64 → number when safe else string, Decimal128/UUID/RegExp →
+// string. No EJSON wrappers ({"$oid": ...}) on output.
 package serialize
 
 import (
@@ -38,8 +38,8 @@ func Value(value any) any {
 		}
 		return base64.StdEncoding.EncodeToString(v.Data)
 	case int64:
-		// Match the TS driver's promoteLongs behavior: numbers when exactly
-		// representable in a double, strings otherwise.
+		// Numbers only when exactly representable in a double (what JSON
+		// consumers can trust), strings otherwise.
 		if v >= -maxSafeInteger && v <= maxSafeInteger {
 			return v
 		}

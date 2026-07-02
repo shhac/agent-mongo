@@ -45,7 +45,7 @@ func availableConnections() string {
 	return list
 }
 
-// ResolveAlias applies the TS resolution order:
+// ResolveAlias resolves the connection to use:
 // -c flag > AGENT_MONGO_CONNECTION env > config default > error.
 func ResolveAlias(flag string) (string, error) {
 	if trimmed := strings.TrimSpace(flag); trimmed != "" {
@@ -62,6 +62,41 @@ func ResolveAlias(flag string) (string, error) {
 		availableConnections())
 }
 
+// clientOptions builds driver options tuned for a short-lived, single-shot
+// CLI process: a single pooled connection, no warm minimum, and a short idle
+// lifetime — anything larger only slows process exit.
+func clientOptions(
+	conn config.Connection, timeout time.Duration,
+) (*options.ClientOptions, error) {
+	clientOpts := options.Client().
+		ApplyURI(conn.ConnectionString).
+		SetMaxPoolSize(1).
+		SetMinPoolSize(0).
+		SetMaxConnIdleTime(5 * time.Second).
+		SetServerSelectionTimeout(10 * time.Second)
+	if timeout > 0 {
+		clientOpts = clientOpts.SetTimeout(timeout).SetConnectTimeout(timeout)
+	}
+
+	if conn.Credential == "" {
+		return clientOpts, nil
+	}
+	cred, ok := credential.Get(conn.Credential)
+	if !ok {
+		available := strings.Join(credential.Aliases(), ", ")
+		if available == "" {
+			available = "(none)"
+		}
+		return nil, fmt.Errorf(
+			"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
+			conn.Credential, available)
+	}
+	return clientOpts.SetAuth(options.Credential{
+		Username: cred.Username,
+		Password: cred.Password,
+	}), nil
+}
+
 // Connect resolves the alias, builds client options (CLI-friendly pool
 // settings, optional named credential), and connects.
 func Connect(opts ConnectOpts) (*Session, error) {
@@ -76,31 +111,9 @@ func Connect(opts ConnectOpts) (*Session, error) {
 			alias, availableConnections())
 	}
 
-	clientOpts := options.Client().
-		ApplyURI(conn.ConnectionString).
-		SetMaxPoolSize(1).
-		SetMinPoolSize(0).
-		SetMaxConnIdleTime(5 * time.Second).
-		SetServerSelectionTimeout(10 * time.Second)
-	if opts.Timeout > 0 {
-		clientOpts = clientOpts.SetTimeout(opts.Timeout).SetConnectTimeout(opts.Timeout)
-	}
-
-	if conn.Credential != "" {
-		cred, ok := credential.Get(conn.Credential)
-		if !ok {
-			available := strings.Join(credential.Aliases(), ", ")
-			if available == "" {
-				available = "(none)"
-			}
-			return nil, fmt.Errorf(
-				"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
-				conn.Credential, available)
-		}
-		clientOpts = clientOpts.SetAuth(options.Credential{
-			Username: cred.Username,
-			Password: cred.Password,
-		})
+	clientOpts, err := clientOptions(conn, opts.Timeout)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := driver.Connect(clientOpts)

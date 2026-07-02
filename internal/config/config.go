@@ -1,6 +1,6 @@
-// Package config owns ~/.config/agent-mongo/config.json — the same file, same
-// schema, the TypeScript implementation reads and writes. Credentials with
-// keychain-backed values keep the "__KEYCHAIN__" sentinel; resolution lives in
+// Package config owns ~/.config/agent-mongo/config.json: connections,
+// credential entries, and persisted settings. Credentials with keychain-backed
+// values hold the "__KEYCHAIN__" sentinel; resolution lives in
 // internal/credential.
 package config
 
@@ -63,7 +63,8 @@ func filePath() string { return filepath.Join(Dir(), "config.json") }
 func store() creds.Store { return creds.Store{Path: filePath()} }
 
 // Read returns the parsed config, or a zero Config when the file is missing
-// or unparseable (matching the TS behavior of treating both as empty).
+// or unparseable — a corrupt file behaves like an empty one rather than
+// wedging every command.
 func Read() Config {
 	data, err := os.ReadFile(filePath())
 	if err != nil {

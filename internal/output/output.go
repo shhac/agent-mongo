@@ -27,8 +27,9 @@ func ResolveFormat() out.Format {
 	return format
 }
 
-// pruneTruncate is the pruner for data-bearing output: strip empty fields,
-// then truncate oversized strings (same order as the TS pipeline).
+// pruneTruncate is the pruner for data-bearing output: strip empty fields
+// first, then truncate oversized strings — truncating first could leave a
+// companion {field}Length key whose field was later pruned.
 func pruneTruncate(v any) any { return truncation.Apply(out.PruneEmpty(v)) }
 
 // PrintResult emits a single data-bearing record (pruned + truncated).

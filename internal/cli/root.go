@@ -71,8 +71,7 @@ func newRootCmd(version string) *cobra.Command {
 }
 
 // applyConfigDefaults resolves persisted settings into the process-wide
-// singletons before any command runs — the Go equivalent of the TS
-// persistentPreRun applyGlobals.
+// singletons before any command runs.
 func applyConfigDefaults(g *rootFlags) {
 	settings := config.ReadSettings()
 

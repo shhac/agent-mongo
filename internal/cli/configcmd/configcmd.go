@@ -1,5 +1,5 @@
 // Package configcmd implements `agent-mongo config` — persisted settings with
-// the same keys, defaults, and ranges as the TS valid-keys.ts table.
+// validated keys, defaults, and min/max ranges.
 package configcmd
 
 import (

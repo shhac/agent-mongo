@@ -190,8 +190,8 @@ func typeName(value any) string {
 	case int32:
 		return "int"
 	case int64:
-		// The TS driver promotes safe int64s to JS numbers, which the TS
-		// schema reports as "int"; only unsafe magnitudes surface as "long".
+		// Safe int64s read as plain integers to JSON consumers, so report
+		// "int"; only magnitudes a double cannot hold surface as "long".
 		if v >= -maxSafeInteger && v <= maxSafeInteger {
 			return "int"
 		}

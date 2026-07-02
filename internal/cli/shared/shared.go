@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// DefaultTimeoutMS mirrors the TS default query timeout (30s).
+// DefaultTimeoutMS is the default query timeout (30s).
 const DefaultTimeoutMS = 30_000
 
 // GlobalFlags is a snapshot of the root command's persistent flags, resolved

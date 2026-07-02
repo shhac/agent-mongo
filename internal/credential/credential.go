@@ -1,8 +1,7 @@
 // Package credential stores username/password pairs in the OS keychain when
-// available, falling back to plaintext in config.json. The on-disk layout is
-// byte-compatible with the TypeScript implementation: keychain-backed entries
-// hold the "__KEYCHAIN__" sentinel in config.json, and the real values live in
-// the keychain service "app.paulie.agent-mongo" under the accounts
+// available, falling back to plaintext in config.json. Keychain-backed entries
+// hold the "__KEYCHAIN__" sentinel in config.json; the real values live in the
+// keychain service "app.paulie.agent-mongo" under the accounts
 // "username:<alias>" and "password:<alias>".
 package credential
 
@@ -20,7 +19,7 @@ import (
 
 const (
 	sentinel = "__KEYCHAIN__"
-	// Service is the reverse-DNS keychain service id shared with the TS CLI.
+	// Service is the reverse-DNS keychain service id.
 	Service = "app.paulie.agent-mongo"
 
 	StorageKeychain = "keychain"

@@ -42,8 +42,8 @@ func Configure(opts Options) {
 func shouldExpand(field string) bool { return expandAll || expandFields[field] }
 
 // Apply walks JSON-decoded data (maps, slices, scalars), truncating oversized
-// string fields. Only object properties are truncated — bare strings inside
-// arrays pass through untouched, matching the TS implementation.
+// string fields. Only object properties are truncated — a bare string inside
+// an array has no field name to hang a {field}Length companion on.
 func Apply(data any) any {
 	switch v := data.(type) {
 	case []any:
