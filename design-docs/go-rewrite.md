@@ -34,7 +34,7 @@ instead of eight — and the libs now exist.
    Both binaries work during migration.
 3. **Family output contract, not byte parity** — the output layer adopts
    `lib-agent-output` (NDJSON + `@pagination` + stderr `{error, fixable_by, hint}`).
-   Byte-level parity is required only for *domain* behavior: schema inference,
+   Byte-level parity is required only for _domain_ behavior: schema inference,
    BSON→JSON mapping, truncation semantics, pipeline validation, error hints.
 4. **TS stays runnable until parity** — `src/` + `test/` remain in place on the
    branch as the golden reference; deleted in the final phase.
@@ -43,14 +43,14 @@ instead of eight — and the libs now exist.
 
 ## Scope
 
-| Area | TS lines | Go estimate | Notes |
-|---|---|---|---|
-| `src/lib/` (config, output, keychain, dialog, timeout, version) | ~900 | ~250 | mostly replaced by lib-agent-cli/keyring/output |
-| `src/lib/` domain (serialize, truncation, compact-json, parse-json, errors) | ~250 | ~400 | ported; Go is more verbose |
-| `src/mongo/` | ~750 | ~900 | mongo-driver v2 |
-| `src/cli/` (7 groups, ~30 leaves incl. usage texts) | ~1,850 | ~1,600 | cobra; usage texts copied verbatim |
-| **Total source** | **~3,756** | **~3,200** | |
-| Tests | ~1,780 | ~2,200 | table-driven ports + new integration suite |
+| Area                                                                        | TS lines   | Go estimate | Notes                                           |
+| --------------------------------------------------------------------------- | ---------- | ----------- | ----------------------------------------------- |
+| `src/lib/` (config, output, keychain, dialog, timeout, version)             | ~900       | ~250        | mostly replaced by lib-agent-cli/keyring/output |
+| `src/lib/` domain (serialize, truncation, compact-json, parse-json, errors) | ~250       | ~400        | ported; Go is more verbose                      |
+| `src/mongo/`                                                                | ~750       | ~900        | mongo-driver v2                                 |
+| `src/cli/` (7 groups, ~30 leaves incl. usage texts)                         | ~1,850     | ~1,600      | cobra; usage texts copied verbatim              |
+| **Total source**                                                            | **~3,756** | **~3,200**  |                                                 |
+| Tests                                                                       | ~1,780     | ~2,200      | table-driven ports + new integration suite      |
 
 ## Directory structure
 
@@ -84,14 +84,14 @@ agent-mongo/
 
 ## Dependencies
 
-| Module | Purpose |
-|---|---|
-| `github.com/shhac/lib-agent-cli` | root cmd, config/credential storage, XDG, dialog |
-| `github.com/shhac/lib-agent-output` | NDJSON contract, errors, pagination |
-| `github.com/shhac/lib-agent-keyring` | OS secret store (indirect via lib-agent-cli) |
-| `github.com/shhac/lib-agent-mcp` | `agent-mongo mcp` |
-| `github.com/spf13/cobra` | CLI framework |
-| `go.mongodb.org/mongo-driver/v2` | MongoDB client + bson/EJSON |
+| Module                               | Purpose                                          |
+| ------------------------------------ | ------------------------------------------------ |
+| `github.com/shhac/lib-agent-cli`     | root cmd, config/credential storage, XDG, dialog |
+| `github.com/shhac/lib-agent-output`  | NDJSON contract, errors, pagination              |
+| `github.com/shhac/lib-agent-keyring` | OS secret store (indirect via lib-agent-cli)     |
+| `github.com/shhac/lib-agent-mcp`     | `agent-mongo mcp`                                |
+| `github.com/spf13/cobra`             | CLI framework                                    |
+| `go.mongodb.org/mongo-driver/v2`     | MongoDB client + bson/EJSON                      |
 
 All pure Go — cross-compilation stays trivial.
 
@@ -133,10 +133,12 @@ All pure Go — cross-compilation stays trivial.
 ## Migration phases
 
 ### Phase 0: Prep — DONE
+
 - [x] `design-docs/` tracked (archive stays ignored), stale findings archived
 - [x] This document
 
 ### Phase 1: Scaffold
+
 - [ ] `go mod init github.com/shhac/agent-mongo`
 - [ ] `cmd/agent-mongo/main.go` (`cli.Run`) + `internal/cli/root.go` via `cli.NewRoot`
 - [ ] Domain persistent flags: `-c/--connection`, `--expand`, `--full`
@@ -144,6 +146,7 @@ All pure Go — cross-compilation stays trivial.
 - [ ] TS project still builds/tests alongside
 
 ### Phase 2: Config + credentials (no mongo yet)
+
 - [ ] `internal/config/` — read/write the existing config.json
 - [ ] `internal/credential/` — `__KEYCHAIN__` sentinel via lib-agent-keyring
 - [ ] CLI: `config`, `connection` (except `test`), `credential` groups
@@ -151,11 +154,13 @@ All pure Go — cross-compilation stays trivial.
 - [ ] Red-green: port config.test.ts, credential.test.ts, credential-form.test.ts
 
 ### Phase 3: Domain libraries
+
 - [ ] serialize, truncation, compactjson, ejson, errors packages
 - [ ] Red-green: serialize.test.ts, truncation.test.ts, compact-json.test.ts,
       parse-json.test.ts, output.test.ts, ndjson-stream.test.ts equivalents
 
 ### Phase 4: Mongo layer + commands
+
 - [ ] `internal/mongo/` — client factory (pool opts, alias resolution), databases,
       collections (+existence validation), indexes, schema inference, query
       (find/get/count/sample/distinct), aggregate (validatePipeline)
@@ -164,18 +169,21 @@ All pure Go — cross-compilation stays trivial.
 - [ ] Timeout plumbing: `-t/--timeout` (lib flag) > `query.timeout` > 30s via maxTimeMS
 
 ### Phase 5: Integration parity
+
 - [ ] `internal/integration/` — seeded throwaway mongod (docker `mongo:8`);
       never runs against configured real connections
 - [ ] Golden comparison: TS binary vs Go binary on the same seeded data —
       domain fields must match; output framing asserted against the new contract
 
 ### Phase 6: MCP + docs
+
 - [ ] `agent-mongo mcp` via `agentmcp.Command(root)`; `ReadOnly` annotations on
       query/collection/database tools, `Skip` on credential/config
 - [ ] All `usage` subcommand texts ported (updated for NDJSON framing)
 - [ ] SKILL.md + README + CLAUDE.md updated for Go + new output contract
 
 ### Phase 7: Cleanup
+
 - [ ] Remove `src/`, `test/`, package.json, bun/oxlint/oxfmt config; hooks → Go equivalents
 - [ ] Release: `.goreleaser.yml` + tag-triggered reusable workflow
       (`shhac/homebrew-tap/.github/workflows/go-release.yml`) as in agent-sql;

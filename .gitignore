@@ -10,6 +10,7 @@ bun.lockb
 dist
 release
 *.bun-build
+/agent-mongo
 
 # local
 .cache
