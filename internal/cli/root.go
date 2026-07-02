@@ -9,6 +9,9 @@ import (
 	output "github.com/shhac/lib-agent-output"
 	"github.com/spf13/cobra"
 
+	"github.com/shhac/agent-mongo/internal/cli/configcmd"
+	cliconnection "github.com/shhac/agent-mongo/internal/cli/connection"
+	clicredential "github.com/shhac/agent-mongo/internal/cli/credential"
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	appoutput "github.com/shhac/agent-mongo/internal/output"
@@ -52,6 +55,9 @@ func newRootCmd(version string) *cobra.Command {
 		"Expand truncated fields (comma-separated field names)")
 	pf.BoolVarP(&g.Full, "full", "F", false, "Show full content for all truncated fields")
 
+	cliconnection.Register(root, nil)
+	clicredential.Register(root)
+	configcmd.Register(root)
 	registerUsage(root)
 
 	return root
