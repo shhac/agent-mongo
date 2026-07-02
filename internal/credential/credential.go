@@ -8,10 +8,12 @@ package credential
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/shhac/lib-agent-cli/creds"
+	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
 )
@@ -38,6 +40,7 @@ func Get(alias string) (config.Credential, bool) {
 		return config.Credential{}, false
 	}
 	if cred.Username != sentinel && cred.Password != sentinel {
+		maybeUpgrade(alias, cred)
 		return cred, true
 	}
 	if cred.Username == sentinel {
@@ -55,6 +58,20 @@ func Get(alias string) (config.Credential, bool) {
 		cred.Password = v
 	}
 	return cred, true
+}
+
+// maybeUpgrade migrates a plaintext credential (created before keychain
+// support, or stored on a host without one) into the OS keychain the first
+// time it is read on a host with a usable keychain. Any failure leaves the
+// plaintext entry untouched.
+func maybeUpgrade(alias string, cred config.Credential) {
+	if !keychain.Available() {
+		return
+	}
+	if storage, err := Store(alias, cred); err == nil && storage == StorageKeychain {
+		out.WriteNotice(os.Stderr,
+			fmt.Sprintf("credential %q upgraded from plaintext config to keychain storage", alias), "")
+	}
 }
 
 // All returns the raw stored entries (sentinels intact, secrets unresolved).

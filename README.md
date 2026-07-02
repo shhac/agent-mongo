@@ -206,7 +206,7 @@ agent-mongo connection update legacy --clear-credential
 
 Connections without a `--credential` use the connection string as-is (backward compatible).
 
-Credentials are stored in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) and fall back to plaintext config otherwise. `credential list` shows the `storage` source (`keychain` or `config`) per credential. Set `AGENT_MONGO_NO_KEYCHAIN=1` to force plaintext config storage.
+Credentials are stored in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) and fall back to plaintext config otherwise. `credential list` shows the `storage` source (`keychain` or `config`) per credential. Set `AGENT_MONGO_NO_KEYCHAIN=1` to force plaintext config storage. Plaintext credentials (from older versions or keychain-less hosts) are upgraded to the keychain automatically the first time they are used on a host with a usable keychain.
 
 ### LLM-safe credential entry (`--form`)
 

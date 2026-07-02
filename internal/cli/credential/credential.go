@@ -119,6 +119,8 @@ KEYCHAIN: Credentials are stored in the OS keychain when available (macOS
   Keychain, Linux Secret Service, Windows Credential Manager); otherwise they
   fall back to plaintext config. ` + "`credential list`" + ` shows the storage
   source ("keychain" or "config") per credential.
-  Existing plaintext credentials continue to work unchanged.
+  Plaintext credentials (from older versions or keychain-less hosts) are
+  upgraded to the keychain automatically the first time they are used on a
+  host with a usable keychain (a {"notice": ...} line on stderr reports it).
 
 CONFIG: ~/.config/agent-mongo/config.json (respects XDG_CONFIG_HOME)`

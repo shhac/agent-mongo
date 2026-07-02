@@ -113,7 +113,7 @@ agent-mongo credential list                              # passwords always reda
 agent-mongo credential remove acme --force               # even if connections reference it
 ```
 
-Credentials are stored separately from connections, in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) with plaintext-config fallback. `credential list` shows the `storage` source per credential. When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
+Credentials are stored separately from connections, in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) with plaintext-config fallback. `credential list` shows the `storage` source per credential. Plaintext entries are auto-upgraded to the keychain on first use (reported via a stderr `{"notice": ...}` line — not an error). When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
 
 ### LLM-safe entry with `--form`
 

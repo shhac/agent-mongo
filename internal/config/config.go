@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/shhac/lib-agent-cli/creds"
 	"github.com/shhac/lib-agent-cli/xdg"
 )
 
@@ -59,6 +60,8 @@ func Dir() string { return xdg.ConfigDir("agent-mongo") }
 
 func filePath() string { return filepath.Join(Dir(), "config.json") }
 
+func store() creds.Store { return creds.Store{Path: filePath()} }
+
 // Read returns the parsed config, or a zero Config when the file is missing
 // or unparseable (matching the TS behavior of treating both as empty).
 func Read() Config {
@@ -73,16 +76,7 @@ func Read() Config {
 	return cfg
 }
 
-func Write(cfg Config) error {
-	if err := os.MkdirAll(Dir(), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filePath(), append(data, '\n'), 0o600)
-}
+func Write(cfg Config) error { return store().Save(cfg) }
 
 func GetConnection(alias string) (Connection, bool) {
 	conn, ok := Read().Connections[alias]
