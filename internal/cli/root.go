@@ -48,7 +48,7 @@ func newRootCmd(version string) *cobra.Command {
 		Globals:        &g.Globals,
 		DefaultFormat:  output.FormatNDJSON,
 		UnknownHint:    "run 'agent-mongo usage' to see the available commands",
-		ConfigDefaults: func() { applyConfigDefaults(g) },
+		ConfigDefaults: func(_ *cobra.Command) { applyConfigDefaults(g) },
 	})
 
 	pf := root.PersistentFlags()
