@@ -1,6 +1,8 @@
 package connection
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -20,7 +22,27 @@ func registerAdd(parent *cobra.Command) {
 		RunE: func(_ *cobra.Command, args []string) error {
 			alias, connectionString := args[0], args[1]
 
-			if credentialAlias != "" {
+			username, password, stripped, hasEmbedded := mongo.SplitURICredentials(connectionString)
+			credentialCreated := false
+			var credentialStorage string
+			switch {
+			case hasEmbedded && credentialAlias != "":
+				return fmt.Errorf(
+					"Connection string embeds a username/password and --credential %q was also given. Drop the credentials from the URI or the --credential flag.",
+					credentialAlias)
+			case hasEmbedded:
+				storage, err := credential.Store(alias, config.Credential{
+					Username: username,
+					Password: password,
+				})
+				if err != nil {
+					return err
+				}
+				connectionString = stripped
+				credentialAlias = alias
+				credentialCreated = true
+				credentialStorage = storage
+			case credentialAlias != "":
 				if _, ok := credential.Get(credentialAlias); !ok {
 					return credential.NotFoundError(credentialAlias)
 				}
@@ -46,14 +68,21 @@ func registerAdd(parent *cobra.Command) {
 			if resolvedDB == "" {
 				resolvedDB = mongo.ParseDBFromURI(connectionString)
 			}
-			return output.PrintRaw(map[string]any{
+			result := map[string]any{
 				"ok":         true,
 				"alias":      alias,
 				"database":   resolvedDB,
 				"credential": credentialAlias,
 				"isDefault":  setDefault,
 				"hint":       "Test with: agent-mongo connection test " + alias,
-			})
+			}
+			if credentialCreated {
+				result["credentialCreated"] = true
+				result["credentialStorage"] = credentialStorage
+				result["notice"] = fmt.Sprintf(
+					"Embedded username/password moved out of the connection string into credential %q", alias)
+			}
+			return output.PrintRaw(result)
 		},
 	}
 

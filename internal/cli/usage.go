@@ -34,6 +34,8 @@ GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full,
 
 CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
   Connections can reference stored credentials via --credential for shared auth.
+  A user:pass embedded in an added URI is auto-extracted into a credential
+  named after the connection alias; displayed connection strings redact passwords.
 
 SAFETY: Read-only. No write operations. Aggregation rejects $out/$merge.
   Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).

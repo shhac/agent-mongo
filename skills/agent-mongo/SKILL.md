@@ -32,6 +32,11 @@ agent-mongo credential add acme --username deploy --password secret
 agent-mongo connection add prod "mongodb+srv://cluster.example.net/myapp" --credential acme --default
 ```
 
+A `user:pass` embedded in the URI is automatically extracted into a stored
+credential named after the connection alias (don't combine with
+`--credential` — that's an error). `connection list` always redacts passwords
+in connection strings.
+
 ## Exploring a database
 
 ```bash

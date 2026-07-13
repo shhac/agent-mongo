@@ -173,6 +173,13 @@ agent-mongo connection test staging    # pings specific connection
 agent-mongo connection test -c local   # also works with -c flag
 ```
 
+A `user:pass` embedded in the URI is automatically moved into a stored
+credential named after the connection alias (here: `staging`), so the password
+lands in the OS keychain instead of sitting in the connection string in
+config.json. Embedding credentials and passing `--credential` at the same time
+is an error. `connection list` always redacts passwords in connection strings,
+including connections saved before this extraction existed.
+
 Or set an environment variable:
 
 ```bash

@@ -5,10 +5,10 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 ## Connection
 
-- `agent-mongo connection add <alias> <uri> [--database <db>] [--credential <name>] [--default]` — save a MongoDB connection
+- `agent-mongo connection add <alias> <uri> [--database <db>] [--credential <name>] [--default]` — save a MongoDB connection; a user:pass embedded in the URI is auto-extracted into a credential named after the alias (mutually exclusive with --credential)
 - `agent-mongo connection update <alias> [--credential <name>] [--clear-credential] [--database <db>]` — update saved connection
 - `agent-mongo connection remove <alias>` — remove a saved connection
-- `agent-mongo connection list` — one record per saved connection (alias, connection_string, credential, default)
+- `agent-mongo connection list` — one record per saved connection (alias, connection_string with password redacted, credential, default)
 - `agent-mongo connection test [alias] [-c <alias>]` — ping MongoDB to verify connectivity
 - `agent-mongo connection set-default <alias>` — set default connection
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
@@ -57,7 +58,7 @@ func registerList(parent *cobra.Command) {
 				conn := connections[alias]
 				items = append(items, map[string]any{
 					"alias":             alias,
-					"connection_string": conn.ConnectionString,
+					"connection_string": mongo.RedactURI(conn.ConnectionString),
 					"database":          conn.Database,
 					"credential":        conn.Credential,
 					"default":           alias == defaultAlias,
@@ -88,6 +89,8 @@ COMMANDS:
   connection add <alias> <uri> [--database <db>] [--credential <name>] [--default]
     Save a MongoDB connection. Alias is a short name (e.g. local, staging, prod).
     URI: mongodb://... or mongodb+srv://...
+    A user:pass embedded in the URI is moved into a stored credential named
+    after the connection alias (mutually exclusive with --credential).
     --database overrides the database from the URI.
     --credential references a stored credential for authentication.
     --default sets this connection as the default.
@@ -101,7 +104,8 @@ COMMANDS:
     Remove a saved connection.
 
   connection list
-    List all saved connections with credential names.
+    List all saved connections with credential names. Passwords in
+    connection strings are redacted.
 
   connection test [alias] [-c <alias>]
     Ping MongoDB to verify connectivity. Alias as argument or -c flag. Uses default if omitted.
