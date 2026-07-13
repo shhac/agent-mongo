@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	out "github.com/shhac/lib-agent-output"
+
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -64,11 +66,17 @@ func TestAddExtractsEmbeddedCredentials(t *testing.T) {
 	}
 }
 
-// TestAddOverwritesExistingCredential pins the upsert semantics: re-adding a
-// connection whose alias collides with an existing credential silently
-// replaces that credential's values, matching `credential add`. Connections
-// sharing the credential pick up the new secret.
-func TestAddOverwritesExistingCredential(t *testing.T) {
+// hintOf unwraps the structured hint the CLI renders alongside the error.
+func hintOf(t *testing.T, err error) string {
+	t.Helper()
+	var oerr *out.Error
+	if !out.As(err, &oerr) {
+		t.Fatalf("expected *out.Error with a hint, got %T: %v", err, err)
+	}
+	return oerr.Hint
+}
+
+func TestAddRefusesToClobberDifferentCredential(t *testing.T) {
 	testutil.IsolateConfig(t)
 
 	if _, err := credential.Store("staging", config.Credential{
@@ -85,16 +93,68 @@ func TestAddOverwritesExistingCredential(t *testing.T) {
 	}
 
 	_, err := execute(t, "connection", "add", "staging", "mongodb://new-user:new-pass@localhost/app")
-	if err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	if err == nil {
+		t.Fatal("expected refusal, got nil")
+	}
+	if !strings.Contains(err.Error(), "other") {
+		t.Errorf("error = %q, want it to name the connections using the credential", err)
+	}
+
+	hint := hintOf(t, err)
+	if !strings.Contains(hint, "--credential staging") {
+		t.Errorf("hint = %q, want the --credential fallback", hint)
+	}
+	if !strings.Contains(hint, "credential remove staging") {
+		t.Errorf("hint = %q, want the credential remove path", hint)
 	}
 
 	cred, ok := credential.Get("staging")
-	if !ok {
-		t.Fatal("credential 'staging' missing after re-add")
+	if !ok || cred.Username != "old-user" || cred.Password != "old-pass" {
+		t.Errorf("credential = %+v (ok=%v), want untouched old-user/old-pass", cred, ok)
 	}
-	if cred.Username != "new-user" || cred.Password != "new-pass" {
-		t.Errorf("credential = %q/%q, want overwritten to new-user/new-pass", cred.Username, cred.Password)
+	if _, ok := config.GetConnection("staging"); ok {
+		t.Error("connection stored despite refusal")
+	}
+}
+
+func TestAddClobberHintRecommendsRotationWhenOnlyCredentialChanges(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if _, err := credential.Store("staging", config.Credential{
+		Username: "old-user",
+		Password: "old-pass",
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := config.StoreConnection("staging", config.Connection{
+		ConnectionString: "mongodb://localhost/app",
+		Credential:       "staging",
+	}); err != nil {
+		t.Fatalf("StoreConnection: %v", err)
+	}
+
+	_, err := execute(t, "connection", "add", "staging", "mongodb://new-user:new-pass@localhost/app")
+	if err == nil {
+		t.Fatal("expected refusal, got nil")
+	}
+	if hint := hintOf(t, err); !strings.Contains(hint, "credential add staging") {
+		t.Errorf("hint = %q, want rotation via credential add", hint)
+	}
+}
+
+func TestAddSameEmbeddedCredentialsIsIdempotent(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	uri := "mongodb://deploy:hunter2@localhost/app"
+	if _, err := execute(t, "connection", "add", "staging", uri); err != nil {
+		t.Fatalf("first add: %v", err)
+	}
+	stdout, err := execute(t, "connection", "add", "staging", uri)
+	if err != nil {
+		t.Fatalf("same-values re-add should succeed, got: %v", err)
+	}
+	if !strings.Contains(stdout, `"credentialCreated":true`) {
+		t.Errorf("re-add receipt = %s, want credentialCreated", stdout)
 	}
 }
 

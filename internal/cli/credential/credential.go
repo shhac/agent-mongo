@@ -87,15 +87,17 @@ func registerList(parent *cobra.Command) {
 const usageText = `credential — Manage stored credentials for MongoDB authentication
 
 COMMANDS:
-  credential add <name> --username <user> --password <pass>
-    Store a named credential. Overwrites if name already exists.
+  credential add <name> --form   (recommended)
+    Store a named credential (overwrites if name already exists), prompting
+    for any missing --username / --password via a native OS dialog. The
+    agent never sees the secret — input goes directly into the OS dialog.
+    Fails with fixable_by=human if no GUI is available (e.g. SSH session);
+    fixable_by=retry if the user cancels the dialog.
     Credentials are referenced by connections via --credential.
 
-  credential add <name> --form
-    Same, but prompts for any missing --username / --password via a native
-    OS dialog. The agent never sees the secret — input goes directly into
-    the OS dialog. Fails with fixable_by=human if no GUI is available
-    (e.g. SSH session); fixable_by=retry if the user cancels the dialog.
+  credential add <name> --username <user> --password <pass>
+    Same, fully non-interactive. Prefer --form: flag values land in shell
+    history and agent context.
 
   credential remove <name>
     Remove a stored credential. Fails if any connection references it.
@@ -106,10 +108,10 @@ COMMANDS:
     Shows which connections reference each credential.
 
 WORKFLOW:
-  1. Store credential:   agent-mongo credential add acme --username deploy --password secret
+  1. Store credential:   agent-mongo credential add acme --form
   2. Add connections:    agent-mongo connection add prod <uri> --credential acme
                          agent-mongo connection add staging <uri> --credential acme
-  3. Rotate password:    agent-mongo credential add acme --username deploy --password new-secret
+  3. Rotate password:    agent-mongo credential add acme --form
      All connections referencing "acme" pick up the new password automatically.
 
 RESOLUTION: When a connection references a credential, auth is passed to the MongoDB

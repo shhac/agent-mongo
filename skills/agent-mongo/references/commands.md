@@ -14,8 +14,8 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 ## Credential
 
-- `agent-mongo credential add <name> --username <user> --password <pass>` — store named credential (overwrites if exists)
-- `agent-mongo credential add <name> [--username <user>] --form` — prompt for missing fields via native OS dialog (agent never sees the secret)
+- `agent-mongo credential add <name> [--username <user>] --form` — store named credential, prompting for missing fields via native OS dialog (recommended: the agent never sees the secret; overwrites if exists)
+- `agent-mongo credential add <name> --username <user> --password <pass>` — fully non-interactive variant; prefer `--form` (flag values land in shell history and agent context)
 - `agent-mongo credential remove <name> [--force]` — remove credential (--force: remove even if referenced)
 - `agent-mongo credential list` — list credentials (passwords redacted) with storage source and referencing connections
 

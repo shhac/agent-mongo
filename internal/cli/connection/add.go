@@ -2,8 +2,11 @@ package connection
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+
+	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
@@ -32,6 +35,9 @@ func resolveCredential(alias, connectionString, credentialAlias string) (credent
 			"Connection string embeds a username/password and --credential %q was also given. Drop the credentials from the URI or the --credential flag.",
 			credentialAlias)
 	case hasEmbedded:
+		if err := refuseCredentialOverwrite(alias, username, password, stripped); err != nil {
+			return credentialResolution{}, err
+		}
 		storage, err := credential.Store(alias, config.Credential{
 			Username: username,
 			Password: password,
@@ -51,6 +57,43 @@ func resolveCredential(alias, connectionString, credentialAlias string) (credent
 		}
 	}
 	return credentialResolution{ConnectionString: connectionString, Alias: credentialAlias}, nil
+}
+
+// refuseCredentialOverwrite blocks extraction from clobbering an existing
+// credential that holds different (or unresolvable) values — connections
+// referencing it would silently switch auth. Re-adding the same values stays
+// idempotent.
+func refuseCredentialOverwrite(alias, username, password, stripped string) error {
+	if _, exists := credential.All()[alias]; !exists {
+		return nil
+	}
+	existing, ok := credential.Get(alias)
+	if ok && existing.Username == username && existing.Password == password {
+		return nil
+	}
+
+	usedBy := ""
+	if used := credential.ConnectionsUsing(alias); len(used) > 0 {
+		usedBy = " (used by connections: " + strings.Join(used, ", ") + ")"
+	}
+	err := fmt.Errorf(
+		"Credential %q already exists with different values%s. Refusing to overwrite it: connections referencing it would silently change auth.",
+		alias, usedBy)
+	return out.Wrap(err, out.FixableByAgent).WithHint(overwriteHint(alias, stripped))
+}
+
+// overwriteHint tailors the fix to what is actually changing: same host/URI
+// means a credential rotation; a different URI means the embedded credentials
+// are the mistake.
+func overwriteHint(alias, stripped string) string {
+	if conn, ok := config.GetConnection(alias); ok && conn.ConnectionString == stripped {
+		return fmt.Sprintf(
+			"Only the credential is changing. Rotate it explicitly: agent-mongo credential add %s --form (OS dialog keeps the secret out of agent context; or pass --username/--password)",
+			alias)
+	}
+	return fmt.Sprintf(
+		"Drop the username/password from the URI and pass --credential %s to keep the stored credential, or remove it first: agent-mongo credential remove %s",
+		alias, alias)
 }
 
 func registerAdd(parent *cobra.Command) {

@@ -25,17 +25,22 @@ agent-mongo connection add local "mongodb://localhost:27017/myapp" --default
 agent-mongo connection test
 ```
 
-For authenticated connections, store credentials separately:
+For authenticated connections, store credentials separately — prefer `--form`
+(native OS dialog; the secret never enters agent context) over
+`--username`/`--password` flags:
 
 ```bash
-agent-mongo credential add acme --username deploy --password secret
+agent-mongo credential add acme --form
 agent-mongo connection add prod "mongodb+srv://cluster.example.net/myapp" --credential acme --default
 ```
 
 A `user:pass` embedded in the URI is automatically extracted into a stored
 credential named after the connection alias (don't combine with
-`--credential` — that's an error). `connection list` always redacts passwords
-in connection strings.
+`--credential` — that's an error). If a credential with that alias already
+exists holding different values, the add is refused; follow the error's hint
+(rotate via `credential add --form`, or reference the existing credential
+with `--credential`). `connection list` always redacts passwords in
+connection strings.
 
 ## Exploring a database
 
@@ -113,7 +118,8 @@ Connection resolution: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default
 ## Credential management
 
 ```bash
-agent-mongo credential add acme --username deploy --password secret
+agent-mongo credential add acme --form                   # preferred; see LLM-safe entry below
+agent-mongo credential add acme --username deploy --password secret   # non-interactive fallback
 agent-mongo credential list                              # passwords always redacted
 agent-mongo credential remove acme --force               # even if connections reference it
 ```

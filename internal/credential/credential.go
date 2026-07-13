@@ -149,7 +149,7 @@ func Require(alias string) error {
 // reference (used by connection add/update validation and connect).
 func NotFoundError(alias string) error {
 	return fmt.Errorf(
-		"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --username <user> --password <pass>",
+		"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --form (or --username <user> --password <pass>)",
 		alias, config.JoinOrNone(Aliases()))
 }
 

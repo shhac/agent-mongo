@@ -177,8 +177,12 @@ A `user:pass` embedded in the URI is automatically moved into a stored
 credential named after the connection alias (here: `staging`), so the password
 lands in the OS keychain instead of sitting in the connection string in
 config.json. Embedding credentials and passing `--credential` at the same time
-is an error. `connection list` always redacts passwords in connection strings,
-including connections saved before this extraction existed.
+is an error, and if a credential with that alias already exists with different
+values the add is refused rather than silently overwriting it (the error's
+hint explains whether to rotate via `credential add --form` or reference the
+existing credential with `--credential`). `connection list` always redacts
+passwords in connection strings, including connections saved before this
+extraction existed.
 
 Or set an environment variable:
 
@@ -193,15 +197,17 @@ Connection resolution order: `-c` flag > `AGENT_MONGO_CONNECTION` env > config d
 Store credentials separately from connections. Useful when the same username/password is shared across multiple environments (staging, prod) within an organization:
 
 ```bash
-# Store a credential once
-agent-mongo credential add acme --username deploy --password secret123
+# Store a credential once — --form prompts via a native OS dialog, keeping
+# the secret out of shell history and agent context (recommended; you can
+# also pass --username/--password directly)
+agent-mongo credential add acme --form
 
 # Reference it from multiple connections
 agent-mongo connection add acme-staging "mongodb+srv://staging.acme.net/app" --credential acme
 agent-mongo connection add acme-prod "mongodb+srv://prod.acme.net/app" --credential acme
 
 # Rotate a password — all connections pick up the change
-agent-mongo credential add acme --username deploy --password new-secret
+agent-mongo credential add acme --form
 
 # List credentials (passwords always redacted)
 agent-mongo credential list

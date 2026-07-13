@@ -91,6 +91,8 @@ COMMANDS:
     URI: mongodb://... or mongodb+srv://...
     A user:pass embedded in the URI is moved into a stored credential named
     after the connection alias (mutually exclusive with --credential).
+    Refuses if that credential already exists with different values — the
+    error's hint says how to rotate (credential add --form) or reuse it.
     --database overrides the database from the URI.
     --credential references a stored credential for authentication.
     --default sets this connection as the default.
