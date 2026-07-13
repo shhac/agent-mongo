@@ -18,9 +18,9 @@ formula bump.**
 1. `$ARGUMENTS` must be `patch`, `minor`, or `major` — else stop and ask.
 2. Pre-flight (CI re-runs tests on the tag, but check locally first):
    - Clean tree (`git status --short`), on `main`, up to date with `origin/main`.
-   - Tests, vet, and lint pass (`make test`, `go vet ./...`, `make lint`). The
-     version is injected from the tag (`-ldflags -X main.version=…`) — there is
-     no version file to edit.
+   - Tests, vet, and lint pass (e.g. `make test` / `go test ./...`, `go vet ./...`,
+     `make lint` / `golangci-lint run ./...`). The version is injected from the tag
+     (`-ldflags -X main.version=…`) — there is no version file to edit.
    - Optionally run `make test-integration` (needs docker) for release-critical
      changes to query/mongo code.
 3. Compute the new version by bumping the latest tag
@@ -48,11 +48,12 @@ the workflow entirely, build the `GOOS/GOARCH` binaries with
 ## Secrets
 
 The formula push authenticates via the `TAP_DEPLOY_KEY` secret in this repo's
-`homebrew-tap` GitHub environment, paired with the read-write
-"agent-mongo release automation (env-scoped)" deploy key on `shhac/homebrew-tap`;
-the skill publish uses the repo-level `SKILLS_DEPLOY_KEY`. If the workflow logs
-"TAP_DEPLOY_KEY not set — skipping tap update", rotate the pair — pipe the
-private key, never echo it:
+`homebrew-tap` GitHub environment, paired with a read-write deploy key on
+`shhac/homebrew-tap` (the shared "go cli family release automation" key, or a
+repo-specific "agent-mongo release automation (env-scoped)" one). The skill
+publish uses the repo-level `SKILLS_DEPLOY_KEY`. If the workflow logs
+"TAP_DEPLOY_KEY not set — skipping tap update", rotate with a repo-specific
+pair — pipe the private key, never echo it:
 
 ```bash
 ssh-keygen -t ed25519 -N "" -C "agent-mongo release automation" -f tap_key
