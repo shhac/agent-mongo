@@ -14,9 +14,10 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 	cmd := &cobra.Command{Use: "collection", Short: "Collection discovery"}
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "list <database>",
-		Short: "List collections in a database",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list <database>",
+		Aliases: []string{"ls"},
+		Short:   "List collections in a database",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
 			return shared.WithSession(g, func(ctx shared.SessionCtx) error {

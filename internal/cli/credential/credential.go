@@ -60,9 +60,10 @@ func registerRemove(parent *cobra.Command) {
 
 func registerList(parent *cobra.Command) {
 	parent.AddCommand(&cobra.Command{
-		Use:   "list",
-		Short: "List stored credentials (passwords redacted)",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List stored credentials (passwords redacted)",
+		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			entries := credstore.All()
 			items := make([]any, 0, len(entries))

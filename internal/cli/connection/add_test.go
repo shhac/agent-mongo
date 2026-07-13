@@ -216,6 +216,21 @@ func TestAddWithoutEmbeddedCredentialsIsUnchanged(t *testing.T) {
 	}
 }
 
+func TestLsIsListAlias(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if _, err := execute(t, "connection", "add", "local", "mongodb://localhost/app"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	stdout, err := execute(t, "connection", "ls")
+	if err != nil {
+		t.Fatalf("connection ls: %v", err)
+	}
+	if !strings.Contains(stdout, `"alias":"local"`) {
+		t.Errorf("ls output = %s, want the saved connection listed", stdout)
+	}
+}
+
 func TestListRedactsEmbeddedPasswords(t *testing.T) {
 	testutil.IsolateConfig(t)
 

@@ -46,9 +46,10 @@ func registerRemove(parent *cobra.Command) {
 
 func registerList(parent *cobra.Command) {
 	parent.AddCommand(&cobra.Command{
-		Use:   "list",
-		Short: "List saved connections",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List saved connections",
+		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			connections := config.Connections()
 			defaultAlias := config.DefaultConnectionAlias()
