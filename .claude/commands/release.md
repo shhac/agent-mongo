@@ -1,77 +1,63 @@
 ---
-description: Build, release, and publish to Homebrew
+description: Release via tag push — CI builds, publishes, and bumps the Homebrew formula
 argument-hint: <patch|minor|major>
 ---
 
 # Release
 
-Release the `agent-mongo` CLI. A `v*` tag push triggers the shared GitHub
-workflow (`shhac/homebrew-tap/.github/workflows/go-release.yml`), which
-cross-builds, publishes the GitHub Release, and regenerates + pushes the
-Homebrew formula. There is no version file — the binary version comes from the
-git tag via ldflags.
+Releasing `agent-mongo` is automated. Pushing a `v*` tag triggers
+`.github/workflows/release.yml`, which calls the shared `go-release` workflow in
+`shhac/homebrew-tap` to cross-build every platform, publish the GitHub Release,
+and regenerate + push `Formula/agent-mongo.rb` (with shell completions) to the tap.
+The tag also triggers `.github/workflows/publish-skill.yml`, which publishes
+`skills/agent-mongo` to `shhac/agent-skills`. **No manual build, and no manual
+formula bump.**
 
-## Arguments
+## Steps
 
-- `$ARGUMENTS` — version bump type: `patch`, `minor`, or `major`
+1. `$ARGUMENTS` must be `patch`, `minor`, or `major` — else stop and ask.
+2. Pre-flight (CI re-runs tests on the tag, but check locally first):
+   - Clean tree (`git status --short`), on `main`, up to date with `origin/main`.
+   - Tests, vet, and lint pass (`make test`, `go vet ./...`, `make lint`). The
+     version is injected from the tag (`-ldflags -X main.version=…`) — there is
+     no version file to edit.
+   - Optionally run `make test-integration` (needs docker) for release-critical
+     changes to query/mongo code.
+3. Compute the new version by bumping the latest tag
+   (`git describe --tags --abbrev=0`): patch → x.y.(z+1), minor → x.(y+1).0,
+   major → (x+1).0.0.
+4. Tag and push — this is the whole release:
+   ```bash
+   git tag "v${new_version}"
+   git push origin "v${new_version}"
+   ```
+5. Verify CI and the outputs:
+   ```bash
+   gh run watch --repo shhac/agent-mongo          # release + Publish skill runs green
+   gh release view "v${new_version}" --repo shhac/agent-mongo   # 6 assets
+   ```
+   Install / upgrade: `brew install shhac/tap/agent-mongo` · `brew upgrade shhac/tap/agent-mongo`
 
-## Instructions
+## Manual fallback (only if the workflow itself is broken)
 
-### Pre-flight
+Re-run a failed release with `gh run rerun <id> --repo shhac/agent-mongo`. To bypass
+the workflow entirely, build the `GOOS/GOARCH` binaries with
+`-ldflags "-s -w -X main.version=<v>"`, `gh release create` the tarballs, and edit
+`Formula/agent-mongo.rb` by hand (see this file's git history for the old full flow).
 
-1. Confirm the working tree is clean (`git st`) and you are on `main`, up to
-   date with `origin/main`. If not, stop and ask.
-2. Run `make test` and `go vet ./...`. If either fails, stop and fix.
-3. Optionally run `make test-integration` (needs docker) for release-critical
-   changes to query/mongo code.
-4. Compute the new version: latest tag from `git tag --sort=-v:refname | head -1`,
-   bumped per `$ARGUMENTS`. Show the user current → new before continuing.
+## Secrets
 
-### Step 1: Tag and push
+The formula push authenticates via the `TAP_DEPLOY_KEY` secret in this repo's
+`homebrew-tap` GitHub environment, paired with the read-write
+"agent-mongo release automation (env-scoped)" deploy key on `shhac/homebrew-tap`;
+the skill publish uses the repo-level `SKILLS_DEPLOY_KEY`. If the workflow logs
+"TAP_DEPLOY_KEY not set — skipping tap update", rotate the pair — pipe the
+private key, never echo it:
 
 ```bash
-git tag v<NEW_VERSION>
-git push origin main v<NEW_VERSION>
+ssh-keygen -t ed25519 -N "" -C "agent-mongo release automation" -f tap_key
+gh repo deploy-key add tap_key.pub -R shhac/homebrew-tap --allow-write \
+  --title "agent-mongo release automation (env-scoped)"
+gh secret set TAP_DEPLOY_KEY --repo shhac/agent-mongo --env homebrew-tap < tap_key
+rm tap_key tap_key.pub
 ```
-
-### Step 2: Watch the release workflow
-
-```bash
-gh run watch --exit-status $(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
-```
-
-If the workflow fails, inspect with `gh run view --log-failed` and fix before
-re-tagging (delete the tag locally and remotely first).
-
-### Step 3: Verify
-
-```bash
-gh release view v<NEW_VERSION>
-```
-
-Confirm the release has assets for darwin/linux (arm64 + amd64) and windows,
-and that the tap formula was updated (check the latest commit on the
-`homebrew-tap` repo touches `Formula/agent-mongo.rb` with the new version).
-
-The formula push requires the `TAP_DEPLOY_KEY` secret in this repo's
-`homebrew-tap` GitHub environment (set up 2026-07-13; env-scoped like the
-sibling CLIs, paired with the "agent-mongo release automation (env-scoped)"
-deploy key on `shhac/homebrew-tap`). If the workflow logs "TAP_DEPLOY_KEY not
-set — skipping tap update", the release succeeded but the formula must be
-updated by hand: regenerate `Formula/agent-mongo.rb` in the sibling
-`homebrew-tap` repo with the new version + sha256s from the release's
-`checksums-sha256.txt`, commit as "agent-mongo <VERSION>", and push. (Fix
-properly by re-creating the key pair — pipe the private key, never echo it:
-`ssh-keygen -t ed25519 -N "" -C "agent-mongo release automation" -f tap_key`,
-`gh repo deploy-key add tap_key.pub -R shhac/homebrew-tap --allow-write
---title "agent-mongo release automation (env-scoped)"`,
-`gh secret set TAP_DEPLOY_KEY --repo shhac/agent-mongo --env homebrew-tap
-< tap_key`, then delete both key files.)
-
-### Step 4: Report
-
-Show the user:
-
-- New version number
-- GitHub release URL
-- `brew upgrade shhac/tap/agent-mongo` command for users
