@@ -1,12 +1,10 @@
 package credential
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -15,6 +13,8 @@ import (
 	"github.com/shhac/lib-agent-cli/dialog"
 	"github.com/shhac/lib-agent-cli/dialog/dialogtest"
 	out "github.com/shhac/lib-agent-output"
+
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
 func TestPromptMissingReturnsSuppliedValuesWithoutPrompting(t *testing.T) {
@@ -175,8 +175,7 @@ func TestPromptMissingReturnsHumanErrorWhenNoGUI(t *testing.T) {
 // AGENT_MONGO_NO_KEYCHAIN forces credential.Store onto the config.json fallback
 // so no keychain backend is touched (and macOS never prompts).
 func TestCredentialAddFormDoesNotLeakSecretToStdout(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("AGENT_MONGO_NO_KEYCHAIN", "1")
+	testutil.IsolateConfig(t)
 
 	const canary = "TOPSECRET-CANARY-7A3F"
 	rec := &dialogtest.Recorder{
@@ -184,7 +183,7 @@ func TestCredentialAddFormDoesNotLeakSecretToStdout(t *testing.T) {
 	}
 	defer dialog.SetDefault(rec)()
 
-	stdout, restore := captureStdout(t)
+	stdout, restore := testutil.CaptureStdout(t)
 
 	root := &cobra.Command{Use: "agent-mongo"}
 	Register(root)
@@ -208,31 +207,5 @@ func TestCredentialAddFormDoesNotLeakSecretToStdout(t *testing.T) {
 	}
 	if !strings.Contains(captured, "deploy") {
 		t.Errorf("expected receipt to include username, got: %s", captured)
-	}
-}
-
-// captureStdout redirects os.Stdout to a pipe and returns a buffer receiving
-// everything written to stdout. The returned restore func puts stdout back.
-func captureStdout(t *testing.T) (*bytes.Buffer, func()) {
-	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	prev := os.Stdout
-	os.Stdout = w
-
-	buf := &bytes.Buffer{}
-	done := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(buf, r)
-		close(done)
-	}()
-
-	return buf, func() {
-		_ = w.Close()
-		<-done
-		os.Stdout = prev
-		_ = r.Close()
 	}
 }

@@ -1,4 +1,7 @@
-package mongo
+// Package mongouri parses MongoDB connection strings with plain string
+// handling — no driver dependency — so config/display layers can extract and
+// redact URI credentials without linking the driver.
+package mongouri
 
 import (
 	"net/url"
@@ -15,14 +18,23 @@ func ParseDBFromURI(uri string) string {
 	return strings.TrimPrefix(u.Path, "/")
 }
 
+// userinfoParts is one parse of a connection string around its userinfo.
+type userinfoParts struct {
+	prefix  string // scheme plus "://"
+	user    string // raw (still percent-encoded) username
+	pass    string // raw password; meaningful only when hasPass
+	hasPass bool   // userinfo contained a ":"; pass may still be empty
+	rest    string // host onward, after the "@"
+}
+
 // splitUserinfo separates a connection string around its userinfo section.
 // Parsed by hand because url.Parse rejects multi-host URIs
 // (mongodb://a:1,b:2/db). The last "@" before the path delimits the userinfo,
 // matching driver behaviour for passwords containing an unescaped "@".
-func splitUserinfo(uri string) (prefix, userinfo, hostAndAfter string, ok bool) {
+func splitUserinfo(uri string) (userinfoParts, bool) {
 	schemeEnd := strings.Index(uri, "://")
 	if schemeEnd < 0 {
-		return "", "", "", false
+		return userinfoParts{}, false
 	}
 	tail := uri[schemeEnd+3:]
 	authority := tail
@@ -31,38 +43,39 @@ func splitUserinfo(uri string) (prefix, userinfo, hostAndAfter string, ok bool) 
 	}
 	at := strings.LastIndex(authority, "@")
 	if at < 0 {
-		return "", "", "", false
+		return userinfoParts{}, false
 	}
-	return uri[:schemeEnd+3], authority[:at], tail[at+1:], true
+	user, pass, hasPass := strings.Cut(authority[:at], ":")
+	return userinfoParts{
+		prefix:  uri[:schemeEnd+3],
+		user:    user,
+		pass:    pass,
+		hasPass: hasPass,
+		rest:    tail[at+1:],
+	}, true
 }
 
 // SplitURICredentials extracts a username/password embedded in a connection
 // string's userinfo, percent-decoded, along with the URI with the userinfo
 // removed. found is false when the URI carries no password (username-only
-// userinfo, e.g. X.509 auth, is left alone).
+// userinfo, e.g. X.509 auth, is left alone). An empty password ("user:@host")
+// is deliberately not extractable even though RedactURI masks it — display
+// errs on the safe side.
 func SplitURICredentials(uri string) (username, password, stripped string, found bool) {
-	prefix, userinfo, rest, ok := splitUserinfo(uri)
-	if !ok {
+	p, ok := splitUserinfo(uri)
+	if !ok || !p.hasPass || p.pass == "" {
 		return "", "", uri, false
 	}
-	rawUser, rawPass, hasPass := strings.Cut(userinfo, ":")
-	if !hasPass || rawPass == "" {
-		return "", "", uri, false
-	}
-	return unescape(rawUser), unescape(rawPass), prefix + rest, true
+	return unescape(p.user), unescape(p.pass), p.prefix + p.rest, true
 }
 
 // RedactURI masks the password in a connection string's userinfo for display.
 func RedactURI(uri string) string {
-	prefix, userinfo, rest, ok := splitUserinfo(uri)
-	if !ok {
+	p, ok := splitUserinfo(uri)
+	if !ok || !p.hasPass {
 		return uri
 	}
-	user, _, hasPass := strings.Cut(userinfo, ":")
-	if !hasPass {
-		return uri
-	}
-	return prefix + user + ":***@" + rest
+	return p.prefix + p.user + ":***@" + p.rest
 }
 
 func unescape(s string) string {

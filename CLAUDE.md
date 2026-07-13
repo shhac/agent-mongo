@@ -24,6 +24,8 @@ internal/
 ├── credential/                # __KEYCHAIN__ sentinel store via lib-agent-keyring
 ├── mongo/                     # client factory, databases, collections, indexes,
 │                              #   schema inference, query, aggregate
+├── mongouri/                  # driver-free connection-string parsing:
+│                              #   db-name extraction, credential split, redaction
 ├── serialize/                 # BSON → JSON-safe (ObjectId→hex, Date→ISO, …)
 ├── truncation/                # any-string truncation + {field}Length companion
 ├── ejson/                     # Extended JSON parsing for --filter/--sort/--pipeline

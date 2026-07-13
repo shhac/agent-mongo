@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
 // TestClientOptionsPoolIsCLISized pins the pool shape for a short-lived CLI
@@ -49,8 +50,7 @@ func TestClientOptionsZeroTimeoutLeavesDriverDefault(t *testing.T) {
 }
 
 func TestClientOptionsUnknownCredential(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("AGENT_MONGO_NO_KEYCHAIN", "1")
+	testutil.IsolateConfig(t)
 
 	_, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017",

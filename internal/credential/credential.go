@@ -136,6 +136,15 @@ func ConnectionsUsing(credentialAlias string) []string {
 	return used
 }
 
+// Require verifies that a credential alias resolves, returning the shared
+// self-correcting NotFoundError when it doesn't.
+func Require(alias string) error {
+	if _, ok := Get(alias); !ok {
+		return NotFoundError(alias)
+	}
+	return nil
+}
+
 // NotFoundError is the shared self-correcting error for a missing credential
 // reference (used by connection add/update validation and connect).
 func NotFoundError(alias string) error {

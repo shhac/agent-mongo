@@ -1,4 +1,4 @@
-package mongo
+package mongouri
 
 import "testing"
 
@@ -57,6 +57,30 @@ func TestSplitURICredentials(t *testing.T) {
 			username: "deploy",
 			password: "s3cret",
 			stripped: "mongodb://localhost?authSource=admin",
+			found:    true,
+		},
+		{
+			name:     "invalid percent escape falls back to raw",
+			uri:      "mongodb://user:p%zzword@localhost/db",
+			username: "user",
+			password: "p%zzword",
+			stripped: "mongodb://localhost/db",
+			found:    true,
+		},
+		{
+			name:     "trailing bare percent falls back to raw",
+			uri:      "mongodb://u%zz:pa%@localhost/db",
+			username: "u%zz",
+			password: "pa%",
+			stripped: "mongodb://localhost/db",
+			found:    true,
+		},
+		{
+			name:     "empty username with password",
+			uri:      "mongodb://:pass@localhost/db",
+			username: "",
+			password: "pass",
+			stripped: "mongodb://localhost/db",
 			found:    true,
 		},
 		{
@@ -123,6 +147,11 @@ func TestRedactURI(t *testing.T) {
 			name: "empty password still masked",
 			uri:  "mongodb://deploy:@localhost/db",
 			want: "mongodb://deploy:***@localhost/db",
+		},
+		{
+			name: "empty username with password",
+			uri:  "mongodb://:pass@localhost/db",
+			want: "mongodb://:***@localhost/db",
 		},
 		{
 			name: "no userinfo untouched",

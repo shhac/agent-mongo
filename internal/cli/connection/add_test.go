@@ -1,9 +1,7 @@
 package connection
 
 import (
-	"bytes"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -11,15 +9,8 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
-
-// isolate points config at a throwaway dir and forces credential.Store onto
-// the config.json fallback so tests never touch a real keychain.
-func isolate(t *testing.T) {
-	t.Helper()
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("AGENT_MONGO_NO_KEYCHAIN", "1")
-}
 
 func execute(t *testing.T, args ...string) (string, error) {
 	t.Helper()
@@ -29,14 +20,14 @@ func execute(t *testing.T, args ...string) (string, error) {
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)
 
-	stdout, restore := captureStdout(t)
+	stdout, restore := testutil.CaptureStdout(t)
 	err := root.Execute()
 	restore()
 	return stdout.String(), err
 }
 
 func TestAddExtractsEmbeddedCredentials(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 
 	const canary = "TOPSECRET-CANARY-7A3F"
 	stdout, err := execute(t,
@@ -73,8 +64,57 @@ func TestAddExtractsEmbeddedCredentials(t *testing.T) {
 	}
 }
 
+// TestAddOverwritesExistingCredential pins the upsert semantics: re-adding a
+// connection whose alias collides with an existing credential silently
+// replaces that credential's values, matching `credential add`. Connections
+// sharing the credential pick up the new secret.
+func TestAddOverwritesExistingCredential(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if _, err := credential.Store("staging", config.Credential{
+		Username: "old-user",
+		Password: "old-pass",
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if err := config.StoreConnection("other", config.Connection{
+		ConnectionString: "mongodb://other.example.net/app",
+		Credential:       "staging",
+	}); err != nil {
+		t.Fatalf("StoreConnection: %v", err)
+	}
+
+	_, err := execute(t, "connection", "add", "staging", "mongodb://new-user:new-pass@localhost/app")
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	cred, ok := credential.Get("staging")
+	if !ok {
+		t.Fatal("credential 'staging' missing after re-add")
+	}
+	if cred.Username != "new-user" || cred.Password != "new-pass" {
+		t.Errorf("credential = %q/%q, want overwritten to new-user/new-pass", cred.Username, cred.Password)
+	}
+}
+
+func TestAddRejectsUnknownCredentialFlag(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	_, err := execute(t, "connection", "add", "local", "mongodb://localhost/app", "--credential", "ghost")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, want credential-not-found", err)
+	}
+	if _, ok := config.GetConnection("local"); ok {
+		t.Error("connection stored despite unknown credential")
+	}
+}
+
 func TestAddRejectsEmbeddedCredentialsWithCredentialFlag(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 
 	_, err := execute(t,
 		"connection", "add", "staging",
@@ -91,7 +131,7 @@ func TestAddRejectsEmbeddedCredentialsWithCredentialFlag(t *testing.T) {
 }
 
 func TestAddWithoutEmbeddedCredentialsIsUnchanged(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 
 	stdout, err := execute(t, "connection", "add", "local", "mongodb://localhost:27017/myapp")
 	if err != nil {
@@ -117,7 +157,7 @@ func TestAddWithoutEmbeddedCredentialsIsUnchanged(t *testing.T) {
 }
 
 func TestListRedactsEmbeddedPasswords(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 
 	// A pre-extraction connection stored with the password still in the URI.
 	if err := config.StoreConnection("legacy", config.Connection{
@@ -135,31 +175,5 @@ func TestListRedactsEmbeddedPasswords(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "mongodb://deploy:***@localhost/app") {
 		t.Errorf("list output missing redacted connection string: %s", stdout)
-	}
-}
-
-// captureStdout redirects os.Stdout to a pipe and returns a buffer receiving
-// everything written to stdout. The returned restore func puts stdout back.
-func captureStdout(t *testing.T) (*bytes.Buffer, func()) {
-	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	prev := os.Stdout
-	os.Stdout = w
-
-	buf := &bytes.Buffer{}
-	done := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(buf, r)
-		close(done)
-	}()
-
-	return buf, func() {
-		_ = w.Close()
-		<-done
-		os.Stdout = prev
-		_ = r.Close()
 	}
 }

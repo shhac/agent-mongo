@@ -5,27 +5,18 @@ import (
 	"testing"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
-// isolate points config at a temp dir and opts out of the OS keychain so
-// Store falls back to plaintext config.json — deterministic and side-effect
-// free. AGENT_MONGO_NO_KEYCHAIN is the opt-out env for keychain service
-// "app.paulie.agent-mongo".
-func isolate(t *testing.T) {
-	t.Helper()
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("AGENT_MONGO_NO_KEYCHAIN", "1")
-}
-
 func TestAllReturnsEmptyWhenNoneStored(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if got := All(); len(got) != 0 {
 		t.Errorf("All() = %v, want empty", got)
 	}
 }
 
 func TestStoreCredentialStores(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	storage, err := Store("acme", config.Credential{Username: "deploy", Password: "secret123"})
 	if err != nil {
 		t.Fatalf("Store() error: %v", err)
@@ -43,7 +34,7 @@ func TestStoreCredentialStores(t *testing.T) {
 }
 
 func TestStorageTypeReturnsValidType(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret123"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
@@ -53,14 +44,14 @@ func TestStorageTypeReturnsValidType(t *testing.T) {
 }
 
 func TestStorageTypeReturnsConfigForUnknownAlias(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if got := StorageType("nonexistent"); got != StorageConfig {
 		t.Errorf("StorageType(nonexistent) = %q, want config", got)
 	}
 }
 
 func TestStoreCredentialUpsertsExisting(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "old-pass"}); err != nil {
 		t.Fatalf("Store(old) error: %v", err)
 	}
@@ -74,7 +65,7 @@ func TestStoreCredentialUpsertsExisting(t *testing.T) {
 }
 
 func TestMultipleCredentialsStoredIndependently(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "acme-pass"}); err != nil {
 		t.Fatalf("Store(acme) error: %v", err)
 	}
@@ -94,14 +85,14 @@ func TestMultipleCredentialsStoredIndependently(t *testing.T) {
 }
 
 func TestGetReturnsFalseForUnknownName(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, ok := Get("nonexistent"); ok {
 		t.Error("Get(nonexistent) = ok, want not found")
 	}
 }
 
 func TestRemoveCredentialRemoves(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
@@ -117,7 +108,7 @@ func TestRemoveCredentialRemoves(t *testing.T) {
 }
 
 func TestRemoveCredentialErrorsForUnknownName(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	err := Remove("nonexistent")
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -128,7 +119,7 @@ func TestRemoveCredentialErrorsForUnknownName(t *testing.T) {
 }
 
 func TestRemoveCredentialErrorsWhenInUse(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
@@ -149,7 +140,7 @@ func TestRemoveCredentialErrorsWhenInUse(t *testing.T) {
 }
 
 func TestRemoveCredentialSucceedsAfterClearingReferences(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
@@ -173,7 +164,7 @@ func TestRemoveCredentialSucceedsAfterClearingReferences(t *testing.T) {
 }
 
 func TestStoreCredentialDoesNotTouchConnectionData(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	err := config.StoreConnection("local", config.Connection{ConnectionString: "mongodb://localhost"})
 	if err != nil {
 		t.Fatalf("StoreConnection() error: %v", err)
@@ -192,7 +183,7 @@ func TestStoreCredentialDoesNotTouchConnectionData(t *testing.T) {
 }
 
 func TestConnectionsUsingReturnsEmptyWhenNoneReference(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
@@ -206,7 +197,7 @@ func TestConnectionsUsingReturnsEmptyWhenNoneReference(t *testing.T) {
 }
 
 func TestConnectionsUsingReturnsReferencingConnections(t *testing.T) {
-	isolate(t)
+	testutil.IsolateConfig(t)
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}

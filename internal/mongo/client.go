@@ -14,6 +14,7 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
+	"github.com/shhac/agent-mongo/internal/mongouri"
 )
 
 // Session bundles a connected client with its resolved connection metadata.
@@ -113,7 +114,7 @@ func Connect(opts ConnectOpts) (*Session, error) {
 
 	dbName := conn.Database
 	if dbName == "" {
-		dbName = ParseDBFromURI(conn.ConnectionString)
+		dbName = mongouri.ParseDBFromURI(conn.ConnectionString)
 	}
 	return &Session{Client: client, Alias: alias, DBName: dbName}, nil
 }

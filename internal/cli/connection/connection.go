@@ -7,7 +7,7 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
-	"github.com/shhac/agent-mongo/internal/mongo"
+	"github.com/shhac/agent-mongo/internal/mongouri"
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
@@ -58,7 +58,7 @@ func registerList(parent *cobra.Command) {
 				conn := connections[alias]
 				items = append(items, map[string]any{
 					"alias":             alias,
-					"connection_string": mongo.RedactURI(conn.ConnectionString),
+					"connection_string": mongouri.RedactURI(conn.ConnectionString),
 					"database":          conn.Database,
 					"credential":        conn.Credential,
 					"default":           alias == defaultAlias,
