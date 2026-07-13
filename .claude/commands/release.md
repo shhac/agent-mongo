@@ -53,14 +53,20 @@ Confirm the release has assets for darwin/linux (arm64 + amd64) and windows,
 and that the tap formula was updated (check the latest commit on the
 `homebrew-tap` repo touches `Formula/agent-mongo.rb` with the new version).
 
-The formula push requires the `TAP_DEPLOY_KEY` secret on this repo. If the
-workflow logs "TAP_DEPLOY_KEY not set — skipping tap update", the release
-succeeded but the formula must be updated by hand: regenerate
-`Formula/agent-mongo.rb` in the sibling `homebrew-tap` repo with the new
-version + sha256s from the release's `checksums-sha256.txt`, commit as
-"agent-mongo <VERSION>", and push. (Fix properly by adding the secret:
-`gh secret set TAP_DEPLOY_KEY --repo shhac/agent-mongo`, same deploy key the
-sibling CLIs use.)
+The formula push requires the `TAP_DEPLOY_KEY` secret in this repo's
+`homebrew-tap` GitHub environment (set up 2026-07-13; env-scoped like the
+sibling CLIs, paired with the "agent-mongo release automation (env-scoped)"
+deploy key on `shhac/homebrew-tap`). If the workflow logs "TAP_DEPLOY_KEY not
+set — skipping tap update", the release succeeded but the formula must be
+updated by hand: regenerate `Formula/agent-mongo.rb` in the sibling
+`homebrew-tap` repo with the new version + sha256s from the release's
+`checksums-sha256.txt`, commit as "agent-mongo <VERSION>", and push. (Fix
+properly by re-creating the key pair — pipe the private key, never echo it:
+`ssh-keygen -t ed25519 -N "" -C "agent-mongo release automation" -f tap_key`,
+`gh repo deploy-key add tap_key.pub -R shhac/homebrew-tap --allow-write
+--title "agent-mongo release automation (env-scoped)"`,
+`gh secret set TAP_DEPLOY_KEY --repo shhac/agent-mongo --env homebrew-tap
+< tap_key`, then delete both key files.)
 
 ### Step 4: Report
 
