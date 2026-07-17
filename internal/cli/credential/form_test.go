@@ -158,8 +158,8 @@ func TestPromptMissingReturnsHumanErrorWhenNoGUI(t *testing.T) {
 	if !strings.Contains(oerr.Hint, "agent-mongo credential add --form") {
 		t.Errorf("hint = %q, want the agent-mongo-specific --form guidance", oerr.Hint)
 	}
-	if !strings.Contains(oerr.Hint, "--username <u> --password <secret>") {
-		t.Errorf("hint = %q, want the non-interactive fallback", oerr.Hint)
+	if !strings.Contains(oerr.Hint, "printf '%s'") || !strings.Contains(oerr.Hint, "--username <u>") {
+		t.Errorf("hint = %q, want the non-interactive stdin fallback", oerr.Hint)
 	}
 	if !errors.Is(err, dialog.ErrNoGUI) {
 		t.Error("errors.Is(err, ErrNoGUI) = false, want true (sentinel chain broken)")

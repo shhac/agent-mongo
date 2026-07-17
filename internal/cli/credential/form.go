@@ -58,8 +58,8 @@ func classifyDialogErr(err error, name string) error {
 	case dialog.CategoryHuman:
 		fixableBy = out.FixableByHuman
 		hint = "agent-mongo credential add --form requires a graphical desktop session. " +
-			"Ask the user to run on their local machine, or fall back to non-interactive: " +
-			"agent-mongo credential add " + name + " --username <u> --password <secret>"
+			"Ask the user to run on their local machine, or fall back to non-interactive stdin (keeps the password off argv): " +
+			"printf '%s' \"$PASSWORD\" | agent-mongo credential add " + name + " --username <u>"
 	case dialog.CategoryRetry:
 		fixableBy = out.FixableByRetry
 		hint = "User cancelled the dialog. Re-run agent-mongo credential add --form to retry."
