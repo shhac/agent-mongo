@@ -118,26 +118,36 @@ Connection resolution: `-c` flag > `AGENT_MONGO_CONNECTION` env > config default
 ## Credential management
 
 ```bash
-agent-mongo credential add acme --form                   # preferred; see LLM-safe entry below
-agent-mongo credential add acme --username deploy --password secret   # non-interactive fallback
+agent-mongo credential add acme --form                   # preferred interactive; see secure entry below
+printf '%s' "$PW" | agent-mongo credential add acme --username deploy   # non-interactive machine path
 agent-mongo credential list                              # passwords always redacted
 agent-mongo credential remove acme --force               # even if connections reference it
 ```
 
 Credentials are stored separately from connections, in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) with plaintext-config fallback. `credential list` shows the `storage` source per credential. Plaintext entries are auto-upgraded to the keychain on first use (reported via a stderr `{"notice": ...}` line — not an error). When you rotate a password, just re-add the credential — all connections referencing it pick up the new auth automatically.
 
-### LLM-safe entry with `--form`
+### Secure credential entry — never paste a secret into `--password`
 
-When you (the agent) are driving the CLI on a user's local machine, do not put a real password on the command line — you'll see it in your own argv. Use `--form` to escalate the secret to a native OS dialog instead. The user types into the OS popup; the secret never enters the agent's context.
+If a user pastes a MongoDB password (or any secret) into chat, **do not** put it into `--password`. A literal secret on the command line would land in your context window, transcripts, shell history, `ps`/`/proc`, and any downstream telemetry. Two safe paths supply the secret without ever putting it on argv:
+
+**1. `--form` — preferred interactive path.** A native OS dialog (macOS osascript, Linux zenity/kdialog, Windows Win32) pops up and the user types the secret straight into the OS. The agent only sees a redacted JSON receipt. When the agent is driving the CLI on the user's machine, instruct the user to run the `--form` command themselves so the secret stays out of the LLM:
 
 ```bash
 agent-mongo credential add acme --form                              # both fields prompted
 agent-mongo credential add acme --username deploy --form            # only password prompted
 ```
 
-Failure modes return a structured error with `fixable_by`:
+**2. Piped stdin — non-interactive machine path.** For scripts, CI, or a headless host where no GUI is available, pipe the password on stdin. It is read off the stream, never placed on the command line. `--username` is not a secret and stays a flag:
 
-- `human` — no GUI session available (SSH, headless host). Ask the user to run on their local machine, or fall back to non-interactive `--username <u> --password <secret>`.
+```bash
+printf '%s' "$PW" | agent-mongo credential add acme --username deploy
+```
+
+Password resolution precedence: `--password` flag > piped stdin > `--form` dialog. Prefer `--form` or stdin; reserve `--password` for values that are already non-secret (test fixtures, throwaway local dbs) — never for a secret pasted into chat.
+
+`--form` failure modes return a structured error with `fixable_by`:
+
+- `human` — no GUI session available (SSH, headless host). Ask the user to run on their local machine, or use the piped-stdin path above.
 - `retry` — user cancelled the dialog. Re-running the same command is the right next step.
 
 ## Truncation

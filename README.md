@@ -198,8 +198,8 @@ Store credentials separately from connections. Useful when the same username/pas
 
 ```bash
 # Store a credential once — --form prompts via a native OS dialog, keeping
-# the secret out of shell history and agent context (recommended; you can
-# also pass --username/--password directly)
+# the secret out of shell history and agent context (recommended). For a
+# non-interactive machine path, pipe the password on stdin instead (below).
 agent-mongo credential add acme --form
 
 # Reference it from multiple connections
@@ -221,19 +221,29 @@ Connections without a `--credential` use the connection string as-is (backward c
 
 Credentials are stored in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) and fall back to plaintext config otherwise. `credential list` shows the `storage` source (`keychain` or `config`) per credential. Set `AGENT_MONGO_NO_KEYCHAIN=1` to force plaintext config storage. Plaintext credentials (from older versions or keychain-less hosts) are upgraded to the keychain automatically the first time they are used on a host with a usable keychain.
 
-### LLM-safe credential entry (`--form`)
+### Secure credential entry — never paste a secret into `--password`
 
-When an agent is driving the CLI, putting a password on the command line means the agent sees it. `credential add --form` prompts for any missing `--username` / `--password` via a native OS dialog (osascript on macOS, zenity/kdialog on Linux, PowerShell on Windows). The value is typed directly into the OS popup — agent-mongo only receives the result, and the agent never sees the keystrokes.
+A literal secret on the command line lands in shell history, `ps`/`/proc`, and — when an agent is driving the CLI — the agent's context and transcripts. Do not put a pasted password into `--password`. Two paths supply the secret without ever placing it on argv:
+
+**`--form` — preferred interactive path.** Prompts for any missing `--username` / `--password` via a native OS dialog (osascript on macOS, zenity/kdialog on Linux, PowerShell on Windows). The value is typed directly into the OS popup — agent-mongo only receives the result, and the agent never sees the keystrokes.
 
 ```bash
 # Both fields prompted via OS dialog
 agent-mongo credential add acme --form
 
-# Username on the command line, password prompted
+# Username on the command line (not a secret), password prompted
 agent-mongo credential add acme --username deploy --form
 ```
 
-If no GUI session is available (SSH, headless host), the command exits with a structured error: `fixable_by: "human"` and a hint to run on the user's local machine or fall back to non-interactive flags. If the user cancels the dialog, the result is `fixable_by: "retry"`.
+**Piped stdin — non-interactive machine path.** For scripts, CI, or a headless host with no GUI, pipe the password on stdin. It is read off the stream, never placed on the command line:
+
+```bash
+printf '%s' "$PW" | agent-mongo credential add acme --username deploy
+```
+
+Password resolution precedence: `--password` flag > piped stdin > `--form` dialog. Reserve `--password` for values that are already non-secret; use `--form` or stdin for anything sensitive.
+
+If no GUI session is available (SSH, headless host), `--form` exits with a structured error: `fixable_by: "human"` and a hint to run on the user's local machine or use the piped-stdin path. If the user cancels the dialog, the result is `fixable_by: "retry"`.
 
 ## MCP server
 
