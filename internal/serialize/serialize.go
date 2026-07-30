@@ -9,7 +9,18 @@ import (
 	"fmt"
 	"time"
 
+	out "github.com/shhac/lib-agent-output"
 	"go.mongodb.org/mongo-driver/v2/bson"
+)
+
+// Ordered and Field are the family's order-preserving document, re-exported so
+// this package's callers need not import lib-agent-output directly. Field order
+// is load-bearing for an index key spec: {a:1,b:1} and {b:1,a:1} are different
+// indexes. JSON, NDJSON and YAML all preserve it, and the pruners and redactor
+// walk it, so ordering no longer costs the ability to prune.
+type (
+	Ordered = out.Ordered
+	Field   = out.Field
 )
 
 const maxSafeInteger = 1<<53 - 1 // JS Number.MAX_SAFE_INTEGER

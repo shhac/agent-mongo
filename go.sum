@@ -31,12 +31,16 @@ github.com/randall77/makefat v0.0.0-20210315173500-7ddd0e42c844/go.mod h1:T1TLSf
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shhac/lib-agent-cli v0.21.0 h1:xrEoxg020/llelPrdhKltR5Kr4drUGR0+ryp47jIDU0=
 github.com/shhac/lib-agent-cli v0.21.0/go.mod h1:pXkdLWRWBJFdHWyWD9xDRFjIM2g8pU4H8kbIfnY0E60=
+github.com/shhac/lib-agent-cli v0.22.0 h1:F2w7ikhnrgBmyLXBAB1k0AfkKmAz4/KvMW9nsjeJloQ=
+github.com/shhac/lib-agent-cli v0.22.0/go.mod h1:oAckf1JiU7pkpVVVoPVRhVc/bt0tZMpH8eFvh5xfaXE=
 github.com/shhac/lib-agent-keyring v0.1.1 h1:cAwFr0UzlQ0xsgO0zY607lmwhvSamPN6Tp1DCNJO7hg=
 github.com/shhac/lib-agent-keyring v0.1.1/go.mod h1:nTk+YfRDc2dc8Nghd1o9w4c40xU8Pqx/UgToN0yGvZ8=
 github.com/shhac/lib-agent-mcp v0.12.0 h1:JVdlf6ny8k676c5wl3gNeQW4f4XbFnPBLu6Io3zzVUE=
 github.com/shhac/lib-agent-mcp v0.12.0/go.mod h1:Hx/X1hJagJP7HDt72hPd4yeoaEggLuH9eWQzmovVOAo=
 github.com/shhac/lib-agent-output v0.10.0 h1:m/o7/uxf3FLS7M+qcb4x+socjc7hEsvQM+tJilh2+7Y=
 github.com/shhac/lib-agent-output v0.10.0/go.mod h1:YyO2KSKAZxRrCJGanfB6qAyV0DvG+GSsZNShQoLslT0=
+github.com/shhac/lib-agent-output v0.11.0 h1:TpEBW3Tkl0gzX7Nep5xMFBSGuzRptOwzNTJeUZwvKZQ=
+github.com/shhac/lib-agent-output v0.11.0/go.mod h1:YyO2KSKAZxRrCJGanfB6qAyV0DvG+GSsZNShQoLslT0=
 github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
 github.com/spf13/cobra v1.10.2/go.mod h1:7C1pvHqHw5A4vrJfjNwvOdzYu0Gml16OCs2GRiTUUS4=
 github.com/spf13/pflag v1.0.9 h1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=

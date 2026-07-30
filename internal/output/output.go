@@ -32,23 +32,22 @@ func ResolveFormat() out.Format {
 // companion {field}Length key whose field was later pruned.
 func pruneTruncate(v any) any { return truncation.Apply(out.PruneEmpty(v)) }
 
-// Verbatim marks a record whose encoded shape is itself the data: field order,
-// nulls and exact values all carry meaning. serialize.Ordered is one — an index
-// key spec describes a different index once its fields are re-sorted.
+// A record built as an out.Ordered is one whose encoded shape is itself the
+// data — in this CLI, an index key spec or an echoed query filter. Field order
+// survives the normalizing path since lib-agent-output v0.11.0, but the rest of
+// that path does not leave such a record intact: PruneEmpty drops a `field:
+// null` clause, which is the whole difference between a partial index that
+// excludes soft-deleted documents and one that does not, and truncation would
+// silently rewrite a long value.
 //
-// The normalizing printers below reject these records rather than quietly
-// mangling them. They have to reject rather than adapt: pruning runs on the far
-// side of a JSON round-trip that re-sorts object keys and drops nulls, so by
-// the time a Pruner sees the record the order is already gone. Print verbatim
-// records with PrintListVerbatim.
-type Verbatim interface{ VerbatimRecord() }
-
+// So the normalizing printers reject these records rather than half-mangling
+// them. Print them with PrintListVerbatim.
 var errVerbatim = out.New(
-	"internal: a verbatim record was printed through a normalizing path, which would "+
-		"re-sort its keys and drop its nulls — use output.PrintListVerbatim",
+	"internal: an ordered record was printed through a normalizing path, which would "+
+		"drop its nulls and truncate its values — use output.PrintListVerbatim",
 	out.FixableByHuman)
 
-func isVerbatim(v any) bool { _, ok := v.(Verbatim); return ok }
+func isVerbatim(v any) bool { _, ok := v.(out.Ordered); return ok }
 
 // rejectVerbatim checks T's zero value as well as the records themselves, so a
 // call passing a concrete verbatim slice type is caught even when it is empty.
