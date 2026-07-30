@@ -35,7 +35,7 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 - `agent-mongo collection list <database> [-c <alias>]` — list collections (one record per collection: name, type)
 - `agent-mongo collection schema <database> <collection> [--sample-size <n>] [--depth <n>] [--limit <n>] [--skip <n>] [-c <alias>]` — infer schema from samples (default: 100, configurable via defaults.schemaSampleSize). One record per field; sampleSize/totalDocuments/totalFields on the `@meta` line. Errors if collection does not exist. Use --depth to limit nesting, --limit/--skip for field pagination.
-- `agent-mongo collection indexes <database> <collection> [-c <alias>]` — list indexes with key patterns
+- `agent-mongo collection indexes <database> <collection> [-c <alias>]` — list indexes with key patterns. Specs are verbatim: compound key order is the real index order (not sorted), null clauses in `partialFilterExpression` are kept, nothing is truncated
 - `agent-mongo collection stats <database> <collection> [-c <alias>]` — collection statistics (document count, sizes, capped)
 
 ## Query

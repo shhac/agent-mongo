@@ -9,7 +9,7 @@ Default output is **NDJSON** (`-f jsonl`) — one JSON record per line on stdout
   - `{"@pagination": {...}}` — `has_more`, `total_items`, and `next_cursor` when more results exist.
 - **Single results** (stats, `query get`, `count`, `distinct`, receipts) print as one JSON line.
 
-Empty/null fields are pruned automatically — a missing key means no value, not `null`.
+Empty/null fields are pruned automatically and object keys are sorted alphabetically — a missing key means no value, not `null`. This is a normalization for readable, diffable documents; it is **not** applied to `collection indexes`, where field order and null clauses carry meaning (see below).
 
 Errors print one JSON line to **stderr** with exit code 1:
 
@@ -115,11 +115,18 @@ With `--limit`/`--skip` pagination, a `@pagination` line carries `next_cursor` (
 ## Collection indexes (`collection indexes`)
 
 ```
-{"key":{"_id":1},"name":"_id_"}
+{"name":"_id_","key":{"_id":1}}
+{"name":"status_1_expiryDate_1","key":{"status":1,"expiryDate":1}}
+{"name":"participantIds_1","key":{"participantIds":1},"partialFilterExpression":{"participantIds":{"$type":"string"},"deletedAt":null,"status":{"$in":["pending","confirmed"]}}}
 {"@meta":{"collection":"users","database":"testdb"}}
 ```
 
-Indexes also carry `unique`, `sparse`, and other properties when set.
+Index specs are **verbatim**, unlike every other command's output — safe to compare byte-for-byte against an index declared in code:
+
+- Compound `key` order is the real index order, never sorted. `{a:1,b:1}` and `{b:1,a:1}` are different indexes serving different queries (ESR ordering), so the displayed order always agrees with the index name.
+- `null` clauses survive. `deletedAt: null` in a `partialFilterExpression` is the difference between an index that excludes soft-deleted documents and one that does not — and in MongoDB `{x: null}` matches missing *and* null, whereas `{x: {$exists: false}}` matches only missing.
+- Array order (e.g. inside `$in`) is preserved, and no value is truncated.
+- Every option the server reports rides along in server order — `unique`, `sparse`, `hidden`, `collation`, `expireAfterSeconds`, `weights`, `wildcardProjection`, and any newer option. Only storage-version markers (`v`, `ns`, `textIndexVersion`, `2dsphereIndexVersion`) are dropped.
 
 ## Collection stats (`collection stats`)
 

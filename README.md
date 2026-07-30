@@ -78,7 +78,7 @@ Default output is **NDJSON** — one JSON record per line on stdout.
 
 - List commands emit one record per item, followed by `@`-prefixed metadata lines: `{"@meta": {...}}` carries command context (database, collection, sample size, totals) and `{"@pagination": {...}}` carries `has_more`, `total_items`, and a `next_cursor` when applicable.
 - Single results (stats, `query get`, `count`, `distinct`, write receipts) print as one JSON line.
-- Empty/null fields are pruned automatically — a missing key means no value, not `null`.
+- Empty/null fields are pruned automatically and object keys are sorted — a missing key means no value, not `null`. `collection indexes` is the exception: index specs are emitted verbatim (see below).
 - Errors go to stderr as one JSON line with exit code 1: `{"error": "...", "fixable_by": "agent"|"human"|"retry", "hint": "..."}`. `fixable_by` tells the caller who can resolve it — `agent` (fix the input and retry), `human` (needs the user, e.g. auth or a GUI dialog), or `retry` (transient).
 
 Use `-f/--format` to change the shape:

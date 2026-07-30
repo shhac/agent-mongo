@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +102,24 @@ func seed() error {
 		},
 	})
 	if err != nil {
+		return err
+	}
+
+	// Indexes whose specs are only correct if reported verbatim: a compound key
+	// whose real order is the reverse of alphabetical, and a partial filter
+	// carrying a null clause and a multi-value $in.
+	reservations := db.Collection("reservations")
+	if _, err := reservations.Indexes().CreateMany(ctx, []driver.IndexModel{
+		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "expiryDate", Value: 1}}},
+		{
+			Keys: bson.D{{Key: "participantIds", Value: 1}},
+			Options: options.Index().SetPartialFilterExpression(bson.D{
+				{Key: "participantIds", Value: bson.D{{Key: "$type", Value: "string"}}},
+				{Key: "deletedAt", Value: nil},
+				{Key: "status", Value: bson.D{{Key: "$in", Value: bson.A{"pending", "confirmed"}}}},
+			}),
+		},
+	}); err != nil {
 		return err
 	}
 
@@ -280,6 +299,37 @@ func TestCollectionCommands(t *testing.T) {
 	items, _ = r.records(t)
 	if items[0]["documentCount"].(float64) != 150 {
 		t.Errorf("stats: %v", items)
+	}
+}
+
+// Index specs must survive as bytes: sorting a compound key makes the output
+// disagree with the index name, and pruning a null clause out of a partial
+// filter loses the only thing that makes the index partial.
+func TestCollectionIndexesAreVerbatim(t *testing.T) {
+	lines := strings.Split(strings.TrimSpace(
+		runIn(t, home(t), "collection", "indexes", testDB, "reservations").stdout), "\n")
+
+	want := []string{
+		`{"name":"status_1_expiryDate_1","key":{"status":1,"expiryDate":1}}`,
+		`{"name":"participantIds_1","key":{"participantIds":1},"partialFilterExpression":` +
+			`{"participantIds":{"$type":"string"},"deletedAt":null,"status":{"$in":["pending","confirmed"]}}}`,
+	}
+	for _, line := range want {
+		if !slices.Contains(lines, line) {
+			t.Errorf("missing index line\n want: %s\n got:  %s", line, strings.Join(lines, "\n       "))
+		}
+	}
+
+	// The json/yaml envelope is a separate branch in lib-agent-output, so it
+	// needs its own check that the compound key was not reordered.
+	for _, format := range []string{"json", "yaml"} {
+		out := runIn(t, home(t), "collection", "indexes", testDB, "reservations", "-f", format).stdout
+		if strings.Index(out, "status") > strings.Index(out, "expiryDate") {
+			t.Errorf("-f %s reordered the compound key:\n%s", format, out)
+		}
+		if !strings.Contains(out, "deletedAt") {
+			t.Errorf("-f %s dropped the null clause:\n%s", format, out)
+		}
 	}
 }
 

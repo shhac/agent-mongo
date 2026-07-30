@@ -51,7 +51,7 @@ agent-mongo collection schema myapp users                # infer schema from sam
 agent-mongo collection schema myapp users --depth 2      # limit nesting depth
 agent-mongo collection schema myapp events --limit 50    # paginate large schemas
 agent-mongo collection schema myapp events --limit 50 --skip 50  # next page
-agent-mongo collection indexes myapp users               # index key patterns
+agent-mongo collection indexes myapp users               # index key patterns (verbatim specs)
 agent-mongo collection stats myapp orders                # document count, sizes
 agent-mongo database stats myapp                         # database-level statistics
 ```

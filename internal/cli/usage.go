@@ -19,7 +19,7 @@ COMMANDS:
 
   collection list <database>                      List collections
   collection schema <database> <collection>       Infer schema from samples
-  collection indexes <database> <collection>      List indexes
+  collection indexes <database> <collection>      List indexes (verbatim specs)
   collection stats <database> <collection>        Collection statistics
 
   query find <database> <collection> [--filter] [--sort]              Find documents
@@ -43,7 +43,10 @@ SAFETY: Read-only. No write operations. Aggregation rejects $out/$merge.
 OUTPUT: NDJSON to stdout — one JSON record per line; metadata rides on
   @-prefixed lines (e.g. {"@pagination": ...}). Use -f json for a pretty
   {"data": [...]} envelope. Errors: {"error", "fixable_by", "hint"} to stderr,
-  exit code 1.
+  exit code 1. Records are normalized — object keys sorted, empty/null fields
+  pruned, long strings truncated. "collection indexes" is exempt: index specs
+  come out verbatim (real key order, nulls kept) so they can be compared
+  byte-for-byte against a declared index.
 
 DETAIL: Run "<command> usage" for per-command docs.`
 

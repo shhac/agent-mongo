@@ -49,7 +49,11 @@ internal/
   `@`-prefixed lines (`@meta`, `@pagination`); `-f json`/`-f yaml` produce a
   `{"data": [...]}` envelope. Data-bearing output goes through
   `output.PrintResult`/`PrintList` (prune + truncate); admin receipts through
-  `output.PrintRaw` (prune only). Errors: return them from `RunE` — libcli.Run
+  `output.PrintRaw` (prune only). Records whose encoded shape *is* the data —
+  index specs — go through `output.PrintListVerbatim` (no prune, no truncate,
+  field order kept) and implement `output.Verbatim`; the normalizing printers
+  reject them rather than silently re-sorting keys and dropping nulls.
+  Errors: return them from `RunE` — libcli.Run
   renders `{error, fixable_by, hint}` on stderr once, exit 1. Never pre-print
   errors in commands.
 - **Truncation**: any string over `truncation.maxLength` is cut with `…` plus a

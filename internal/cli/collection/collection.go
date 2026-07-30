@@ -8,6 +8,7 @@ import (
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
+	"github.com/shhac/agent-mongo/internal/serialize"
 )
 
 func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
@@ -46,10 +47,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 				if err != nil {
 					return err
 				}
-				return output.PrintList(indexes, output.Meta(map[string]any{
-					"database":   ref.DB,
-					"collection": ref.Collection,
-				}))
+				return printIndexes(indexes, ref)
 			})
 		},
 	})
@@ -75,6 +73,16 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 	root.AddCommand(cmd)
 }
 
+// printIndexes is split out of the command so a unit test can pin the print
+// policy without a live session: index specs go out verbatim, never through the
+// normalizing path that would re-sort compound keys and prune null clauses.
+func printIndexes(indexes []serialize.Ordered, ref mongo.Ref) error {
+	return output.PrintListVerbatim(indexes, output.Meta(map[string]any{
+		"database":   ref.DB,
+		"collection": ref.Collection,
+	}))
+}
+
 const usageText = `collection — Collection discovery
 
 COMMANDS:
@@ -95,6 +103,10 @@ COMMANDS:
 
   collection indexes <database> <collection> [-c <alias>]
     List all indexes with key patterns, uniqueness, and other properties.
+    Specs are emitted verbatim, unlike document output: compound key order is
+    the real index order (not sorted), null clauses in partialFilterExpression
+    are kept, and no value is truncated. Safe to compare byte-for-byte against
+    a declared index.
 
   collection stats <database> <collection> [-c <alias>]
     Get collection statistics: document count, data/storage/index sizes, capped flag.

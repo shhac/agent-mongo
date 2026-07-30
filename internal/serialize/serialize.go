@@ -24,8 +24,26 @@ func uuidString(data []byte) string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", data[0:4], data[4:6], data[6:8], data[8:10], data[10:16])
 }
 
-// Value converts a single BSON-decoded value to a JSON-safe value.
-func Value(value any) any {
+// fieldOrder selects how documents are converted: into a map (field order
+// lost, which is what document output wants — sorted keys diff cleanly) or into
+// an Ordered (field order kept, for values where the order carries meaning).
+type fieldOrder bool
+
+const (
+	sortedFields   fieldOrder = false
+	preservedOrder fieldOrder = true
+)
+
+// Value converts a single BSON-decoded value to a JSON-safe value. Document
+// field order is not preserved; see OrderedDocument where it matters.
+func Value(value any) any { return convert(value, sortedFields) }
+
+// orderedValue is Value with document field order preserved. Unexported until
+// a caller outside this package needs a bare value rather than a whole
+// document — OrderedDocument is the entry point.
+func orderedValue(value any) any { return convert(value, preservedOrder) }
+
+func convert(value any, order fieldOrder) any {
 	switch v := value.(type) {
 	case nil:
 		return nil
@@ -60,36 +78,43 @@ func Value(value any) any {
 	case bson.Null, bson.Undefined:
 		return nil
 	case bson.D:
+		if order == preservedOrder {
+			out := make(Ordered, len(v))
+			for i, elem := range v {
+				out[i] = Field{Key: elem.Key, Value: convert(elem.Value, order)}
+			}
+			return out
+		}
 		out := make(map[string]any, len(v))
 		for _, elem := range v {
-			out[elem.Key] = Value(elem.Value)
+			out[elem.Key] = convert(elem.Value, order)
 		}
 		return out
 	case bson.M:
 		out := make(map[string]any, len(v))
 		for key, val := range v {
-			out[key] = Value(val)
+			out[key] = convert(val, order)
 		}
 		return out
 	case map[string]any:
 		out := make(map[string]any, len(v))
 		for key, val := range v {
-			out[key] = Value(val)
+			out[key] = convert(val, order)
 		}
 		return out
 	case bson.A:
-		return sliceValue(v)
+		return sliceValue(v, order)
 	case []any:
-		return sliceValue(v)
+		return sliceValue(v, order)
 	default:
 		return v
 	}
 }
 
-func sliceValue(items []any) []any {
+func sliceValue(items []any, order fieldOrder) []any {
 	out := make([]any, len(items))
 	for i, item := range items {
-		out[i] = Value(item)
+		out[i] = convert(item, order)
 	}
 	return out
 }
@@ -97,6 +122,13 @@ func sliceValue(items []any) []any {
 // Document converts a BSON document to a JSON-safe map.
 func Document(doc bson.D) map[string]any {
 	converted, _ := Value(doc).(map[string]any)
+	return converted
+}
+
+// OrderedDocument converts a BSON document to a JSON-safe Ordered, keeping
+// field order at every level.
+func OrderedDocument(doc bson.D) Ordered {
+	converted, _ := orderedValue(doc).(Ordered)
 	return converted
 }
 
