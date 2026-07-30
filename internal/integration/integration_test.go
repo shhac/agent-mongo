@@ -333,6 +333,59 @@ func TestCollectionIndexesAreVerbatim(t *testing.T) {
 	}
 }
 
+// The echo must be faithful end-to-end: a caller uses it to confirm what ran,
+// so an alphabetized filter or a swallowed null clause would answer with a
+// query they did not send.
+func TestQueryEcho(t *testing.T) {
+	h := home(t)
+
+	t.Run("off by default", func(t *testing.T) {
+		r := runIn(t, h, "query", "count", testDB, "orders", "--filter", `{"status":"pending"}`)
+		if strings.Contains(r.stdout, "@query") {
+			t.Errorf("echo appeared without the flag:\n%s", r.stdout)
+		}
+	})
+
+	t.Run("filter order and nulls survive", func(t *testing.T) {
+		r := runIn(t, h, "query", "count", testDB, "orders",
+			"--filter", `{"status":"pending","deletedAt":null}`, "--echo-query")
+		want := `{"@query":{"filter":{"status":"pending","deletedAt":null}}}`
+		if !slices.Contains(strings.Split(strings.TrimSpace(r.stdout), "\n"), want) {
+			t.Errorf("want %s\ngot:\n%s", want, r.stdout)
+		}
+	})
+
+	t.Run("find echoes effective sort and limit", func(t *testing.T) {
+		r := runIn(t, h, "query", "find", testDB, "orders",
+			"--filter", `{"status":"pending"}`, "--limit", "1", "--echo-query")
+		want := `{"@query":{"filter":{"status":"pending"},"sort":{"_id":-1},"limit":1}}`
+		if !slices.Contains(strings.Split(strings.TrimSpace(r.stdout), "\n"), want) {
+			t.Errorf("want %s\ngot:\n%s", want, r.stdout)
+		}
+	})
+
+	t.Run("aggregate echoes stage and field order", func(t *testing.T) {
+		r := runIn(t, h, "query", "aggregate", testDB, "orders",
+			`[{"$match":{"status":"pending","amount":{"$gte":0}}},{"$count":"n"}]`, "--echo-query")
+		if !strings.Contains(r.stdout,
+			`"pipeline":[{"$match":{"status":"pending","amount":{"$gte":0}}},{"$count":"n"}]`) {
+			t.Errorf("pipeline order lost:\n%s", r.stdout)
+		}
+	})
+
+	t.Run("single-result echo stays valid in json", func(t *testing.T) {
+		r := runIn(t, h, "query", "count", testDB, "orders",
+			"--filter", `{"b":1,"a":2}`, "--echo-query", "-f", "json")
+		var doc map[string]any
+		if err := json.Unmarshal([]byte(r.stdout), &doc); err != nil {
+			t.Fatalf("not a single valid JSON document: %v\n%s", err, r.stdout)
+		}
+		if _, ok := doc["@query"]; !ok {
+			t.Errorf("@query missing from the json envelope: %s", r.stdout)
+		}
+	})
+}
+
 func TestQueryCommands(t *testing.T) {
 	h := home(t)
 

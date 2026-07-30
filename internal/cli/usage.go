@@ -31,6 +31,8 @@ COMMANDS:
 
 GLOBAL FLAGS: -c <alias> (connection), --expand <fields>, --full,
   -t/--timeout <ms>, -f/--format <jsonl|json|yaml>
+QUERY FLAG: --echo-query echoes the executed query on an {"@query": ...} line
+  (verbatim: real field order, nulls kept). Off by default.
 
 CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
   Connections can reference stored credentials via --credential for shared auth.

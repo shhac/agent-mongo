@@ -4,7 +4,9 @@
 package output
 
 import (
+	"maps"
 	"os"
+	"slices"
 
 	out "github.com/shhac/lib-agent-output"
 
@@ -70,6 +72,40 @@ func PrintResult(item any) error {
 		return errVerbatim
 	}
 	return out.Print(os.Stdout, item, ResolveFormat(), pruneTruncate)
+}
+
+// PrintResultWithMeta emits a single data-bearing record plus @-prefixed
+// metadata. The record is pruned and truncated as usual; the metadata is not —
+// it rides through verbatim, matching how WriteList treats a list's metadata,
+// which is what lets an echoed query keep its field order and null clauses.
+//
+// In NDJSON the metadata takes its own trailing lines, as it does for lists.
+// The single-document formats have nowhere else to put it, so the keys merge
+// into the record; being @-prefixed, they stay distinguishable from data.
+func PrintResultWithMeta(item map[string]any, meta map[string]any) error {
+	if len(meta) == 0 {
+		return PrintResult(item)
+	}
+	format := ResolveFormat()
+	if format == out.FormatNDJSON {
+		if err := PrintResult(item); err != nil {
+			return err
+		}
+		writer := out.NewNDJSONWriter(os.Stdout)
+		for _, key := range slices.Sorted(maps.Keys(meta)) {
+			if err := writer.WriteMetaLine(key, meta[key]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	merged := map[string]any{}
+	if pruned, ok := pruneTruncate(item).(map[string]any); ok {
+		maps.Copy(merged, pruned)
+	}
+	maps.Copy(merged, meta)
+	return out.Print(os.Stdout, merged, format, nil)
 }
 
 // PrintRaw emits a single admin/receipt record (pruned, never truncated).

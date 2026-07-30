@@ -49,10 +49,14 @@ internal/
   `@`-prefixed lines (`@meta`, `@pagination`); `-f json`/`-f yaml` produce a
   `{"data": [...]}` envelope. Data-bearing output goes through
   `output.PrintResult`/`PrintList` (prune + truncate); admin receipts through
-  `output.PrintRaw` (prune only). Records whose encoded shape *is* the data —
-  index specs — go through `output.PrintListVerbatim` (no prune, no truncate,
-  field order kept) and implement `output.Verbatim`; the normalizing printers
-  reject them rather than silently re-sorting keys and dropping nulls.
+  `output.PrintRaw` (prune only). Records whose encoded shape *is* the data are
+  built as `serialize.Ordered` (an alias for `lib-agent-output`'s type, so the
+  library's walkers recognize it) and printed with `output.PrintListVerbatim` /
+  `PrintResultWithMeta` — no prune, no truncate, field order kept. The
+  normalizing printers reject an `Ordered` outright rather than half-mangling
+  it: order now survives them, but dropped nulls and truncation would still
+  turn a real spec into a plausible wrong one. Two such outputs exist — index
+  specs, and the `--echo-query` echo built in `internal/cli/query/echo.go`.
   Errors: return them from `RunE` — libcli.Run
   renders `{error, fixable_by, hint}` on stderr once, exit 1. Never pre-print
   errors in commands.

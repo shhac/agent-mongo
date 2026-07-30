@@ -112,6 +112,22 @@ With `--limit`/`--skip` pagination, a `@pagination` line carries `next_cursor` (
 {"@pagination":{"has_more":true,"next_cursor":"3","total_items":21}}
 ```
 
+## Query echo (`--echo-query`)
+
+Any `query` command can report what it actually ran:
+
+```
+{"orderNo":147,"status":"pending","amount":1470}
+{"@meta":{"collection":"orders","database":"testdb"}}
+{"@query":{"filter":{"status":"pending","deletedAt":null},"sort":{"_id":-1},"limit":1}}
+```
+
+Like index specs, the echo is verbatim — filter key order is the real order, `null` clauses survive, `$in` element order is preserved. That is what makes it usable as a check: a normalized echo could report a query that differs from the one that ran.
+
+It reports **effective** values, including defaults the CLI supplied (`sort: {_id: -1}`, the resolved limit), not just the flags passed. Options left unset are omitted rather than echoed as zero.
+
+For single-result commands (`count`, `distinct`, `get`) under `-f json`/`-f yaml` there is no separate metadata line, so the `@query` key merges into the record; the `@` prefix keeps it distinguishable from data.
+
 ## Collection indexes (`collection indexes`)
 
 ```

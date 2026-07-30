@@ -61,6 +61,7 @@ agent-mongo query get myapp users 665a1b2c3d4e5f6a7b8c9d0e
 agent-mongo query count myapp orders --filter '{"status":"pending"}'
 agent-mongo query sample myapp users --size 5
 agent-mongo query distinct myapp orders status
+agent-mongo query count myapp orders --filter '{"status":"pending"}' --echo-query   # echo what ran
 ```
 
 ### Extended JSON (EJSON)
@@ -78,7 +79,7 @@ Default output is **NDJSON** — one JSON record per line on stdout.
 
 - List commands emit one record per item, followed by `@`-prefixed metadata lines: `{"@meta": {...}}` carries command context (database, collection, sample size, totals) and `{"@pagination": {...}}` carries `has_more`, `total_items`, and a `next_cursor` when applicable.
 - Single results (stats, `query get`, `count`, `distinct`, write receipts) print as one JSON line.
-- Empty/null fields are pruned automatically and object keys are sorted — a missing key means no value, not `null`. `collection indexes` is the exception: index specs are emitted verbatim (see below).
+- Empty/null fields are pruned automatically and object keys are sorted — a missing key means no value, not `null`. Two outputs are exempt, because for them the shape *is* the data: `collection indexes` specs, and the `--echo-query` echo. Both are emitted verbatim — real field order, nulls kept (see below).
 - Errors go to stderr as one JSON line with exit code 1: `{"error": "...", "fixable_by": "agent"|"human"|"retry", "hint": "..."}`. `fixable_by` tells the caller who can resolve it — `agent` (fix the input and retry), `human` (needs the user, e.g. auth or a GUI dialog), or `retry` (transient).
 
 Use `-f/--format` to change the shape:
@@ -133,7 +134,7 @@ agent-mongo [-c <alias>] [-f <fmt>] [-F/--full] [-e/--expand <fields>] [-t/--tim
 │   ├── indexes <database> <collection>
 │   ├── stats <database> <collection>
 │   └── usage
-├── query
+├── query   [--echo-query]                      # echo the executed query on an @query line
 │   ├── find <database> <collection> [--filter] [--sort] [--projection] [--limit] [--skip]
 │   ├── get <database> <collection> <id> [--type objectid|string|number] [--projection <json>]
 │   ├── count <database> <collection> [--filter]

@@ -40,13 +40,14 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				return err
 			}
 
+			effectiveLimit := shared.EffectiveLimit(limit)
 			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.FindDocuments(ctx.Ctx, mongo.FindOpts{
 					Ref:        ref,
 					Filter:     filterDoc,
 					Sort:       sortDoc,
 					Projection: projectionDoc,
-					Limit:      shared.EffectiveLimit(limit),
+					Limit:      effectiveLimit,
 					Skip:       skip,
 				})
 				if err != nil {
@@ -58,6 +59,15 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 					"collection": ref.Collection,
 				})
 				maps.Copy(meta, output.PaginationMeta(result.HasMore, "", int(result.TotalMatching)))
+
+				var e echo
+				e.doc("filter", filterDoc)
+				e.doc("sort", sortDoc)
+				e.doc("projection", projectionDoc)
+				e.num("limit", effectiveLimit)
+				e.num("skip", skip)
+				maps.Copy(meta, e.meta())
+
 				return output.PrintList(result.Documents, meta)
 			})
 		},

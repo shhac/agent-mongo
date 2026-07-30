@@ -3,6 +3,7 @@ package query
 import (
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/shhac/agent-mongo/internal/ejson"
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
+	"github.com/shhac/agent-mongo/internal/serialize"
 )
 
 func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags) {
@@ -37,20 +39,27 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 				return err
 			}
 
+			effectiveLimit := shared.EffectiveLimit(limit)
 			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
 				docs, err := ctx.Session.Aggregate(ctx.Ctx, mongo.AggregateOpts{
 					Ref:      ref,
 					Pipeline: pipeline,
-					Limit:    shared.EffectiveLimit(limit),
+					Limit:    effectiveLimit,
 				})
 				if err != nil {
 					return err
 				}
-				return output.PrintList(docs, output.Meta(map[string]any{
+				meta := output.Meta(map[string]any{
 					"database":   ref.DB,
 					"collection": ref.Collection,
 					"count":      len(docs),
-				}))
+				})
+				var e echo
+				// Both orders matter: the sequence of stages, and each stage's fields.
+				e.value("pipeline", serialize.OrderedValue(pipeline))
+				e.num("limit", effectiveLimit)
+				maps.Copy(meta, e.meta())
+				return output.PrintList(docs, meta)
 			})
 		},
 	}

@@ -40,6 +40,8 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 
 ## Query
 
+All `query` commands accept `--echo-query`, which adds an `{"@query": ...}` line reporting the query as sent to the server — verbatim, so field order and null clauses are intact. Off by default.
+
 - `agent-mongo query find <database> <collection> [--filter <json>] [--sort <json>] [--projection <json>] [--limit <n>] [--skip <n>] [-c <alias>]` — find documents (default sort: `{_id:-1}`, default limit: 20). One record per document; `@pagination` line carries has_more and total_items.
 - `agent-mongo query get <database> <collection> <id> [--type objectid|string|number] [--projection <json>] [-c <alias>]` — get document by \_id (auto-detects ObjectId). Returns { database, collection, fieldCount, document }.
 - `agent-mongo query count <database> <collection> [--filter <json>] [-c <alias>]` — count documents (omit filter for total)

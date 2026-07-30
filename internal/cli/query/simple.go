@@ -1,6 +1,8 @@
 package query
 
 import (
+	"maps"
+
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
@@ -28,11 +30,13 @@ func registerCount(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				if err != nil {
 					return err
 				}
-				return output.PrintResult(map[string]any{
+				var e echo
+				e.doc("filter", filterDoc)
+				return output.PrintResultWithMeta(map[string]any{
 					"database":   ref.DB,
 					"collection": ref.Collection,
 					"count":      count,
-				})
+				}, e.meta())
 			})
 		},
 	}
@@ -73,11 +77,16 @@ func registerSample(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				if err != nil {
 					return err
 				}
-				return output.PrintList(docs, output.Meta(map[string]any{
+				meta := output.Meta(map[string]any{
 					"database":   ref.DB,
 					"collection": ref.Collection,
 					"sampleSize": len(docs),
-				}))
+				})
+				var e echo
+				e.doc("filter", filterDoc)
+				e.num("size", requestedSize)
+				maps.Copy(meta, e.meta())
+				return output.PrintList(docs, meta)
 			})
 		},
 	}
@@ -109,13 +118,16 @@ func registerDistinct(parent *cobra.Command, globals func() *shared.GlobalFlags)
 				if err != nil {
 					return err
 				}
-				return output.PrintResult(map[string]any{
+				var e echo
+				e.str("field", field)
+				e.doc("filter", filterDoc)
+				return output.PrintResultWithMeta(map[string]any{
 					"database":   ref.DB,
 					"collection": ref.Collection,
 					"field":      field,
 					"values":     values,
 					"count":      len(values),
-				})
+				}, e.meta())
 			})
 		},
 	}

@@ -43,12 +43,16 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				if doc == nil {
 					return fmt.Errorf("Document not found: _id=%s in %s.%s", id, ref.DB, ref.Collection)
 				}
-				return output.PrintResult(map[string]any{
+				var e echo
+				e.str("id", id)
+				e.str("idType", idType)
+				e.doc("projection", projectionDoc)
+				return output.PrintResultWithMeta(map[string]any{
 					"database":   ref.DB,
 					"collection": ref.Collection,
 					"fieldCount": len(doc),
 					"document":   doc,
-				})
+				}, e.meta())
 			})
 		},
 	}

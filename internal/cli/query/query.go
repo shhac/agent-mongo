@@ -11,6 +11,7 @@ import (
 
 func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 	cmd := &cobra.Command{Use: "query", Short: "Document retrieval (read-only)"}
+	registerEchoFlag(cmd)
 
 	registerFind(cmd, globals)
 	registerGet(cmd, globals)
@@ -58,6 +59,14 @@ COMMANDS:
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
     Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
 
+ECHO: --echo-query adds an {"@query": ...} line reporting what actually ran —
+  filter, sort, projection, limit, skip, pipeline, as sent to the server,
+  including defaults the CLI applied (e.g. sort {_id:-1}, the resolved limit).
+  Emitted verbatim: field order is the real order and null clauses are kept, so
+  it can be compared against the query you meant to send. Off by default.
+  For single-result commands (count, distinct, get) the @query keys merge into
+  the record under -f json/yaml, where there is no separate metadata line.
+
 JSON ARGS: All --filter, --sort, --projection, --pipeline values accept MongoDB Extended JSON (EJSON).
   Use {"$date":"2026-01-01T00:00:00Z"} for dates, {"$oid":"..."} for ObjectIds, etc.
 
@@ -74,4 +83,5 @@ EXAMPLES:
   agent-mongo query sample myapp users --size 10 --filter '{"status":"active"}'
   agent-mongo query distinct myapp orders status
   agent-mongo query aggregate myapp orders '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
-  agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'`
+  agent-mongo query aggregate myapp orders --pipeline '[{"$group":{"_id":"$status","count":{"$sum":1}}}]'
+  agent-mongo query count myapp orders --filter '{"status":"pending","deletedAt":null}' --echo-query`

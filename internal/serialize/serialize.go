@@ -49,10 +49,10 @@ const (
 // field order is not preserved; see OrderedDocument where it matters.
 func Value(value any) any { return convert(value, sortedFields) }
 
-// orderedValue is Value with document field order preserved. Unexported until
-// a caller outside this package needs a bare value rather than a whole
-// document — OrderedDocument is the entry point.
-func orderedValue(value any) any { return convert(value, preservedOrder) }
+// OrderedValue is Value with document field order preserved, for values that
+// are not whole documents — an aggregation pipeline is a bson.A of stages, and
+// both the stage order and each stage's field order are part of the query.
+func OrderedValue(value any) any { return convert(value, preservedOrder) }
 
 func convert(value any, order fieldOrder) any {
 	switch v := value.(type) {
@@ -139,7 +139,7 @@ func Document(doc bson.D) map[string]any {
 // OrderedDocument converts a BSON document to a JSON-safe Ordered, keeping
 // field order at every level.
 func OrderedDocument(doc bson.D) Ordered {
-	converted, _ := orderedValue(doc).(Ordered)
+	converted, _ := OrderedValue(doc).(Ordered)
 	return converted
 }
 
