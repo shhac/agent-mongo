@@ -54,21 +54,13 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 					return err
 				}
 
-				meta := output.Meta(map[string]any{
-					"database":   ref.DB,
-					"collection": ref.Collection,
+				return printFind(result, ref, findEcho{
+					filter:     filterDoc,
+					sort:       sortDoc,
+					projection: projectionDoc,
+					limit:      effectiveLimit,
+					skip:       skip,
 				})
-				maps.Copy(meta, output.PaginationMeta(result.HasMore, "", int(result.TotalMatching)))
-
-				var e echo
-				e.doc("filter", filterDoc)
-				e.doc("sort", sortDoc)
-				e.doc("projection", projectionDoc)
-				e.num("limit", effectiveLimit)
-				e.num("skip", skip)
-				maps.Copy(meta, e.meta())
-
-				return output.PrintList(result.Documents, meta)
 			})
 		},
 	}
@@ -81,4 +73,32 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 	cmd.Flags().BoolVar(&stream, "stream", false, "Deprecated no-op: NDJSON is the default output")
 	_ = cmd.Flags().MarkHidden("stream")
 	parent.AddCommand(cmd)
+}
+
+// findEcho is what `find` sent to the server, as sent — including the defaults
+// this CLI supplied rather than only the flags the caller typed.
+type findEcho struct {
+	filter, sort, projection bson.D
+	limit, skip              int
+}
+
+// printFind assembles the record set, its metadata and the optional query echo.
+// Split from the command so it is testable without a live session, following
+// collection.printIndexes.
+func printFind(result mongo.FindResult, ref mongo.Ref, q findEcho) error {
+	meta := output.Meta(map[string]any{
+		"database":   ref.DB,
+		"collection": ref.Collection,
+	})
+	maps.Copy(meta, output.PaginationMeta(result.HasMore, "", int(result.TotalMatching)))
+
+	var e echo
+	e.doc("filter", q.filter)
+	e.doc("sort", q.sort)
+	e.doc("projection", q.projection)
+	e.num("limit", q.limit)
+	e.num("skip", q.skip)
+	maps.Copy(meta, e.meta())
+
+	return output.PrintList(result.Documents, meta)
 }

@@ -364,6 +364,29 @@ func TestQueryEcho(t *testing.T) {
 		}
 	})
 
+	t.Run("distinct and get echo their own options", func(t *testing.T) {
+		r := runIn(t, h, "query", "distinct", testDB, "orders", "status",
+			"--filter", `{"amount":{"$gte":0}}`, "--echo-query")
+		if !strings.Contains(r.stdout, `{"@query":{"field":"status","filter":{"amount":{"$gte":0}}}}`) {
+			t.Errorf("distinct echo wrong:\n%s", r.stdout)
+		}
+
+		r = runIn(t, h, "query", "get", testDB, "users", "665a1b2c3d4e5f6a7b8c9d0e",
+			"--projection", `{"name":1}`, "--echo-query")
+		if !strings.Contains(r.stdout, `"id":"665a1b2c3d4e5f6a7b8c9d0e"`) ||
+			!strings.Contains(r.stdout, `"projection":{"name":1}`) {
+			t.Errorf("get echo wrong:\n%s", r.stdout)
+		}
+	})
+
+	t.Run("sample echoes filter and size", func(t *testing.T) {
+		r := runIn(t, h, "query", "sample", testDB, "orders",
+			"--size", "2", "--filter", `{"status":"pending"}`, "--echo-query")
+		if !strings.Contains(r.stdout, `{"@query":{"filter":{"status":"pending"},"size":2}}`) {
+			t.Errorf("sample echo wrong:\n%s", r.stdout)
+		}
+	})
+
 	t.Run("aggregate echoes stage and field order", func(t *testing.T) {
 		r := runIn(t, h, "query", "aggregate", testDB, "orders",
 			`[{"$match":{"status":"pending","amount":{"$gte":0}}},{"$count":"n"}]`, "--echo-query")
@@ -374,14 +397,27 @@ func TestQueryEcho(t *testing.T) {
 	})
 
 	t.Run("single-result echo stays valid in json", func(t *testing.T) {
+		// A null clause here on purpose: the merge branch must not prune the
+		// metadata, or the echo would report a filter that matched everything.
 		r := runIn(t, h, "query", "count", testDB, "orders",
-			"--filter", `{"b":1,"a":2}`, "--echo-query", "-f", "json")
+			"--filter", `{"status":"pending","deletedAt":null}`, "--echo-query", "-f", "json")
 		var doc map[string]any
 		if err := json.Unmarshal([]byte(r.stdout), &doc); err != nil {
 			t.Fatalf("not a single valid JSON document: %v\n%s", err, r.stdout)
 		}
-		if _, ok := doc["@query"]; !ok {
-			t.Errorf("@query missing from the json envelope: %s", r.stdout)
+		query, ok := doc["@query"].(map[string]any)
+		if !ok {
+			t.Fatalf("@query missing from the json envelope: %s", r.stdout)
+		}
+		filter, ok := query["filter"].(map[string]any)
+		if !ok {
+			t.Fatalf("@query.filter missing: %s", r.stdout)
+		}
+		if _, present := filter["deletedAt"]; !present {
+			t.Errorf("the null clause was pruned out of the echo: %s", r.stdout)
+		}
+		if strings.Index(r.stdout, "status") > strings.Index(r.stdout, "deletedAt") {
+			t.Errorf("the echoed filter was reordered: %s", r.stdout)
 		}
 	})
 }

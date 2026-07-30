@@ -1,8 +1,11 @@
 package truncation
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	out "github.com/shhac/lib-agent-output"
 )
 
 const ell = "…"
@@ -245,5 +248,56 @@ func TestConfigureResetsToDefault(t *testing.T) {
 	result := Apply(map[string]any{"description": long}).(map[string]any)
 	if result["description"] != strings.Repeat("a", 200)+ell {
 		t.Error("description not truncated after reset, want default truncation")
+	}
+}
+
+// Apply runs chained after out.PruneEmpty over the same tree, so the two must
+// agree on what a document is. Before Ordered was added here, an ordered
+// document hit the default branch and was returned unshaped — silently, which
+// is the same fail-open shape the library's own walkers warn about.
+func TestApplyWalksOrderedDocuments(t *testing.T) {
+	Configure(Options{MaxLength: 10})
+	t.Cleanup(func() { Configure(Options{}) })
+
+	long := strings.Repeat("x", 25)
+	got, ok := Apply(out.Ordered{
+		{Key: "zebra", Value: long},
+		{Key: "apple", Value: "short"},
+	}).(out.Ordered)
+	if !ok {
+		t.Fatalf("Apply returned %T, want out.Ordered", Apply(out.Ordered{}))
+	}
+
+	// Field order survives, and the companion key follows the field it describes.
+	var keys []string
+	for _, field := range got {
+		keys = append(keys, field.Key)
+	}
+	want := []string{"zebra", "zebraLength", "apple"}
+	if !slices.Equal(keys, want) {
+		t.Errorf("keys = %v, want %v", keys, want)
+	}
+	if value, _ := got.Lookup("zebra"); value != strings.Repeat("x", 10)+"…" {
+		t.Errorf("value not truncated: %v", value)
+	}
+	if length, _ := got.Lookup("zebraLength"); length != 25 {
+		t.Errorf("length companion = %v, want 25", length)
+	}
+}
+
+func TestApplyWalksOrderedNestedInAMap(t *testing.T) {
+	Configure(Options{MaxLength: 10})
+	t.Cleanup(func() { Configure(Options{}) })
+
+	got, _ := Apply(map[string]any{
+		"spec": out.Ordered{{Key: "note", Value: strings.Repeat("y", 25)}},
+	}).(map[string]any)
+
+	nested, ok := got["spec"].(out.Ordered)
+	if !ok {
+		t.Fatalf("nested Ordered became %T", got["spec"])
+	}
+	if _, present := nested.Lookup("noteLength"); !present {
+		t.Errorf("nested ordered document escaped truncation: %v", nested)
 	}
 }

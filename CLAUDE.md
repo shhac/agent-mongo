@@ -19,7 +19,8 @@ internal/
 │   ├── configcmd/             # config get/set/reset/list-keys — keyDef table
 │   ├── database/              # database list/stats
 │   ├── collection/            # collection list/schema/indexes/stats
-│   └── query/                 # query find/get/count/sample/distinct/aggregate
+│   └── query/                 # find/get/count/sample/distinct/aggregate, one
+│                              #   file each + echo.go (--echo-query)
 ├── config/                    # ~/.config/agent-mongo/config.json I/O + settings
 ├── credential/                # __KEYCHAIN__ sentinel store via lib-agent-keyring
 ├── mongo/                     # client factory, databases, collections, indexes,

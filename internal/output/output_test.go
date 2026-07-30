@@ -154,3 +154,72 @@ func TestPrintListVerbatimDoesNotTruncate(t *testing.T) {
 		t.Errorf("truncation companion key leaked into a verbatim record:\n%s", got)
 	}
 }
+
+// PrintResultWithMeta exists to carry metadata that must NOT be normalized
+// alongside a record that must. If the metadata ever went through the pruner,
+// an echoed filter would lose its null clauses — reading as a filter that
+// matched everything — and its key order. That is the whole point of the
+// function, and it had no unit coverage at all.
+func TestPrintResultWithMetaPrunesTheRecordButNotTheMetadata(t *testing.T) {
+	record := func() map[string]any {
+		return map[string]any{"count": 7, "dropMe": "", "database": "myapp"}
+	}
+	// Reverse-alphabetical, with a null: normalization would reorder and drop.
+	queryMeta := func() map[string]any {
+		return map[string]any{"@query": serialize.Ordered{
+			{Key: "filter", Value: serialize.Ordered{
+				{Key: "status", Value: "pending"},
+				{Key: "deletedAt", Value: nil},
+			}},
+		}}
+	}
+
+	tests := []struct {
+		format string
+		want   []string
+	}{
+		{"jsonl", []string{
+			`{"count":7,"database":"myapp"}`,
+			`{"@query":{"filter":{"status":"pending","deletedAt":null}}}`,
+		}},
+		{"json", []string{`"status": "pending"`, `"deletedAt": null`, `"count": 7`}},
+		{"yaml", []string{"status: pending\n", "deletedAt: null\n", "count: 7\n"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.format, func(t *testing.T) {
+			ConfigureFormat(tc.format)
+			t.Cleanup(func() { ConfigureFormat("") })
+
+			got := captureStdout(t, func() error {
+				return PrintResultWithMeta(record(), queryMeta())
+			})
+			for _, want := range tc.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("missing %q in %s output:\n%s", want, tc.format, got)
+				}
+			}
+			// The record half is still normalized.
+			if strings.Contains(got, "dropMe") {
+				t.Errorf("the record should still be pruned in %s:\n%s", tc.format, got)
+			}
+			// Metadata order must survive in every format.
+			if strings.Index(got, "status") > strings.Index(got, "deletedAt") {
+				t.Errorf("metadata was reordered in %s:\n%s", tc.format, got)
+			}
+		})
+	}
+}
+
+// With no metadata it must behave exactly like PrintResult.
+func TestPrintResultWithMetaMatchesPrintResultWhenEmpty(t *testing.T) {
+	ConfigureFormat("jsonl")
+	t.Cleanup(func() { ConfigureFormat("") })
+
+	record := map[string]any{"count": 7, "dropMe": ""}
+	withMeta := captureStdout(t, func() error { return PrintResultWithMeta(record, nil) })
+	plain := captureStdout(t, func() error { return PrintResult(record) })
+	if withMeta != plain {
+		t.Errorf("diverged from PrintResult\n got: %q\nwant: %q", withMeta, plain)
+	}
+}

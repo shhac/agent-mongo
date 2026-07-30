@@ -49,6 +49,11 @@ var errVerbatim = out.New(
 		"drop its nulls and truncate its values — use output.PrintListVerbatim",
 	out.FixableByHuman)
 
+// isVerbatim recognizes exactly out.Ordered. It cannot be an opt-in marker
+// interface: serialize.Ordered is a type *alias* for the library's type (it has
+// to be, or the library's own walkers would not recognize it), and an alias
+// cannot carry methods. So a future verbatim-shaped record that is not an
+// out.Ordered must be added here explicitly — it has no way to declare itself.
 func isVerbatim(v any) bool { _, ok := v.(out.Ordered); return ok }
 
 // rejectVerbatim checks T's zero value as well as the records themselves, so a
@@ -67,28 +72,36 @@ func rejectVerbatim[T any](items []T) error {
 }
 
 // PrintResult emits a single data-bearing record (pruned + truncated).
-func PrintResult(item any) error {
-	if isVerbatim(item) {
-		return errVerbatim
-	}
-	return out.Print(os.Stdout, item, ResolveFormat(), pruneTruncate)
-}
+func PrintResult(item any) error { return printOne(item, pruneTruncate, nil) }
+
+// PrintRaw emits a single admin/receipt record (pruned, never truncated).
+func PrintRaw(item any) error { return printOne(item, out.PruneEmpty, nil) }
 
 // PrintResultWithMeta emits a single data-bearing record plus @-prefixed
 // metadata. The record is pruned and truncated as usual; the metadata is not —
 // it rides through verbatim, matching how WriteList treats a list's metadata,
 // which is what lets an echoed query keep its field order and null clauses.
-//
-// In NDJSON the metadata takes its own trailing lines, as it does for lists.
-// The single-document formats have nowhere else to put it, so the keys merge
-// into the record; being @-prefixed, they stay distinguishable from data.
 func PrintResultWithMeta(item map[string]any, meta map[string]any) error {
-	if len(meta) == 0 {
-		return PrintResult(item)
+	return printOne(item, pruneTruncate, meta)
+}
+
+// printOne is the single-record counterpart to printList: one guard, one prune
+// policy, one place that decides where metadata goes.
+//
+// NDJSON gives metadata its own trailing lines, as it does for lists. The
+// single-document formats have nowhere else to put it, so the keys merge into
+// the record; being @-prefixed they stay distinguishable from data. Merging
+// happens after pruning the record and never touches the metadata itself.
+func printOne(item any, prune out.Pruner, meta map[string]any) error {
+	if isVerbatim(item) {
+		return errVerbatim
 	}
 	format := ResolveFormat()
+	if len(meta) == 0 {
+		return out.Print(os.Stdout, item, format, prune)
+	}
 	if format == out.FormatNDJSON {
-		if err := PrintResult(item); err != nil {
+		if err := out.Print(os.Stdout, item, format, prune); err != nil {
 			return err
 		}
 		writer := out.NewNDJSONWriter(os.Stdout)
@@ -101,19 +114,11 @@ func PrintResultWithMeta(item map[string]any, meta map[string]any) error {
 	}
 
 	merged := map[string]any{}
-	if pruned, ok := pruneTruncate(item).(map[string]any); ok {
+	if pruned, ok := prune(item).(map[string]any); ok {
 		maps.Copy(merged, pruned)
 	}
 	maps.Copy(merged, meta)
 	return out.Print(os.Stdout, merged, format, nil)
-}
-
-// PrintRaw emits a single admin/receipt record (pruned, never truncated).
-func PrintRaw(item any) error {
-	if isVerbatim(item) {
-		return errVerbatim
-	}
-	return out.Print(os.Stdout, item, ResolveFormat(), out.PruneEmpty)
 }
 
 // PrintList streams records with optional @-metadata (NDJSON) or a {"data":

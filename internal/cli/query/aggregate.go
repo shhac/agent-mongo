@@ -49,17 +49,7 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 				if err != nil {
 					return err
 				}
-				meta := output.Meta(map[string]any{
-					"database":   ref.DB,
-					"collection": ref.Collection,
-					"count":      len(docs),
-				})
-				var e echo
-				// Both orders matter: the sequence of stages, and each stage's fields.
-				e.value("pipeline", serialize.OrderedValue(pipeline))
-				e.num("limit", effectiveLimit)
-				maps.Copy(meta, e.meta())
-				return output.PrintList(docs, meta)
+				return printAggregate(docs, ref, pipeline, effectiveLimit)
 			})
 		},
 	}
@@ -103,4 +93,20 @@ func readStdin() (string, error) {
 			"Empty stdin. Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.")
 	}
 	return trimmed, nil
+}
+
+// printAggregate assembles the aggregation output and its optional echo, split
+// from the command so it is testable without a live session.
+func printAggregate(docs []map[string]any, ref mongo.Ref, pipeline bson.A, limit int) error {
+	meta := output.Meta(map[string]any{
+		"database":   ref.DB,
+		"collection": ref.Collection,
+		"count":      len(docs),
+	})
+	var e echo
+	// Both orders matter: the sequence of stages, and each stage's fields.
+	e.value("pipeline", serialize.OrderedValue(pipeline))
+	e.num("limit", limit)
+	maps.Copy(meta, e.meta())
+	return output.PrintList(docs, meta)
 }

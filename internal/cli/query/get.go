@@ -8,6 +8,7 @@ import (
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
@@ -43,16 +44,7 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				if doc == nil {
 					return fmt.Errorf("Document not found: _id=%s in %s.%s", id, ref.DB, ref.Collection)
 				}
-				var e echo
-				e.str("id", id)
-				e.str("idType", idType)
-				e.doc("projection", projectionDoc)
-				return output.PrintResultWithMeta(map[string]any{
-					"database":   ref.DB,
-					"collection": ref.Collection,
-					"fieldCount": len(doc),
-					"document":   doc,
-				}, e.meta())
+				return printGet(doc, ref, id, idType, projectionDoc)
 			})
 		},
 	}
@@ -61,4 +53,19 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 		"Force ID type: objectid, string, number (auto-detected by default)")
 	cmd.Flags().StringVar(&projection, "projection", "", `Field projection (e.g. {"name": 1, "email": 1})`)
 	parent.AddCommand(cmd)
+}
+
+// printGet assembles the single-document record and its optional echo, split
+// from the command so it is testable without a live session.
+func printGet(doc map[string]any, ref mongo.Ref, id, idType string, projection bson.D) error {
+	var e echo
+	e.str("id", id)
+	e.str("idType", idType)
+	e.doc("projection", projection)
+	return output.PrintResultWithMeta(map[string]any{
+		"database":   ref.DB,
+		"collection": ref.Collection,
+		"fieldCount": len(doc),
+		"document":   doc,
+	}, e.meta())
 }
