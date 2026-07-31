@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/shhac/lib-agent-cli v0.22.0
 	github.com/shhac/lib-agent-mcp v0.12.0
-	github.com/shhac/lib-agent-output v0.11.0
+	github.com/shhac/lib-agent-output v0.12.0
 	github.com/spf13/cobra v1.10.2
 	go.mongodb.org/mongo-driver/v2 v2.7.0
 	gopkg.in/yaml.v3 v3.0.1
