@@ -164,16 +164,18 @@ func UpdateSetting(key string, value int) error {
 	if !ok {
 		return fmt.Errorf("Unknown key: %q", key)
 	}
-	cfg := Read()
-	if cfg.Settings == nil {
-		cfg.Settings = &Settings{}
-	}
-	def.set(cfg.Settings, value)
-	return Write(cfg)
+	return Update(func(cfg *Config) error {
+		if cfg.Settings == nil {
+			cfg.Settings = &Settings{}
+		}
+		def.set(cfg.Settings, value)
+		return nil
+	})
 }
 
 func ResetSettings() error {
-	cfg := Read()
-	cfg.Settings = nil
-	return Write(cfg)
+	return Update(func(cfg *Config) error {
+		cfg.Settings = nil
+		return nil
+	})
 }

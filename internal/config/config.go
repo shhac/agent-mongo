@@ -71,7 +71,38 @@ func Read() Config {
 	return cfg
 }
 
+// Write replaces the whole config document. It does NOT lock, so it is only
+// safe for a write that does not depend on what was already there — anything
+// that reads, changes and writes back must go through Update.
 func Write(cfg Config) error { return store().Save(cfg) }
+
+// Update applies mutate to a freshly loaded config while holding the store's
+// exclusive lock across the read, the mutation and the write.
+//
+// Without the lock, two concurrent invocations (say `connection add` racing
+// `credential add`) each build their write from a snapshot taken before the
+// other landed, so all but the last are silently erased. That is worse than an
+// ordinary lost write here: a credential entry lost this way leaves its secret
+// sitting in the OS keychain with nothing referencing it, so the CLI can no
+// longer show or remove it.
+//
+// This is creds.Store.WithLock rather than creds.Store.Update because Read
+// deliberately treats an unparseable file as empty, so a corrupt config can be
+// written over rather than wedging every command. Update surfaces the decode
+// error and refuses to write, which would make a recoverable corrupt file
+// permanent.
+//
+// Returning an error from mutate aborts without writing, leaving the stored
+// document untouched.
+func Update(mutate func(cfg *Config) error) error {
+	return store().WithLock(func() error {
+		cfg := Read()
+		if err := mutate(&cfg); err != nil {
+			return err
+		}
+		return store().Save(cfg)
+	})
+}
 
 func GetConnection(alias string) (Connection, bool) {
 	conn, ok := Read().Connections[alias]
@@ -98,15 +129,16 @@ func ConnectionAliases() []string {
 func DefaultConnectionAlias() string { return Read().DefaultConnection }
 
 func StoreConnection(alias string, conn Connection) error {
-	cfg := Read()
-	if cfg.Connections == nil {
-		cfg.Connections = map[string]Connection{}
-	}
-	cfg.Connections[alias] = conn
-	if cfg.DefaultConnection == "" {
-		cfg.DefaultConnection = alias
-	}
-	return Write(cfg)
+	return Update(func(cfg *Config) error {
+		if cfg.Connections == nil {
+			cfg.Connections = map[string]Connection{}
+		}
+		cfg.Connections[alias] = conn
+		if cfg.DefaultConnection == "" {
+			cfg.DefaultConnection = alias
+		}
+		return nil
+	})
 }
 
 // JoinOrNone renders a valid-values list for self-correcting error messages.
@@ -127,32 +159,34 @@ func unknownConnectionError(alias string, cfg Config) error {
 }
 
 func RemoveConnection(alias string) error {
-	cfg := Read()
-	if _, ok := cfg.Connections[alias]; !ok {
-		return unknownConnectionError(alias, cfg)
-	}
-	delete(cfg.Connections, alias)
-	if cfg.DefaultConnection == alias {
-		cfg.DefaultConnection = ""
-		remaining := make([]string, 0, len(cfg.Connections))
-		for a := range cfg.Connections {
-			remaining = append(remaining, a)
+	return Update(func(cfg *Config) error {
+		if _, ok := cfg.Connections[alias]; !ok {
+			return unknownConnectionError(alias, *cfg)
 		}
-		sort.Strings(remaining)
-		if len(remaining) > 0 {
-			cfg.DefaultConnection = remaining[0]
+		delete(cfg.Connections, alias)
+		if cfg.DefaultConnection == alias {
+			cfg.DefaultConnection = ""
+			remaining := make([]string, 0, len(cfg.Connections))
+			for a := range cfg.Connections {
+				remaining = append(remaining, a)
+			}
+			sort.Strings(remaining)
+			if len(remaining) > 0 {
+				cfg.DefaultConnection = remaining[0]
+			}
 		}
-	}
-	return Write(cfg)
+		return nil
+	})
 }
 
 func SetDefaultConnection(alias string) error {
-	cfg := Read()
-	if _, ok := cfg.Connections[alias]; !ok {
-		return unknownConnectionError(alias, cfg)
-	}
-	cfg.DefaultConnection = alias
-	return Write(cfg)
+	return Update(func(cfg *Config) error {
+		if _, ok := cfg.Connections[alias]; !ok {
+			return unknownConnectionError(alias, *cfg)
+		}
+		cfg.DefaultConnection = alias
+		return nil
+	})
 }
 
 // ConnectionUpdates carries optional field updates: nil means leave unchanged,
@@ -163,19 +197,20 @@ type ConnectionUpdates struct {
 }
 
 func UpdateConnection(alias string, updates ConnectionUpdates) error {
-	cfg := Read()
-	conn, ok := cfg.Connections[alias]
-	if !ok {
-		return unknownConnectionError(alias, cfg)
-	}
-	if updates.Database != nil {
-		conn.Database = *updates.Database
-	}
-	if updates.Credential != nil {
-		conn.Credential = *updates.Credential
-	}
-	cfg.Connections[alias] = conn
-	return Write(cfg)
+	return Update(func(cfg *Config) error {
+		conn, ok := cfg.Connections[alias]
+		if !ok {
+			return unknownConnectionError(alias, *cfg)
+		}
+		if updates.Database != nil {
+			conn.Database = *updates.Database
+		}
+		if updates.Credential != nil {
+			conn.Credential = *updates.Credential
+		}
+		cfg.Connections[alias] = conn
+		return nil
+	})
 }
 
 func ReadSettings() Settings {

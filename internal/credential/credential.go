@@ -91,9 +91,14 @@ func All() map[string]config.Credential {
 	return entries
 }
 
-func Aliases() []string {
-	aliases := make([]string, 0, len(All()))
-	for alias := range All() {
+func Aliases() []string { return aliasesOf(All()) }
+
+// aliasesOf is the sorted-alias logic split out from Aliases so a caller
+// already holding the config lock can answer from its own snapshot instead of
+// re-reading the file.
+func aliasesOf(entries map[string]config.Credential) []string {
+	aliases := make([]string, 0, len(entries))
+	for alias := range entries {
 		aliases = append(aliases, alias)
 	}
 	sort.Strings(aliases)
@@ -102,32 +107,51 @@ func Aliases() []string {
 
 // Store persists a credential, preferring the OS keychain. Returns which
 // storage held the secret ("keychain" or "config").
+// The keychain writes happen inside config.Update's critical section rather
+// than before it, because the keychain and config.json have to agree: the
+// sentinel is only written when the secret really landed in the keychain, and
+// the partial-write cleanup only runs when the config entry is about to say
+// "plaintext". Splitting them would let a concurrent writer interleave between
+// the two halves.
 func Store(alias string, cred config.Credential) (string, error) {
-	cfg := config.Read()
-	if cfg.Credentials == nil {
-		cfg.Credentials = map[string]config.Credential{}
-	}
-
-	if keychain.Available() {
-		userErr := keychain.Set(usernameAccount(alias), cred.Username)
-		passErr := keychain.Set(passwordAccount(alias), cred.Password)
-		if userErr == nil && passErr == nil {
-			cfg.Credentials[alias] = config.Credential{Username: sentinel, Password: sentinel}
-			return StorageKeychain, config.Write(cfg)
+	storage := StorageConfig
+	err := config.Update(func(cfg *config.Config) error {
+		if cfg.Credentials == nil {
+			cfg.Credentials = map[string]config.Credential{}
 		}
-	}
 
-	// Fallback: plaintext in config.json; clean up any partial keychain entries.
-	_ = keychain.Delete(usernameAccount(alias))
-	_ = keychain.Delete(passwordAccount(alias))
-	cfg.Credentials[alias] = cred
-	return StorageConfig, config.Write(cfg)
+		if keychain.Available() {
+			userErr := keychain.Set(usernameAccount(alias), cred.Username)
+			passErr := keychain.Set(passwordAccount(alias), cred.Password)
+			if userErr == nil && passErr == nil {
+				cfg.Credentials[alias] = config.Credential{Username: sentinel, Password: sentinel}
+				storage = StorageKeychain
+				return nil
+			}
+		}
+
+		// Fallback: plaintext in config.json; clean up any partial keychain entries.
+		_ = keychain.Delete(usernameAccount(alias))
+		_ = keychain.Delete(passwordAccount(alias))
+		cfg.Credentials[alias] = cred
+		storage = StorageConfig
+		return nil
+	})
+	return storage, err
 }
 
 // ConnectionsUsing lists connection aliases that reference this credential.
 func ConnectionsUsing(credentialAlias string) []string {
+	return connectionsUsing(config.Connections(), credentialAlias)
+}
+
+// connectionsUsing is ConnectionsUsing over a caller-supplied snapshot, so the
+// check can run against the config the lock just loaded.
+func connectionsUsing(conns map[string]config.Connection, credentialAlias string) []string {
+	// Stays nil when nothing matches: `credential list` marshals this straight
+	// to JSON, where nil is null and an empty slice would be [].
 	var used []string
-	for alias, conn := range config.Connections() {
+	for alias, conn := range conns {
 		if conn.Credential == credentialAlias {
 			used = append(used, alias)
 		}
@@ -153,20 +177,24 @@ func NotFoundError(alias string) error {
 		alias, config.JoinOrNone(Aliases()))
 }
 
+// Remove deletes the keychain secrets inside the same critical section that
+// drops the config entry, so the two cannot be separated by a concurrent
+// writer re-adding the alias between them.
 func Remove(alias string) error {
-	cfg := config.Read()
-	if _, ok := cfg.Credentials[alias]; !ok {
-		return fmt.Errorf("Unknown credential: %q. Valid: %s", alias, config.JoinOrNone(Aliases()))
-	}
-	if used := ConnectionsUsing(alias); len(used) > 0 {
-		return fmt.Errorf(
-			"Credential %q is used by connections: %s. Remove or update those connections first.",
-			alias, strings.Join(used, ", "))
-	}
-	_ = keychain.Delete(usernameAccount(alias))
-	_ = keychain.Delete(passwordAccount(alias))
-	delete(cfg.Credentials, alias)
-	return config.Write(cfg)
+	return config.Update(func(cfg *config.Config) error {
+		if _, ok := cfg.Credentials[alias]; !ok {
+			return fmt.Errorf("Unknown credential: %q. Valid: %s", alias, config.JoinOrNone(aliasesOf(cfg.Credentials)))
+		}
+		if used := connectionsUsing(cfg.Connections, alias); len(used) > 0 {
+			return fmt.Errorf(
+				"Credential %q is used by connections: %s. Remove or update those connections first.",
+				alias, strings.Join(used, ", "))
+		}
+		_ = keychain.Delete(usernameAccount(alias))
+		_ = keychain.Delete(passwordAccount(alias))
+		delete(cfg.Credentials, alias)
+		return nil
+	})
 }
 
 // StorageType reports where a credential's secret lives.

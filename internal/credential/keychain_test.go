@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -11,7 +12,12 @@ import (
 
 // fakeKeychain is an in-memory keychainStore for exercising the sentinel and
 // upgrade paths without touching a real OS keychain.
+//
+// The mutex is what keeps the concurrency tests honest: without it the race
+// detector would trip on these maps and report the test double instead of the
+// code under test.
 type fakeKeychain struct {
+	mu        sync.Mutex
 	entries   map[string]string
 	failSet   map[string]bool // account → force Set error
 	deletes   []string
@@ -22,14 +28,22 @@ func newFakeKeychain() *fakeKeychain {
 	return &fakeKeychain{entries: map[string]string{}, failSet: map[string]bool{}, available: true}
 }
 
-func (f *fakeKeychain) Available() bool { return f.available }
+func (f *fakeKeychain) Available() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.available
+}
 
 func (f *fakeKeychain) Get(account string) (string, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	v, ok := f.entries[account]
 	return v, ok
 }
 
 func (f *fakeKeychain) Set(account, secret string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.failSet[account] {
 		return errors.New("keychain write denied")
 	}
@@ -38,6 +52,8 @@ func (f *fakeKeychain) Set(account, secret string) error {
 }
 
 func (f *fakeKeychain) Delete(account string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deletes = append(f.deletes, account)
 	delete(f.entries, account)
 	return nil
