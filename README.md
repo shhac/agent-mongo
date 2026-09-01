@@ -11,6 +11,8 @@ Read-only MongoDB CLI for AI agents.
 
 **Website:** [agent-mongo.paulie.app](https://agent-mongo.paulie.app/)
 
+![Demo](assets/demo.gif)
+
 ## Installation
 
 ```bash
