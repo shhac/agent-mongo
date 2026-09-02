@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -15,9 +14,8 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// newCredentialLoginCommand builds `credential login` here rather than in the
-// credential package, so that package stays free of driver dependencies — the
-// same reason `connection test` lives here.
+// newCredentialLoginCommand builds `credential login`. It lives here for the
+// reason given in this package's doc comment: it needs the driver.
 func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Command {
 	var connectionAlias string
 
@@ -52,18 +50,7 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 				return err
 			}
 
-			result := map[string]any{
-				"ok":         true,
-				"credential": alias,
-				"connection": connAlias,
-				"host":       session.Host,
-				"issuer":     session.Issuer,
-				"storage":    credential.StorageType(credential.All()[alias]),
-			}
-			if !session.ExpiresAt.IsZero() {
-				result["expiresAt"] = session.ExpiresAt.UTC().Format("2006-01-02T15:04:05Z")
-			}
-			return output.PrintRaw(result)
+			return output.PrintRaw(loginReceipt(alias, connAlias, session))
 		},
 	}
 
@@ -71,6 +58,23 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 		"Connection to log in against (default: the one connection using this credential)")
 	_ = globals
 	return cmd
+}
+
+// loginReceipt is what a completed login reports. Pure, so the shape can be
+// asserted without a deployment to log in to.
+func loginReceipt(alias, connAlias string, session credential.Session) map[string]any {
+	receipt := map[string]any{
+		"ok":         true,
+		"credential": alias,
+		"connection": connAlias,
+		"host":       session.Host,
+		"issuer":     session.Issuer,
+		"storage":    credential.StorageType(credential.All()[alias]),
+	}
+	if !session.ExpiresAt.IsZero() {
+		receipt["expiresAt"] = shared.FormatExpiry(session.ExpiresAt)
+	}
+	return receipt
 }
 
 func promptText(p credential.DevicePrompt) string {
@@ -103,20 +107,26 @@ func connectionForLogin(credAlias, requested string) (config.Connection, string,
 		conn, _ := config.GetConnection(using[0])
 		return conn, using[0], nil
 	case 0:
-		available := config.ConnectionAliases()
-		sort.Strings(available)
-		return config.Connection{}, "", out.New(
-			fmt.Sprintf("No connection uses credential %q, so there is no deployment to log in against", credAlias),
-			out.FixableByAgent,
-		).WithHint(fmt.Sprintf(
-			"Attach it to a connection, or name one: agent-mongo credential login %s --connection <alias>. Available: %s",
-			credAlias, config.JoinOrNone(available)))
+		return config.Connection{}, "", noConnectionForCredentialError(credAlias)
 	default:
-		return config.Connection{}, "", out.New(
-			fmt.Sprintf("Credential %q is used by several connections, which may authenticate against different deployments", credAlias),
-			out.FixableByAgent,
-		).WithHint(fmt.Sprintf(
-			"Name the one to log in against: agent-mongo credential login %s --connection <alias>. Using it: %s",
-			credAlias, config.JoinOrNone(using)))
+		return config.Connection{}, "", ambiguousConnectionError(credAlias, using)
 	}
+}
+
+func noConnectionForCredentialError(credAlias string) error {
+	return out.New(
+		fmt.Sprintf("No connection uses credential %q, so there is no deployment to log in against", credAlias),
+		out.FixableByAgent,
+	).WithHint(fmt.Sprintf(
+		"Attach it to a connection, or name one: agent-mongo credential login %s --connection <alias>. Available: %s",
+		credAlias, config.JoinOrNone(config.ConnectionAliases())))
+}
+
+func ambiguousConnectionError(credAlias string, using []string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q is used by several connections, which may authenticate against different deployments", credAlias),
+		out.FixableByAgent,
+	).WithHint(fmt.Sprintf(
+		"Name the one to log in against: agent-mongo credential login %s --connection <alias>. Using it: %s",
+		credAlias, config.JoinOrNone(using)))
 }

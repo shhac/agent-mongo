@@ -11,6 +11,36 @@ import (
 	"github.com/shhac/agent-mongo/internal/oidc"
 )
 
+// The failure modes a caller may need to tell apart. They are discriminated
+// with errors.Is rather than by a parallel status field, so there is one
+// channel to keep honest instead of two.
+var (
+	// ErrNotFound: no credential is stored under the alias.
+	ErrNotFound = errors.New("credential not found")
+	// ErrUnresolvable: the entry exists but its secret could not be read back.
+	ErrUnresolvable = errors.New("credential secret unreadable")
+	// ErrUnsupportedKind: the entry names a kind this build does not implement.
+	ErrUnsupportedKind = errors.New("unsupported credential kind")
+	// ErrInvalidFlow: an OIDC credential's flow recipe is missing or unusable.
+	ErrInvalidFlow = errors.New("invalid credential flow")
+	// ErrInsecureConnection: the endpoint would carry a token in cleartext.
+	ErrInsecureConnection = errors.New("insecure connection for token auth")
+	// ErrHostNotAllowed: the endpoint is outside the credential's allowlist.
+	ErrHostNotAllowed = errors.New("host not allowed for this credential")
+	// ErrTokenUnreadable: a token could not be read, or is not a JWT.
+	ErrTokenUnreadable = errors.New("oidc token unreadable")
+	// ErrTokenExpired: a token was read but has already expired.
+	ErrTokenExpired = errors.New("oidc token expired")
+	// ErrNotLoggedIn: a device credential has no session yet.
+	ErrNotLoggedIn = errors.New("no session for this credential")
+	// ErrSessionExpired: the session cannot be renewed without a person.
+	ErrSessionExpired = errors.New("session expired")
+	// ErrSessionHostMismatch: the session belongs to a different deployment.
+	ErrSessionHostMismatch = errors.New("session bound to a different host")
+	// ErrRefreshFailed: renewal failed for a reason a retry might fix.
+	ErrRefreshFailed = errors.New("session refresh failed")
+)
+
 // The family error contract puts the next command in `hint`, not in the
 // message, and classifies who can act on it. Every fix here is one a person has
 // to carry out at a terminal except NotFoundError, which an agent can resolve

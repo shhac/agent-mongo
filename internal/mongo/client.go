@@ -59,18 +59,27 @@ func ResolveAlias(flag string) (string, error) {
 		availableConnections())
 }
 
-// clientOptions builds driver options tuned for a short-lived, single-shot
-// CLI process: a single pooled connection, no warm minimum, and a short idle
-// lifetime — anything larger only slows process exit.
+// baseClientOptions is the pool shape every agent-mongo connection uses: a
+// short-lived, single-shot CLI process wants exactly one pooled connection and
+// no warm minimum, because anything larger only slows process exit.
+//
+// Shared with the login path, which needs the same policy and would otherwise
+// restate the numbers with nothing keeping them in step.
+func baseClientOptions(uri string) *options.ClientOptions {
+	return options.Client().
+		ApplyURI(uri).
+		SetMaxPoolSize(1).
+		SetMinPoolSize(0).
+		SetServerSelectionTimeout(10 * time.Second)
+}
+
+// clientOptions adds what a query needs on top: a short idle lifetime, the
+// operation timeout, and the connection's credential.
 func clientOptions(
 	conn config.Connection, timeout time.Duration,
 ) (*options.ClientOptions, error) {
-	clientOpts := options.Client().
-		ApplyURI(conn.ConnectionString).
-		SetMaxPoolSize(1).
-		SetMinPoolSize(0).
-		SetMaxConnIdleTime(5 * time.Second).
-		SetServerSelectionTimeout(10 * time.Second)
+	clientOpts := baseClientOptions(conn.ConnectionString).
+		SetMaxConnIdleTime(5 * time.Second)
 	if timeout > 0 {
 		clientOpts = clientOpts.SetTimeout(timeout).SetConnectTimeout(timeout)
 	}

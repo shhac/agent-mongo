@@ -1,10 +1,9 @@
 package credential
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
 
+	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/output"
@@ -79,7 +78,7 @@ func addSessionState(item map[string]any, name string, entry config.Credential) 
 		item["boundTo"] = info.Host
 	}
 	if !info.ExpiresAt.IsZero() {
-		item["expiresAt"] = info.ExpiresAt.UTC().Format(time.RFC3339)
+		item["expiresAt"] = shared.FormatExpiry(info.ExpiresAt)
 		item["expired"] = info.SessionExpired()
 	}
 }

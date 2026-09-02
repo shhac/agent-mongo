@@ -1,6 +1,12 @@
 // Package cli assembles the agent-mongo root command on lib-agent-cli's
 // shared scaffolding: family persistent flags (--format, --timeout, --debug,
 // --color) plus the domain flags -c/--connection, --expand, --full.
+// Package cli assembles the command tree.
+//
+// A few leaves live here rather than in their own group's package because they
+// need the MongoDB driver, and those packages are deliberately kept free of it:
+// connection test and credential login. They are built here and injected into
+// the group's Register.
 package cli
 
 import (

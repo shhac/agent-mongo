@@ -77,21 +77,33 @@ func SupportedKinds() []string {
 	return names
 }
 
+// lookupField reads one field's value, following the sentinel into the keychain.
+// It reports whether a value was found rather than producing an error, so a
+// caller that is describing rather than authenticating can use the same
+// declaration of where the value lives.
+func lookupField(field secretField, alias string, entry config.Credential) (string, bool) {
+	value := *field.value(&entry)
+	if value != Sentinel {
+		return value, value != ""
+	}
+	stored, found := keychain.Get(field.account(alias))
+	return stored, found && stored != ""
+}
+
 // resolveFields fills in every keychain-backed field that holds the sentinel.
 // It only reads: the plaintext-to-keychain migration is a separate step so that
 // inspecting a credential cannot rewrite it.
 func resolveFields(fields []secretField, alias string, entry config.Credential) (config.Credential, error) {
 	resolved := entry
 	for _, field := range fields {
-		value := field.value(&resolved)
-		if *value != Sentinel {
+		if *field.value(&resolved) != Sentinel {
 			continue
 		}
-		stored, found := keychain.Get(field.account(alias))
-		if !found || stored == "" {
+		stored, found := lookupField(field, alias, entry)
+		if !found {
 			return config.Credential{}, field.missing(alias)
 		}
-		*value = stored
+		*field.value(&resolved) = stored
 	}
 	return resolved, nil
 }

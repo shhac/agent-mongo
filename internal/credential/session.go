@@ -1,40 +1,35 @@
 package credential
 
+// What a session is, and how it is kept: the type, its storage in the OS
+// keychain, and the safe-to-display view of it. What the device flow *does*
+// with one — logging in, presenting a token, renewing it — lives in
+// devicelogin.go, so a later kind that also keeps a session reuses this file
+// untouched.
+
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"strings"
 	"time"
 
 	"github.com/shhac/agent-mongo/internal/config"
-	"github.com/shhac/agent-mongo/internal/oidc"
 )
-
-// identityProvider is the seam over the OIDC client, so tests point the device
-// flow at a mock provider without reaching the network.
-var identityProvider = &oidc.Client{}
-
-// refreshLeeway is how long before expiry a token is treated as spent.
-//
-// Without it a token that passes the check here can still expire between the
-// callback returning and the server reading it, which surfaces as an
-// authentication failure with nothing to act on.
-const refreshLeeway = time.Minute
 
 // sessionAccount is the keychain account holding a credential's session.
 func sessionAccount(alias string) string { return "session:" + alias }
 
-// oidcFields declares the one field an OIDC credential may keep in the
-// keychain. Only the device flow fills it; for the others it stays empty and
-// the generic storage skips it.
-var oidcFields = []secretField{
-	{
-		account: sessionAccount,
-		value:   func(c *config.Credential) *string { return &c.Session },
-		missing: NotLoggedInError,
-	},
+// sessionField is the one field an OIDC credential may keep in the keychain.
+// Only the device flow fills it; for the others it stays empty and the generic
+// storage skips it.
+//
+// Named rather than declared inline because two paths read it: authentication,
+// which fails when it is missing, and the listing, which reports "not logged
+// in" instead. Both go through this declaration so they cannot drift.
+var sessionField = secretField{
+	account: sessionAccount,
+	value:   func(c *config.Credential) *string { return &c.Session },
+	missing: NotLoggedInError,
 }
+
+var oidcFields = []secretField{sessionField}
 
 // Session is what a completed device login leaves behind.
 //
@@ -93,76 +88,87 @@ func storeSession(alias string, cred config.Credential, session Session) error {
 	return err
 }
 
-// deviceFlowToken is the query-path half of the device flow: read the session,
-// refresh it if it has gone stale, and never prompt.
-//
-// The driver may call this twice in one authentication attempt, and an
-// interactive prompt here would fire on both. Logging in is a separate command
-// for that reason, and a session that cannot be renewed without a person is an
-// ordinary self-correcting error.
-func deviceFlowToken(
-	ctx context.Context, alias string, cred config.Credential, host string,
-) (string, error) {
-	session, err := decodeSession(alias, cred.Session)
-	if err != nil {
-		return "", err
+// SaveSession stores a completed login against a credential, replacing whatever
+// session it had.
+func SaveSession(alias string, session Session) error {
+	entry, ok := config.Read().Credentials[alias]
+	if !ok {
+		return NotFoundError(alias)
 	}
-
-	// The token was issued for one deployment and is not shown to another. The
-	// driver binds nothing, and an agent can point a connection wherever it
-	// likes, so this is the check that makes a stored session safe to keep.
-	//
-	// It fails closed. An empty target is a URI whose host could not be read,
-	// and an empty binding is a session that was never tied to a deployment;
-	// neither is a reason to hand over a token, and skipping the check for
-	// either would make an unreadable connection string the way around it.
-	if host == "" || session.Host == "" || !strings.EqualFold(session.Host, host) {
-		return "", SessionHostMismatchError(alias, session.Host, host)
-	}
-
-	if session.usable() {
-		return session.AccessToken, nil
-	}
-	if session.RefreshToken == "" {
-		return "", SessionExpiredError(alias)
-	}
-
-	refreshed, err := refreshSession(ctx, alias, session)
-	if err != nil {
-		return "", err
-	}
-	if err := storeSession(alias, cred, refreshed); err != nil {
-		return "", err
-	}
-	return refreshed.AccessToken, nil
+	return storeSession(alias, entry, session)
 }
 
-// refreshSession renews the access token against the provider that issued it.
-//
-// The driver never does this for agent-mongo: it hands a callback the refresh
-// token only when an earlier callback in the same client returned one, and a
-// CLI is a fresh process every time. Expiry is ours to track and refresh is
-// ours to perform.
-func refreshSession(ctx context.Context, alias string, session Session) (Session, error) {
-	provider, err := identityProvider.Discover(ctx, session.Issuer)
-	if err != nil {
-		return Session{}, RefreshFailedError(alias, err)
+// ClearSession ends a session without removing the credential, which is the
+// operation an administrator asks for: stop the access, keep the configuration.
+func ClearSession(alias string) error {
+	entry, ok := config.Read().Credentials[alias]
+	if !ok {
+		return NotFoundError(alias)
 	}
-	token, err := identityProvider.Refresh(ctx, provider, session.ClientID, session.RefreshToken)
-	if err != nil {
-		if errors.Is(err, oidc.ErrRefreshRejected) {
-			return Session{}, SessionExpiredError(alias)
-		}
-		return Session{}, RefreshFailedError(alias, err)
+	if !IsDeviceFlow(entry) {
+		return NoSessionToClearError(alias)
 	}
 
-	renewed := session
-	renewed.AccessToken = token.AccessToken
-	renewed.ExpiresAt = token.ExpiresAt
-	// A provider that returns no new refresh token is saying the old one still
-	// stands; dropping it here would end the session at the next refresh.
-	if token.RefreshToken != "" {
-		renewed.RefreshToken = token.RefreshToken
+	_ = keychain.Delete(sessionAccount(alias))
+	entry.Session = ""
+	return config.Update(func(cfg *config.Config) error {
+		cfg.SetCredential(alias, entry)
+		return nil
+	})
+}
+
+// IsDeviceFlow reports whether a credential keeps a session.
+//
+// Asked in three places — logging out, describing a session, and rendering a
+// row — and previously written at three different strengths, so logging out an
+// OIDC credential on a platform-identity flow reported success and told the
+// person to log in again, for a credential that can never be logged in.
+func IsDeviceFlow(entry config.Credential) bool {
+	return entry.ResolvedKind() == config.KindOIDC &&
+		entry.Flow != nil && entry.Flow.Type == config.FlowDevice
+}
+
+// SessionInfo is what may safely be shown about a stored session: whether there
+// is one and when it runs out. Never the tokens.
+type SessionInfo struct {
+	LoggedIn  bool
+	ExpiresAt time.Time
+	Host      string
+	Issuer    string
+}
+
+// DescribeSession reports a credential's session state for display.
+//
+// It resolves through the keychain but never fails: a credential with no
+// session, an unreadable one, or a kind that keeps none all read as "not logged
+// in", because this answers a listing rather than an authentication.
+func DescribeSession(alias string, entry config.Credential) SessionInfo {
+	if !IsDeviceFlow(entry) {
+		return SessionInfo{}
 	}
-	return renewed, nil
+
+	raw := entry.Session
+	if raw == Sentinel {
+		stored, found := keychain.Get(sessionAccount(alias))
+		if !found {
+			return SessionInfo{}
+		}
+		raw = stored
+	}
+	session, err := decodeSession(alias, raw)
+	if err != nil {
+		return SessionInfo{}
+	}
+	return SessionInfo{
+		LoggedIn:  session.AccessToken != "",
+		ExpiresAt: session.ExpiresAt,
+		Host:      session.Host,
+		Issuer:    session.Issuer,
+	}
+}
+
+// SessionExpired reports whether a session has run out, for a caller deciding
+// what to tell a person rather than whether to refresh.
+func (s SessionInfo) SessionExpired() bool {
+	return s.LoggedIn && !s.ExpiresAt.IsZero() && !now().Before(s.ExpiresAt)
 }

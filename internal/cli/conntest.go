@@ -13,8 +13,8 @@ import (
 	"github.com/shhac/agent-mongo/internal/serialize"
 )
 
-// newConnectionTestCommand builds `connection test` here (rather than in the
-// connection package) so that package stays free of driver dependencies.
+// newConnectionTestCommand builds `connection test`. It lives here for the
+// reason given in this package's doc comment: it needs the driver.
 func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "test [alias]",
@@ -41,28 +41,31 @@ func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command
 				// A session can be revoked while still unexpired, so the ping
 				// is the real check; the expiry is added so a person can see
 				// the next login coming rather than being surprised by it.
-				addSessionExpiry(receipt, ctx.Session.Alias)
+				if credAlias, expiry, ok := sessionExpiry(ctx.Session.Alias); ok {
+					receipt["credential"] = credAlias
+					receipt["sessionExpiresAt"] = shared.FormatExpiry(expiry)
+				}
 				return output.PrintRaw(receipt)
 			})
 		},
 	}
 }
 
-// addSessionExpiry annotates a successful ping with when the credential's
-// session runs out, when it has one.
-func addSessionExpiry(receipt map[string]any, connAlias string) {
-	conn, ok := config.GetConnection(connAlias)
-	if !ok || conn.Credential == "" {
-		return
+// sessionExpiry reports when a connection's credential session runs out, when
+// it has one. Pure lookup, so what it decides is testable without a deployment
+// to ping.
+func sessionExpiry(connAlias string) (credAlias string, expiry time.Time, ok bool) {
+	conn, found := config.GetConnection(connAlias)
+	if !found || conn.Credential == "" {
+		return "", time.Time{}, false
 	}
-	entry, ok := config.Read().Credentials[conn.Credential]
-	if !ok {
-		return
+	entry, found := config.Read().Credentials[conn.Credential]
+	if !found {
+		return "", time.Time{}, false
 	}
 	info := credential.DescribeSession(conn.Credential, entry)
 	if !info.LoggedIn || info.ExpiresAt.IsZero() {
-		return
+		return "", time.Time{}, false
 	}
-	receipt["credential"] = conn.Credential
-	receipt["sessionExpiresAt"] = info.ExpiresAt.UTC().Format(time.RFC3339)
+	return conn.Credential, info.ExpiresAt, true
 }

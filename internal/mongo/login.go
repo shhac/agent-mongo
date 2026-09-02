@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
@@ -12,6 +11,50 @@ import (
 	"github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/mongouri"
 )
+
+// deviceLogin is the driver-facing half of an interactive login: it converts
+// between the driver's OIDC types and agent-mongo's, and remembers the session
+// the flow produced.
+//
+// A type rather than a closure inside DeviceLogin so the conversion can be
+// exercised directly. Everything fiddly lives here — the server's IdP metadata
+// may be absent, and the driver wants pointers for the optional fields — and
+// none of it would otherwise run outside a live OIDC-configured deployment.
+type deviceLogin struct {
+	host    string
+	prompt  func(credential.DevicePrompt)
+	session credential.Session
+}
+
+func (d *deviceLogin) callback(
+	ctx context.Context, args *options.OIDCArgs,
+) (*options.OIDCCredential, error) {
+	var idp credential.IDPInfo
+	if args != nil && args.IDPInfo != nil {
+		idp = credential.IDPInfo{
+			Issuer:   args.IDPInfo.Issuer,
+			ClientID: args.IDPInfo.ClientID,
+			Scopes:   args.IDPInfo.RequestScopes,
+		}
+	}
+
+	session, err := credential.RunDeviceLogin(ctx, idp, d.host, d.prompt)
+	if err != nil {
+		return nil, err
+	}
+	d.session = session
+
+	result := &options.OIDCCredential{AccessToken: session.AccessToken}
+	if session.RefreshToken != "" {
+		refresh := session.RefreshToken
+		result.RefreshToken = &refresh
+	}
+	if !session.ExpiresAt.IsZero() {
+		expiry := session.ExpiresAt
+		result.ExpiresAt = &expiry
+	}
+	return result, nil
+}
 
 // DeviceLogin performs an interactive OIDC login against a deployment and
 // returns the session to store.
@@ -27,44 +70,15 @@ import (
 func DeviceLogin(
 	ctx context.Context, conn config.Connection, prompt func(credential.DevicePrompt),
 ) (credential.Session, error) {
-	host := mongouri.ParseHostFromURI(conn.ConnectionString)
-
-	var session credential.Session
-	callback := func(ctx context.Context, args *options.OIDCArgs) (*options.OIDCCredential, error) {
-		idp := credential.IDPInfo{}
-		if args.IDPInfo != nil {
-			idp = credential.IDPInfo{
-				Issuer:   args.IDPInfo.Issuer,
-				ClientID: args.IDPInfo.ClientID,
-				Scopes:   args.IDPInfo.RequestScopes,
-			}
-		}
-
-		completed, err := credential.RunDeviceLogin(ctx, idp, host, prompt)
-		if err != nil {
-			return nil, err
-		}
-		session = completed
-
-		result := &options.OIDCCredential{
-			AccessToken:  completed.AccessToken,
-			RefreshToken: nonEmpty(completed.RefreshToken),
-		}
-		if !completed.ExpiresAt.IsZero() {
-			expiry := completed.ExpiresAt
-			result.ExpiresAt = &expiry
-		}
-		return result, nil
+	login := &deviceLogin{
+		host:   mongouri.ParseHostFromURI(conn.ConnectionString),
+		prompt: prompt,
 	}
 
-	clientOpts := options.Client().
-		ApplyURI(conn.ConnectionString).
-		SetMaxPoolSize(1).
-		SetMinPoolSize(0).
-		SetServerSelectionTimeout(10 * time.Second).
+	clientOpts := baseClientOptions(conn.ConnectionString).
 		SetAuth(options.Credential{
 			AuthMechanism:     oidcMechanism,
-			OIDCHumanCallback: callback,
+			OIDCHumanCallback: login.callback,
 		})
 
 	client, err := driver.Connect(clientOpts)
@@ -79,15 +93,8 @@ func DeviceLogin(
 		RunCommand(ctx, bson.D{{Key: "ping", Value: 1}}).Err(); err != nil {
 		return credential.Session{}, err
 	}
-	if session.AccessToken == "" {
+	if login.session.AccessToken == "" {
 		return credential.Session{}, credential.LoginNotAttemptedError()
 	}
-	return session, nil
-}
-
-func nonEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
+	return login.session, nil
 }

@@ -48,3 +48,7 @@ func EffectiveLimit(flagValue int) int {
 func (g *GlobalFlags) MakeContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), g.Timeout()+5*time.Second)
 }
+
+// FormatExpiry renders a session or token expiry for output. One function so
+// every command that reports one uses the same format.
+func FormatExpiry(at time.Time) string { return at.UTC().Format(time.RFC3339) }

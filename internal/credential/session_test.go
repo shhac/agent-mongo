@@ -25,13 +25,11 @@ func useMockIDP(t *testing.T, at time.Time) *oidctest.IDP {
 	idp := oidctest.New(t)
 	fixedClock(t, at)
 
-	prev := identityProvider
-	identityProvider = &oidc.Client{
+	t.Cleanup(UseIdentityProvider(&oidc.Client{
 		HTTP:  idp.Client(),
 		Now:   func() time.Time { return at },
 		Sleep: func(time.Duration) {},
-	}
-	t.Cleanup(func() { identityProvider = prev })
+	}, func() time.Time { return at }))
 	return idp
 }
 
@@ -187,9 +185,7 @@ func TestDeviceFlowReportsARejectedRefresh(t *testing.T) {
 // reported as a session that needs a fresh login.
 func TestDeviceFlowReportsAnUnreachableProviderAsRetryable(t *testing.T) {
 	fixedClock(t, frozen)
-	prev := identityProvider
-	identityProvider = &oidc.Client{Now: func() time.Time { return frozen }}
-	t.Cleanup(func() { identityProvider = prev })
+	t.Cleanup(UseIdentityProvider(&oidc.Client{Now: func() time.Time { return frozen }}, nil))
 
 	session := liveSession("https://127.0.0.1:1/idp")
 	session.ExpiresAt = frozen.Add(-time.Minute)
