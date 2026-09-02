@@ -2,6 +2,7 @@ package credential
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -155,24 +156,36 @@ func checkOIDCConnection(entry config.Credential, uri string) error {
 		"Point the connection at an allowed host, or widen the credential deliberately: agent-mongo credential add <alias> --oidc --allowed-hosts <pattern>,<pattern>")
 }
 
-// hostAllowed matches a host against patterns, where a leading "*." matches any
-// subdomain but not the bare domain — the same shape the driver's own regexes
-// use. Any port is ignored.
+// hostAllowed matches a host against glob patterns.
+//
+// An empty host denies: ParseHostFromURI returns "" for anything it cannot read
+// as a connection string, and a URI whose host cannot be determined is exactly
+// the one a token must not be sent to.
 func hostAllowed(host string, patterns []string) bool {
 	if host == "" {
 		return false
 	}
+	// A fully-qualified name may carry a trailing dot; it names the same host.
+	host = strings.TrimSuffix(host, ".")
 	for _, pattern := range patterns {
-		if matchHostPattern(host, pattern) {
+		re, err := compileHostPattern(pattern)
+		if err != nil {
+			continue // a pattern that will not compile matches nothing
+		}
+		if re.MatchString(host) {
 			return true
 		}
 	}
 	return false
 }
 
-func matchHostPattern(host, pattern string) bool {
-	if suffix, ok := strings.CutPrefix(pattern, "*."); ok {
-		return strings.HasSuffix(host, "."+suffix)
-	}
-	return strings.EqualFold(host, pattern)
+// compileHostPattern turns a glob into an anchored regexp, the same way the
+// driver does for ALLOWED_HOSTS (x/mongo/driver/auth/oidc.go): "." is a literal
+// dot and "*" matches any run of characters. Matching is case-insensitive
+// because DNS is — the driver's own patterns are not, but its list is only ever
+// applied to the human flow, and here it is the whole contract.
+func compileHostPattern(pattern string) (*regexp.Regexp, error) {
+	escaped := strings.ReplaceAll(pattern, ".", "[.]")
+	escaped = strings.ReplaceAll(escaped, "*", ".*")
+	return regexp.Compile("(?i)^" + escaped + "$")
 }

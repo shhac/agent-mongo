@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	out "github.com/shhac/lib-agent-output"
+
 	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -155,5 +157,43 @@ func TestListRendersOIDCFlow(t *testing.T) {
 	}
 	if _, ok := rec["password"]; ok {
 		t.Error("a password column was rendered for a credential that has none")
+	}
+}
+
+// An OIDC flag without --oidc used to be accepted and then ignored: the command
+// fell through to the SCRAM path and complained about a missing password.
+func TestAddRejectsOIDCFlagsWithoutOIDC(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "corp", "--environment", "k8s")
+	if err == nil {
+		t.Fatal("--environment without --oidc was accepted")
+	}
+	if !strings.Contains(err.Error(), "--environment") {
+		t.Errorf("error = %q, want it to name the offending flag", err)
+	}
+	// The contract puts the next action in the hint, not the message.
+	var oerr *out.Error
+	if !out.As(err, &oerr) {
+		t.Fatalf("error = %v, want the family error contract", err)
+	}
+	if !strings.Contains(oerr.Hint, "--oidc") {
+		t.Errorf("hint = %q, want it to name --oidc as the fix", oerr.Hint)
+	}
+	if _, ok := credstore.All()["corp"]; ok {
+		t.Error("a credential was written anyway")
+	}
+}
+
+// The pairwise exclusion rules missed this pair entirely.
+func TestAddRejectsPasswordWithOIDCFlags(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "corp", "--password", "s3cret", "--environment", "k8s")
+	if err == nil {
+		t.Fatal("--password with --environment was accepted")
+	}
+	if _, ok := credstore.All()["corp"]; ok {
+		t.Error("a credential was written anyway")
 	}
 }

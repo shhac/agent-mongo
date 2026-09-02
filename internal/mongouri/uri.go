@@ -136,9 +136,10 @@ func ParseHostFromURI(uri string) string {
 
 	// An IPv6 literal is bracketed, and its own colons must not be read as a
 	// port separator.
-	if literal, rest, ok := strings.Cut(strings.TrimPrefix(host, "["), "]"); ok {
-		_ = rest
-		return literal
+	if strings.HasPrefix(host, "[") {
+		if literal, _, ok := strings.Cut(host[1:], "]"); ok {
+			return literal
+		}
 	}
 	host, _, _ = strings.Cut(host, ":")
 	return host

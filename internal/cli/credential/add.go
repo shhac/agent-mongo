@@ -2,10 +2,13 @@ package credential
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/lib-agent-cli/creds"
+	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
@@ -27,6 +30,14 @@ type addFlags struct {
 	allowedHosts  []string
 }
 
+// scramFlagNames and oidcFlagNames partition the flag surface by kind. The
+// kind is derived from which of them were actually given, so a flag belonging
+// to the other kind is a named error rather than silently ignored.
+var (
+	scramFlagNames = []string{"username", "password", "form"}
+	oidcFlagNames  = []string{"environment", "token-resource", "client-id", "allowed-hosts"}
+)
+
 func registerAdd(parent *cobra.Command) {
 	var flags addFlags
 
@@ -35,7 +46,11 @@ func registerAdd(parent *cobra.Command) {
 		Short: "Add or update a stored credential",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if flags.oidc {
+			kind, err := kindFromFlags(cmd, flags.oidc)
+			if err != nil {
+				return err
+			}
+			if kind == config.KindOIDC {
 				return addOIDC(args[0], flags)
 			}
 			return addSCRAM(cmd, args[0], flags)
@@ -58,17 +73,48 @@ func registerAdd(parent *cobra.Command) {
 	cmd.Flags().StringSliceVar(&flags.allowedHosts, "allowed-hosts", nil,
 		"Hosts this credential may send a token to (default: MongoDB-owned domains and loopback)")
 
-	// The two kinds share no flags, so mixing them is always a mistake rather
-	// than a precedence question to resolve at runtime.
-	for _, scramFlag := range []string{"username", "password", "form"} {
-		cmd.MarkFlagsMutuallyExclusive("oidc", scramFlag)
-	}
-	for _, oidcFlag := range []string{"environment", "token-resource", "client-id", "allowed-hosts"} {
-		cmd.MarkFlagsMutuallyExclusive("username", oidcFlag)
-		cmd.MarkFlagsMutuallyExclusive("form", oidcFlag)
-	}
-
 	parent.AddCommand(cmd)
+}
+
+// kindFromFlags decides which kind is being added.
+//
+// Pairwise exclusion rules were the obvious way to express this and got it
+// wrong twice: the cross product missed --password against the OIDC flags, and
+// an OIDC flag given without --oidc was accepted and then ignored, so
+// `credential add x --environment k8s` complained about a missing password.
+// Deriving the kind from the flags actually given makes both a named error and
+// keeps a new flow to one entry in a list.
+func kindFromFlags(cmd *cobra.Command, oidc bool) (config.Kind, error) {
+	scramGiven := changedFlags(cmd, scramFlagNames)
+	oidcGiven := changedFlags(cmd, oidcFlagNames)
+
+	switch {
+	case oidc && len(scramGiven) > 0:
+		return "", out.New(
+			fmt.Sprintf("--oidc cannot be combined with %s: an OIDC credential has no username or password",
+				strings.Join(scramGiven, ", ")),
+			out.FixableByAgent,
+		).WithHint("Drop " + strings.Join(scramGiven, ", ") + ", or drop --oidc.")
+	case oidc:
+		return config.KindOIDC, nil
+	case len(oidcGiven) > 0:
+		return "", out.New(
+			fmt.Sprintf("%s only applies to an OIDC credential", strings.Join(oidcGiven, ", ")),
+			out.FixableByAgent,
+		).WithHint("Add --oidc, or drop " + strings.Join(oidcGiven, ", ") + ".")
+	default:
+		return config.KindSCRAM, nil
+	}
+}
+
+func changedFlags(cmd *cobra.Command, names []string) []string {
+	var given []string
+	for _, name := range names {
+		if cmd.Flags().Changed(name) {
+			given = append(given, "--"+name)
+		}
+	}
+	return given
 }
 
 func addSCRAM(cmd *cobra.Command, name string, flags addFlags) error {

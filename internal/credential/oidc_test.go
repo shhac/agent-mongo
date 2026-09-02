@@ -230,6 +230,51 @@ func TestCheckConnectionEnforcesAllowedHosts(t *testing.T) {
 			hosts: []string{"*.corp.example.com"},
 			uri:   "mongodb://mongo.corp.example.com:27017/app?tls=true", allowed: true,
 		},
+		{
+			// DNS is case-insensitive, so a URI pasted with any capitalisation
+			// has to match. The wildcard arm used to be case-sensitive while
+			// the literal arm was not, so this was denied and localhost was not.
+			name: "an uppercase host still matches",
+			uri:  "mongodb+srv://C0.ABC.MONGODB.NET/app", allowed: true,
+		},
+		{
+			name:  "an uppercase pattern still matches",
+			hosts: []string{"*.CORP.EXAMPLE.COM"},
+			uri:   "mongodb://mongo.corp.example.com:27017/app?tls=true", allowed: true,
+		},
+		{
+			name: "a trailing-dot FQDN names the same host",
+			uri:  "mongodb+srv://c0.abc.mongodb.net./app", allowed: true,
+		},
+		{
+			// The driver compiles arbitrary globs, and --allowed-hosts promises
+			// the same; only a leading "*." used to work.
+			name:  "a wildcard in the middle of a label",
+			hosts: []string{"db-*.corp.example.com"},
+			uri:   "mongodb://db-01.corp.example.com:27017/app?tls=true", allowed: true,
+		},
+		{
+			name:  "a bare star disables the guard, explicitly",
+			hosts: []string{"*"},
+			uri:   "mongodb+srv://anything.example.com/app", allowed: true,
+		},
+		{
+			name:  "a pattern is a literal dot, not a regexp wildcard",
+			hosts: []string{"a.example.com"},
+			uri:   "mongodb+srv://axexample.com/app", allowed: false,
+		},
+		{
+			// ParseHostFromURI cannot read a host out of this, and a URI whose
+			// host is unknown is exactly the one a token must not go to.
+			name: "a schemeless URI has no host and is denied",
+			uri:  "evil.example.com:27017?tls=true", allowed: false,
+		},
+		{
+			// IsTLS and ParseHostFromURI disagree about where the query starts
+			// here; both currently fail closed, and this pins that.
+			name: "a host smuggled into the userinfo is denied",
+			uri:  "mongodb://user:x?tls=true&@evil.example.com/app", allowed: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -302,5 +347,20 @@ func TestRemoveOIDCLeavesSCRAMAccountsAlone(t *testing.T) {
 		if _, ok := fake.Get(account); !ok {
 			t.Errorf("removing the OIDC credential erased %q, which belongs to another credential", account)
 		}
+	}
+}
+
+func TestHostAllowedDeniesAnUnknownHost(t *testing.T) {
+	if hostAllowed("", DefaultAllowedHosts) {
+		t.Error("an empty host was allowed; a URI whose host cannot be read must be denied")
+	}
+}
+
+func TestOIDCStorageTypeIsAlwaysConfig(t *testing.T) {
+	// The environment flow holds no secret, so there is nothing in the keychain
+	// to report even on a host that has one.
+	got := StorageType(config.Credential{Kind: config.KindOIDC, Flow: envFlow(config.EnvironmentK8s)})
+	if got != StorageConfig {
+		t.Errorf("StorageType = %q, want config", got)
 	}
 }
