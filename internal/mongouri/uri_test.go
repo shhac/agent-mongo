@@ -182,3 +182,48 @@ func TestRedactURI(t *testing.T) {
 		})
 	}
 }
+
+func TestParseAuthSourceFromURI(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{"absent", "mongodb://host:27017/app", ""},
+		{"no query at all", "mongodb://host:27017", ""},
+		{"explicit", "mongodb://host:27017/app?authSource=admin", "admin"},
+		{"lowercase key", "mongodb://host:27017/app?authsource=admin", "admin"},
+		{"among other options", "mongodb+srv://c.example.net/app?retryWrites=true&authSource=admin&w=1", "admin"},
+		{"multi-host", "mongodb://a:27017,b:27017/app?authSource=admin", "admin"},
+		{"percent-encoded", "mongodb://host/app?authSource=my%20db", "my db"},
+		{"empty value", "mongodb://host/app?authSource=", ""},
+		{"not confused by a similar key", "mongodb://host/app?authMechanism=SCRAM-SHA-1", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseAuthSourceFromURI(tt.uri); got != tt.want {
+				t.Errorf("ParseAuthSourceFromURI(%q) = %q, want %q", tt.uri, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseAuthMechanismFromURI(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{"absent", "mongodb://host:27017/app", ""},
+		{"explicit", "mongodb://host/app?authMechanism=SCRAM-SHA-1", "SCRAM-SHA-1"},
+		{"lowercase key", "mongodb://host/app?authmechanism=MONGODB-OIDC", "MONGODB-OIDC"},
+		{"not confused by authSource", "mongodb://host/app?authSource=admin", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseAuthMechanismFromURI(tt.uri); got != tt.want {
+				t.Errorf("ParseAuthMechanismFromURI(%q) = %q, want %q", tt.uri, got, tt.want)
+			}
+		})
+	}
+}

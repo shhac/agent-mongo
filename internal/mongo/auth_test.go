@@ -76,19 +76,74 @@ func TestClientOptionsRejectsUnsupportedKind(t *testing.T) {
 	}
 }
 
-// Characterization test, not an endorsement: a URI carrying ?authSource=app
-// loses it as soon as the connection references a stored credential.
-// ApplyURI only builds an Auth when HasAuthParameters() is true, and that
-// check deliberately excludes authSource, so nothing carries it across and the
-// driver falls back to "admin".
-//
-// Reachable from ordinary use: `connection add prod
-// "mongodb://u:p@host/app?authSource=app"` moves the userinfo into a stored
-// credential and keeps the query string, so a URI that authenticated inline
-// stops working once extracted. Pinned here so the phase-2 OIDC work, which
-// needs authSource to be empty or $external, has to make this decision
-// deliberately rather than inherit it.
-func TestClientOptionsDropsURIAuthSourceWhenCredentialReferenced(t *testing.T) {
+// Moving a URI's credentials into the credential store must not change how
+// that URI authenticates. ApplyURI does not build an Auth from authSource
+// alone, so before this was fixed the option was dropped and the driver fell
+// back to "admin" — a connection that worked inline stopped working once
+// `connection add` extracted its userinfo.
+func TestClientOptionsAuthSourceFollowsTheURI(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{
+			name: "explicit authSource wins",
+			uri:  "mongodb://localhost:27017/app?authSource=admin",
+			want: "admin",
+		},
+		{
+			name: "case-insensitive option key",
+			uri:  "mongodb://localhost:27017/app?authsource=admin",
+			want: "admin",
+		},
+		{
+			name: "falls back to the URI database",
+			uri:  "mongodb://localhost:27017/app",
+			want: "app",
+		},
+		{
+			name: "no database leaves the driver default",
+			uri:  "mongodb://localhost:27017",
+			want: "",
+		},
+		{
+			name: "survives a multi-host URI",
+			uri:  "mongodb://a:27017,b:27017/app?authSource=admin",
+			want: "admin",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.IsolateConfig(t)
+			if _, err := credential.Store("acme", config.Credential{
+				Username: "deploy", Password: "s3cret",
+			}); err != nil {
+				t.Fatalf("Store: %v", err)
+			}
+
+			opts, err := clientOptions(config.Connection{
+				ConnectionString: tt.uri,
+				Credential:       "acme",
+			}, 0)
+			if err != nil {
+				t.Fatalf("clientOptions: %v", err)
+			}
+			if opts.Auth.AuthSource != tt.want {
+				t.Errorf("AuthSource = %q, want %q", opts.Auth.AuthSource, tt.want)
+			}
+			if opts.Auth.Username != "deploy" || opts.Auth.Password != "s3cret" {
+				t.Errorf("Auth = %q/%q, want the stored credential",
+					opts.Auth.Username, opts.Auth.Password)
+			}
+		})
+	}
+}
+
+// The URI may also name a mechanism. SetAuth replaces the whole Credential, so
+// the stored username and password are overlaid onto what ApplyURI derived
+// rather than substituted for it.
+func TestClientOptionsKeepsURIAuthMechanism(t *testing.T) {
 	testutil.IsolateConfig(t)
 	if _, err := credential.Store("acme", config.Credential{
 		Username: "deploy", Password: "s3cret",
@@ -97,16 +152,21 @@ func TestClientOptionsDropsURIAuthSourceWhenCredentialReferenced(t *testing.T) {
 	}
 
 	opts, err := clientOptions(config.Connection{
-		ConnectionString: "mongodb://localhost:27017/app?authSource=app",
+		ConnectionString: "mongodb://localhost:27017/app?authMechanism=SCRAM-SHA-1",
 		Credential:       "acme",
 	}, 0)
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
-	if opts.Auth.AuthSource != "" {
-		t.Errorf("AuthSource = %q; this test pins the current lossy behaviour as \"\" — "+
-			"if it now survives, the bug was fixed and this test should assert %q instead",
-			opts.Auth.AuthSource, "app")
+	// ApplyURI leaves Auth nil here: a URI naming a mechanism with no username
+	// fails the driver's validation, which is exactly the shape `connection
+	// add` produces after it lifts the userinfo out.
+	if opts.Auth.AuthMechanism != "SCRAM-SHA-1" {
+		t.Errorf("AuthMechanism = %q, want the mechanism the URI asked for", opts.Auth.AuthMechanism)
+	}
+	if opts.Auth.Username != "deploy" || opts.Auth.Password != "s3cret" {
+		t.Errorf("Auth = %q/%q, want the stored credential overlaid",
+			opts.Auth.Username, opts.Auth.Password)
 	}
 }
 
@@ -116,7 +176,7 @@ func TestClientOptionsDropsURIAuthSourceWhenCredentialReferenced(t *testing.T) {
 // arm here — the two-place-registration bug it exists to catch — so it is
 // exercised directly rather than left as an untested guard.
 func TestApplyAuthRejectsAKindItCannotDrive(t *testing.T) {
-	_, err := applyAuth(options.Client(), credential.Resolution{
+	_, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
 		Alias: "future",
 		Kind:  "oidc",
 	})

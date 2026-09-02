@@ -18,6 +18,36 @@ func ParseDBFromURI(uri string) string {
 	return strings.TrimPrefix(u.Path, "/")
 }
 
+// ParseAuthSourceFromURI returns the connection string's authSource option, or
+// "" when absent.
+func ParseAuthSourceFromURI(uri string) string { return uriOption(uri, "authsource") }
+
+// ParseAuthMechanismFromURI returns the connection string's authMechanism
+// option, or "" when absent.
+func ParseAuthMechanismFromURI(uri string) string { return uriOption(uri, "authmechanism") }
+
+// uriOption reads one option out of a connection string's query.
+//
+// The key is matched case-insensitively because the driver treats URI option
+// names that way: a connection string written "?authsource=admin"
+// authenticates against the same database as "?authSource=admin".
+func uriOption(uri, name string) string {
+	_, query, found := strings.Cut(uri, "?")
+	if !found {
+		return ""
+	}
+	// A fragment is not meaningful in a connection string, but trim one anyway
+	// so it cannot end up inside the returned value.
+	query, _, _ = strings.Cut(query, "#")
+	for _, pair := range strings.Split(query, "&") {
+		key, value, _ := strings.Cut(pair, "=")
+		if strings.EqualFold(key, name) {
+			return unescape(value)
+		}
+	}
+	return ""
+}
+
 // userinfoParts is one parse of a connection string around its userinfo.
 type userinfoParts struct {
 	prefix  string // scheme plus "://"

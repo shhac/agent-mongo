@@ -82,24 +82,7 @@ func clientOptions(
 	if err != nil {
 		return nil, err
 	}
-	return applyAuth(clientOpts, res)
-}
-
-// applyAuth maps a resolved credential onto driver auth options. The default
-// arm is the guard for a kind that credential.Resolve learns to resolve before
-// this switch learns to drive it.
-func applyAuth(
-	clientOpts *options.ClientOptions, res credential.Resolution,
-) (*options.ClientOptions, error) {
-	switch res.Kind {
-	case config.KindSCRAM:
-		return clientOpts.SetAuth(options.Credential{
-			Username: res.Credential.Username,
-			Password: res.Credential.Password,
-		}), nil
-	default:
-		return nil, credential.UnsupportedKindError(res.Alias, res.Kind)
-	}
+	return applyAuth(clientOpts, conn, res)
 }
 
 // Connect resolves the alias, builds client options (CLI-friendly pool
