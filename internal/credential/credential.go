@@ -64,61 +64,35 @@ type Resolution struct {
 	Credential config.Credential
 }
 
-// kindHandler is everything a credential kind has to supply. One entry in the
-// kinds table is the single place a kind is registered: an incomplete entry
-// fails to compile rather than falling through a switch nobody updated.
-type kindHandler struct {
-	// read fills in the entry's secrets from wherever this kind keeps them.
-	// It is pure: no writes, so an inspection cannot mutate what it inspects.
-	read func(alias string, entry config.Credential) (config.Credential, error)
-	// migrate opportunistically moves an entry to better storage after a
-	// successful read, and is called only on the authenticate path. Nil for a
-	// kind with nothing to migrate.
-	migrate func(alias string, entry config.Credential)
-	// store persists the credential, reporting which storage took the secret.
-	store func(alias string, cred config.Credential) (string, error)
-	// keychainAccounts names every keychain account the kind owns for an alias,
-	// so Remove can erase them without knowing what they hold.
-	keychainAccounts func(alias string) []string
-	// storageType reports where this entry's secret actually lives.
-	storageType func(entry config.Credential) string
-	// checkConnection rejects an endpoint this kind must not be used with.
-	// Nil when the kind places no constraints on where it authenticates.
-	checkConnection func(entry config.Credential, uri string) error
-}
-
-var kinds = map[config.Kind]kindHandler{
-	config.KindSCRAM: {
-		read:             readSCRAM,
-		migrate:          maybeUpgradeSCRAM,
-		store:            storeSCRAM,
-		keychainAccounts: scramAccounts,
-		storageType:      scramStorageType,
-	},
-	config.KindOIDC: {
-		read:             readOIDC,
-		store:            storeOIDC,
-		keychainAccounts: oidcAccounts,
-		storageType:      oidcStorageType,
-		checkConnection:  checkOIDCConnection,
-	},
-}
-
-func handlerFor(kind config.Kind) (kindHandler, bool) {
-	h, ok := kinds[kind]
-	return h, ok
-}
-
-// SupportedKinds lists the kinds this build implements, derived from the
-// dispatch table so it cannot advertise a kind nothing drives. A hand-written
-// list fails by telling the reader to choose from a set that is not real.
-func SupportedKinds() []string {
-	names := make([]string, 0, len(kinds))
-	for kind := range kinds {
-		names = append(names, string(kind))
+// OIDCFlow returns the flow of an OIDC credential.
+//
+// oidcCredential in internal/mongo needs the flow and would otherwise
+// dereference it on an invariant held only by the resolution path. Resolution
+// is a plain struct any caller can build, so the guarantee is stated here
+// rather than assumed there.
+func (r Resolution) OIDCFlow() (config.Flow, error) {
+	if r.Kind != config.KindOIDC {
+		return config.Flow{}, UnsupportedKindError(r.Alias, r.Kind)
 	}
-	sort.Strings(names)
-	return names
+	if r.Credential.Flow == nil {
+		return config.Flow{}, MissingFlowError(r.Alias)
+	}
+	return *r.Credential.Flow, nil
+}
+
+// CheckConnection asks this credential's kind whether it may authenticate
+// against the given endpoint, using the entry already resolved rather than
+// re-reading it. The alias-taking CheckConnection is for callers that have no
+// resolution yet, which is the case when a connection is being wired up.
+func (r Resolution) CheckConnection(uri string) error {
+	h, ok := handlerFor(r.Kind)
+	if !ok {
+		return UnsupportedKindError(r.Alias, r.Kind)
+	}
+	if h.checkConnection == nil {
+		return nil
+	}
+	return h.checkConnection(r.Credential, uri)
 }
 
 // Resolve turns an alias into usable auth material, or returns a
@@ -129,9 +103,7 @@ func Resolve(alias string) (Resolution, error) {
 	if err != nil {
 		return Resolution{}, err
 	}
-	if r.handler.migrate != nil {
-		r.handler.migrate(alias, r.entry)
-	}
+	migrateToKeychain(r.handler, alias, r.entry)
 	return r.Resolution, nil
 }
 
@@ -169,7 +141,12 @@ func read(alias string) (reading, error) {
 	if !ok {
 		return reading{}, UnsupportedKindError(alias, kind)
 	}
-	cred, err := h.read(alias, entry)
+	if h.validate != nil {
+		if err := h.validate(alias, entry); err != nil {
+			return reading{}, err
+		}
+	}
+	cred, err := resolveFields(h.fields, alias, entry)
 	if err != nil {
 		return reading{}, err
 	}
@@ -211,7 +188,7 @@ func Store(alias string, cred config.Credential) (string, error) {
 	if !ok {
 		return "", UnsupportedKindError(alias, kind)
 	}
-	return h.store(alias, cred)
+	return storeCredential(h, alias, cred)
 }
 
 // ConnectionsUsing lists connection aliases that reference this credential.
@@ -266,7 +243,7 @@ func Remove(alias string) error {
 		// a kind whose secret is not a username and password would otherwise
 		// keep live material in the keychain with nothing left to reference it.
 		if h, ok := handlerFor(entry.ResolvedKind()); ok {
-			for _, account := range h.keychainAccounts(alias) {
+			for _, account := range keychainAccountsFor(h.fields, alias) {
 				_ = keychain.Delete(account)
 			}
 		} else {
@@ -315,5 +292,5 @@ func StorageType(entry config.Credential) string {
 	if !ok {
 		return StorageConfig
 	}
-	return h.storageType(entry)
+	return storageTypeFor(h.fields, entry)
 }

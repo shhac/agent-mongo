@@ -190,3 +190,52 @@ func TestApplyAuthRejectsAKindItCannotDrive(t *testing.T) {
 		t.Errorf("error = %q, want it to name the credential", err)
 	}
 }
+
+// The overlay branch — keeping what ApplyURI derived rather than replacing it —
+// is the behaviour scramCredential's comment spends a paragraph justifying, and
+// it is only reachable when the URI itself carries credentials.
+func TestClientOptionsOverlaysOntoURIDerivedAuth(t *testing.T) {
+	testutil.IsolateConfig(t)
+	if _, err := credential.Store("acme", config.Credential{
+		Username: "deploy", Password: "s3cret",
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	// Userinfo present, so ApplyURI builds an Auth; the stored credential must
+	// replace the identity while the mechanism and source survive.
+	opts, err := clientOptions(config.Connection{
+		ConnectionString: "mongodb://uri-user:uri-pass@host:27017/app?authMechanism=SCRAM-SHA-1&authSource=admin",
+		Credential:       "acme",
+	}, 0)
+	if err != nil {
+		t.Fatalf("clientOptions: %v", err)
+	}
+	if opts.Auth.Username != "deploy" || opts.Auth.Password != "s3cret" {
+		t.Errorf("Auth = %q/%q, want the stored credential to win",
+			opts.Auth.Username, opts.Auth.Password)
+	}
+	if opts.Auth.AuthMechanism != "SCRAM-SHA-1" || opts.Auth.AuthSource != "admin" {
+		t.Errorf("mechanism/source = %q/%q, want them preserved from the URI",
+			opts.Auth.AuthMechanism, opts.Auth.AuthSource)
+	}
+}
+
+// A guard misplaced onto the shared path would break every existing plaintext
+// SCRAM connection, so this pins that SCRAM is exempt at the clientOptions
+// layer, not merely at the credential layer.
+func TestClientOptionsAllowsPlaintextSCRAM(t *testing.T) {
+	testutil.IsolateConfig(t)
+	if _, err := credential.Store("acme", config.Credential{
+		Username: "deploy", Password: "s3cret",
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	if _, err := clientOptions(config.Connection{
+		ConnectionString: "mongodb://anywhere.example.com:27017/app",
+		Credential:       "acme",
+	}, 0); err != nil {
+		t.Fatalf("a plaintext SCRAM connection was refused: %v", err)
+	}
+}

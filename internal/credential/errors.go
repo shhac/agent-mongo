@@ -57,3 +57,67 @@ func UnsupportedKindError(alias string, kind config.Kind) error {
 	).WithCause(ErrUnsupportedKind).WithHint(
 		"Upgrade agent-mongo to a build that implements this kind, or re-add the credential with a supported one.")
 }
+
+// MissingFlowError covers an OIDC credential with no flow at all — the whole of
+// what such a credential is.
+func MissingFlowError(alias string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q has no flow: an oidc credential needs to say how it obtains a session", alias),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"Re-add it with a flow: agent-mongo credential add " + alias + " --oidc --environment k8s")
+}
+
+// UnsupportedFlowError names a flow this build does not implement — most likely
+// a config written by a newer agent-mongo.
+func UnsupportedFlowError(alias string, flowType config.FlowType) error {
+	return out.New(
+		fmt.Sprintf("Credential %q has unsupported flow type %q. Supported: %s",
+			alias, flowType, config.JoinOrNone(SupportedFlowTypes())),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"Upgrade agent-mongo to a build that implements this flow, or re-add the credential with a supported one.")
+}
+
+// UnknownEnvironmentError names a platform identity provider the driver has no
+// implementation for.
+func UnknownEnvironmentError(alias, environment string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q names unknown environment %q. Valid: %s",
+			alias, environment, config.JoinOrNone(environmentNames())),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"Re-add it with a valid environment: agent-mongo credential add " + alias + " --oidc --environment k8s")
+}
+
+// MissingTokenResourceError covers an environment whose provider mints tokens
+// for a named audience and was not given one.
+func MissingTokenResourceError(alias, environment string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q needs a token resource: the %s environment mints tokens for a named audience",
+			alias, environment),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(fmt.Sprintf(
+		"Re-add it with the audience: agent-mongo credential add %s --oidc --environment %s --token-resource <audience>",
+		alias, environment))
+}
+
+// InsecureConnectionError covers an endpoint that would carry a bearer token in
+// cleartext.
+func InsecureConnectionError() error {
+	return out.New(
+		"OIDC authentication requires TLS: a bearer token on a plaintext connection is a credential on the wire",
+		out.FixableByHuman,
+	).WithCause(ErrInsecureConnection).WithHint(
+		"Use a mongodb+srv:// URI, or add tls=true to the connection string.")
+}
+
+// HostNotAllowedError covers an endpoint outside the credential's allowlist.
+func HostNotAllowedError(host string, allowed []string) error {
+	return out.New(
+		fmt.Sprintf("Host %q is not in this credential's allowed hosts: %s",
+			host, config.JoinOrNone(allowed)),
+		out.FixableByHuman,
+	).WithCause(ErrHostNotAllowed).WithHint(
+		"Point the connection at an allowed host, or widen the credential deliberately: agent-mongo credential add <alias> --oidc --allowed-hosts <pattern>,<pattern>")
+}

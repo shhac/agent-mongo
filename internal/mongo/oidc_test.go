@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -11,9 +13,9 @@ import (
 
 func oidcConnection(t *testing.T, uri string, flow *config.Flow) (*optionsAuth, error) {
 	t.Helper()
-	if _, err := credential.Store("corp", config.Credential{
-		Kind: config.KindOIDC, Flow: flow,
-	}); err != nil {
+	cred := testutil.OIDCCredential("")
+	cred.Flow = flow
+	if _, err := credential.Store("corp", cred); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
 	opts, err := clientOptions(config.Connection{
@@ -117,5 +119,31 @@ func TestClientOptionsRefusesOIDCToADisallowedHost(t *testing.T) {
 		&config.Flow{Type: config.FlowEnvironment, Environment: config.EnvironmentK8s})
 	if !errors.Is(err, credential.ErrHostNotAllowed) {
 		t.Fatalf("error = %v, want ErrHostNotAllowed", err)
+	}
+}
+
+// The flow switch's default arm: a flow registered for validation before this
+// switch learns to drive it must fail here rather than silently authenticate
+// with the wrong shape.
+func TestOIDCCredentialRejectsAFlowItCannotDrive(t *testing.T) {
+	_, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
+		Alias:      "corp",
+		Kind:       config.KindOIDC,
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("device")}},
+	})
+	if !errors.Is(err, credential.ErrInvalidFlow) {
+		t.Fatalf("error = %v, want ErrInvalidFlow", err)
+	}
+}
+
+// A Resolution is a plain struct, so a caller can build one with an OIDC kind
+// and no flow. That must be an error, not a nil dereference.
+func TestOIDCCredentialRejectsAMissingFlow(t *testing.T) {
+	_, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
+		Alias: "corp",
+		Kind:  config.KindOIDC,
+	})
+	if !errors.Is(err, credential.ErrInvalidFlow) {
+		t.Fatalf("error = %v, want ErrInvalidFlow", err)
 	}
 }

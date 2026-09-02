@@ -84,8 +84,10 @@ func clientOptions(
 	}
 	// Re-checked here rather than trusted from when the connection was wired
 	// up: the connection string can be edited afterwards, and for a kind that
-	// authenticates with a bearer token this is a safety boundary.
-	if err := credential.CheckConnection(conn.Credential, conn.ConnectionString); err != nil {
+	// authenticates with a bearer token this is a safety boundary. Asked of the
+	// resolution rather than the alias, so the check and the auth mapping
+	// provably see the same credential.
+	if err := res.CheckConnection(conn.ConnectionString); err != nil {
 		return nil, err
 	}
 	return applyAuth(clientOpts, conn, res)

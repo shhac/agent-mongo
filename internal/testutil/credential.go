@@ -27,3 +27,16 @@ func StageCredential(t *testing.T, alias string, cred config.Credential) {
 		t.Fatalf("staging credential %q: %v", alias, err)
 	}
 }
+
+// OIDCCredential is the fixture an OIDC test starts from: a credential on the
+// environment flow for the given platform.
+//
+// Only the value lives here, not a store helper — internal/credential's tests
+// are in-package, so testutil importing credential would be an import cycle.
+// Each package keeps its own three-line wrapper around Store or StageCredential.
+func OIDCCredential(environment string) config.Credential {
+	return config.Credential{
+		Kind: config.KindOIDC,
+		Flow: &config.Flow{Type: config.FlowEnvironment, Environment: environment},
+	}
+}

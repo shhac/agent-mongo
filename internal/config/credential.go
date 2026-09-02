@@ -61,3 +61,15 @@ func (c Credential) ResolvedKind() Kind {
 	}
 	return c.Kind
 }
+
+// SetCredential stores an entry, creating the map when this is the first one.
+//
+// A mutator on *Config rather than a top-level helper, because a caller that
+// keeps secrets in the OS keychain has to do this inside the same critical
+// section as its keychain writes.
+func (c *Config) SetCredential(alias string, cred Credential) {
+	if c.Credentials == nil {
+		c.Credentials = map[string]Credential{}
+	}
+	c.Credentials[alias] = cred
+}

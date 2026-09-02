@@ -6,23 +6,27 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// addOIDC stores a flow recipe. Nothing secret is written: the environment
-// flows read an identity the platform already gave this process, so there is no
-// password to keep out of the agent's context and no --form equivalent.
-func addOIDC(name string, flags addFlags) error {
-	flow := &config.Flow{
+// flowFromFlags builds the recipe the flags describe. Pure, and the single
+// place the flow-type decision grows: --oidc alone means the environment flow
+// today, and a later flow adds its arm here rather than inside addOIDC.
+func flowFromFlags(flags addFlags) *config.Flow {
+	return &config.Flow{
 		Type:          config.FlowEnvironment,
 		Environment:   flags.environment,
 		TokenResource: flags.tokenResource,
 		ClientID:      flags.clientID,
 		AllowedHosts:  flags.allowedHosts,
 	}
-	// Validated before the write so a bad recipe is rejected while the user is
-	// still looking at it, rather than at the next query.
-	if err := credstore.ValidateFlow(name, flow); err != nil {
-		return err
-	}
+}
 
+// addOIDC stores a flow recipe. Nothing secret is written: the environment
+// flows read an identity the platform already gave this process, so there is no
+// password to keep out of the agent's context and no --form equivalent.
+//
+// The recipe is validated by Store before anything is written, so there is no
+// pre-check here to keep in step with it.
+func addOIDC(name string, flags addFlags) error {
+	flow := flowFromFlags(flags)
 	storage, err := credstore.Store(name, config.Credential{
 		Kind: config.KindOIDC,
 		Flow: flow,

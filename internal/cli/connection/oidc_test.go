@@ -11,10 +11,7 @@ import (
 
 func storeOIDCCredential(t *testing.T, alias string) {
 	t.Helper()
-	if _, err := credential.Store(alias, config.Credential{
-		Kind: config.KindOIDC,
-		Flow: &config.Flow{Type: config.FlowEnvironment, Environment: config.EnvironmentK8s},
-	}); err != nil {
+	if _, err := credential.Store(alias, testutil.OIDCCredential(config.EnvironmentK8s)); err != nil {
 		t.Fatalf("Store: %v", err)
 	}
 }

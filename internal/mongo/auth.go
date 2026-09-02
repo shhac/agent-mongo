@@ -27,7 +27,11 @@ func applyAuth(
 	case config.KindSCRAM:
 		return clientOpts.SetAuth(scramCredential(clientOpts, conn, res)), nil
 	case config.KindOIDC:
-		return clientOpts.SetAuth(oidcCredential(res)), nil
+		cred, err := oidcCredential(res)
+		if err != nil {
+			return nil, err
+		}
+		return clientOpts.SetAuth(cred), nil
 	default:
 		return nil, credential.UnsupportedKindError(res.Alias, res.Kind)
 	}
@@ -41,18 +45,31 @@ func applyAuth(
 // is the source of truth for how an OIDC credential authenticates, and
 // authSource is deliberately left empty — the driver requires it to be empty or
 // "$external" for MONGODB-OIDC and fills it in itself.
-func oidcCredential(res credential.Resolution) options.Credential {
-	flow := res.Credential.Flow
-	props := map[string]string{oidcEnvironmentProp: flow.Environment}
-	if flow.TokenResource != "" {
-		props[oidcTokenResourceProp] = flow.TokenResource
+//
+// The switch has one arm today. It exists rather than assuming the environment
+// flow because the later flows fail here: a dead session has to surface as a
+// self-correcting error before the driver swallows it into a callback failure.
+func oidcCredential(res credential.Resolution) (options.Credential, error) {
+	flow, err := res.OIDCFlow()
+	if err != nil {
+		return options.Credential{}, err
 	}
-	return options.Credential{
-		AuthMechanism:           oidcMechanism,
-		AuthMechanismProperties: props,
-		// Azure reads this as the managed-identity client id; the gcp and k8s
-		// providers ignore it, and it is empty for them anyway.
-		Username: flow.ClientID,
+
+	switch flow.Type {
+	case config.FlowEnvironment:
+		props := map[string]string{oidcEnvironmentProp: flow.Environment}
+		if flow.TokenResource != "" {
+			props[oidcTokenResourceProp] = flow.TokenResource
+		}
+		return options.Credential{
+			AuthMechanism:           oidcMechanism,
+			AuthMechanismProperties: props,
+			// Azure reads this as the managed-identity client id; the gcp and
+			// k8s providers ignore it, and it is empty for them anyway.
+			Username: flow.ClientID,
+		}, nil
+	default:
+		return options.Credential{}, credential.UnsupportedFlowError(res.Alias, flow.Type)
 	}
 }
 
