@@ -363,3 +363,55 @@ func TestSessionWithNoExpiryIsUsed(t *testing.T) {
 		t.Error("a session with no stated expiry was refreshed anyway")
 	}
 }
+
+// The token is fetched inside the driver's callback, which only runs after a
+// connection exists — so without this check a credential nobody has logged in
+// with surfaces as a connection or DNS failure, hiding the one error that says
+// what to do.
+func TestRequireSession(t *testing.T) {
+	fixedClock(t, frozen)
+
+	t.Run("device flow with no session", func(t *testing.T) {
+		res := Resolution{
+			Alias:      "corp",
+			Kind:       config.KindOIDC,
+			Credential: config.Credential{Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowDevice}},
+		}
+		if err := res.RequireSession(); !errors.Is(err, ErrNotLoggedIn) {
+			t.Errorf("error = %v, want ErrNotLoggedIn", err)
+		}
+	})
+
+	t.Run("device flow with a session", func(t *testing.T) {
+		res := deviceResolution(t, liveSession("https://idp.example.com"))
+		res.Credential.Kind = config.KindOIDC
+		if err := res.RequireSession(); err != nil {
+			t.Errorf("RequireSession = %v, want nil", err)
+		}
+	})
+
+	// An expired session may still be renewable, and finding out is the
+	// callback's job — this check must not pre-empt it.
+	t.Run("an expired session is not refused here", func(t *testing.T) {
+		session := liveSession("https://idp.example.com")
+		session.ExpiresAt = frozen.Add(-time.Hour)
+		res := deviceResolution(t, session)
+		res.Credential.Kind = config.KindOIDC
+		if err := res.RequireSession(); err != nil {
+			t.Errorf("RequireSession = %v, want the refresh left to the callback", err)
+		}
+	})
+
+	t.Run("flows that keep no session pass", func(t *testing.T) {
+		for _, cred := range []config.Credential{
+			{Username: "u", Password: "p"},
+			testutil.OIDCCredential(config.EnvironmentK8s),
+			{Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowFile, Path: "/t"}},
+		} {
+			res := Resolution{Alias: "c", Kind: cred.ResolvedKind(), Credential: cred}
+			if err := res.RequireSession(); err != nil {
+				t.Errorf("RequireSession(%v) = %v, want nil", cred.Flow, err)
+			}
+		}
+	})
+}

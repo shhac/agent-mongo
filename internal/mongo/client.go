@@ -99,6 +99,11 @@ func clientOptions(
 	if err := res.CheckConnection(conn.ConnectionString); err != nil {
 		return nil, err
 	}
+	// Before connecting, so a credential nobody has logged in with says so
+	// rather than surfacing as a connection failure that hides it.
+	if err := res.RequireSession(); err != nil {
+		return nil, err
+	}
 	return applyAuth(clientOpts, conn, res)
 }
 

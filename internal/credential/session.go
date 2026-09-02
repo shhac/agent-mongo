@@ -88,6 +88,31 @@ func storeSession(alias string, cred config.Credential, session Session) error {
 	return err
 }
 
+// RequireSession reports whether a credential is in a state to authenticate at
+// all, without touching the network.
+//
+// The token itself is fetched inside the driver's callback, which only runs
+// once a connection has been established — so a credential nobody has logged in
+// with would otherwise surface as a connection or DNS failure, hiding the one
+// error that says what to do. This is checked before connecting so "run
+// credential login" arrives first.
+//
+// It deliberately does not refresh: an expired session may still be renewable,
+// and finding out is the callback's job.
+func (r Resolution) RequireSession() error {
+	if !IsDeviceFlow(r.Credential) {
+		return nil
+	}
+	session, err := decodeSession(r.Alias, r.Credential.Session)
+	if err != nil {
+		return err
+	}
+	if session.AccessToken == "" {
+		return NotLoggedInError(r.Alias)
+	}
+	return nil
+}
+
 // SaveSession stores a completed login against a credential, replacing whatever
 // session it had.
 func SaveSession(alias string, session Session) error {
