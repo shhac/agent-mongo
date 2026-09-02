@@ -24,9 +24,9 @@ func TestStoreCredentialStores(t *testing.T) {
 	if storage != StorageKeychain && storage != StorageConfig {
 		t.Errorf("storage = %q, want keychain or config", storage)
 	}
-	cred, ok := Get("acme")
+	cred, ok := resolves("acme")
 	if !ok {
-		t.Fatal("Get(acme) not found")
+		t.Fatal("Resolve(acme) not found")
 	}
 	if cred.Username != "deploy" || cred.Password != "secret123" {
 		t.Errorf("cred = %+v, want deploy/secret123", cred)
@@ -58,7 +58,7 @@ func TestStoreCredentialUpsertsExisting(t *testing.T) {
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "new-pass"}); err != nil {
 		t.Fatalf("Store(new) error: %v", err)
 	}
-	cred, ok := Get("acme")
+	cred, ok := resolves("acme")
 	if !ok || cred.Password != "new-pass" {
 		t.Errorf("cred = %+v,%v, want new-pass", cred, ok)
 	}
@@ -76,18 +76,18 @@ func TestMultipleCredentialsStoredIndependently(t *testing.T) {
 	if len(aliases) != 2 || aliases[0] != "acme" || aliases[1] != "globex" {
 		t.Errorf("Aliases() = %v, want [acme globex]", aliases)
 	}
-	if c, _ := Get("acme"); c.Username != "deploy" {
+	if c, _ := resolves("acme"); c.Username != "deploy" {
 		t.Errorf("acme username = %q, want deploy", c.Username)
 	}
-	if c, _ := Get("globex"); c.Username != "admin" {
+	if c, _ := resolves("globex"); c.Username != "admin" {
 		t.Errorf("globex username = %q, want admin", c.Username)
 	}
 }
 
 func TestGetReturnsFalseForUnknownName(t *testing.T) {
 	testutil.IsolateConfig(t)
-	if _, ok := Get("nonexistent"); ok {
-		t.Error("Get(nonexistent) = ok, want not found")
+	if _, ok := resolves("nonexistent"); ok {
+		t.Error("Resolve(nonexistent) = ok, want not found")
 	}
 }
 
@@ -99,8 +99,8 @@ func TestRemoveCredentialRemoves(t *testing.T) {
 	if err := Remove("acme"); err != nil {
 		t.Fatalf("Remove() error: %v", err)
 	}
-	if _, ok := Get("acme"); ok {
-		t.Error("Get(acme) = ok, want removed")
+	if _, ok := resolves("acme"); ok {
+		t.Error("Resolve(acme) = ok, want removed")
 	}
 	if got := All(); len(got) != 0 {
 		t.Errorf("All() = %v, want empty", got)
@@ -158,8 +158,8 @@ func TestRemoveCredentialSucceedsAfterClearingReferences(t *testing.T) {
 	if err := Remove("acme"); err != nil {
 		t.Fatalf("Remove() error: %v", err)
 	}
-	if _, ok := Get("acme"); ok {
-		t.Error("Get(acme) = ok, want removed")
+	if _, ok := resolves("acme"); ok {
+		t.Error("Resolve(acme) = ok, want removed")
 	}
 }
 
@@ -172,7 +172,7 @@ func TestStoreCredentialDoesNotTouchConnectionData(t *testing.T) {
 	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
 		t.Fatalf("Store() error: %v", err)
 	}
-	cred, ok := Get("acme")
+	cred, ok := resolves("acme")
 	if !ok || cred.Username != "deploy" || cred.Password != "secret" {
 		t.Errorf("cred = %+v,%v, want deploy/secret", cred, ok)
 	}

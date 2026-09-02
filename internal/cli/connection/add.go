@@ -52,7 +52,7 @@ func resolveCredential(alias, connectionString, credentialAlias string) (credent
 			Storage:          storage,
 		}, nil
 	case credentialAlias != "":
-		if err := credential.Require(credentialAlias); err != nil {
+		if err := credential.RequireExists(credentialAlias); err != nil {
 			return credentialResolution{}, err
 		}
 	}
@@ -67,8 +67,14 @@ func refuseCredentialOverwrite(alias, username, password, stripped string) error
 	if _, exists := credential.All()[alias]; !exists {
 		return nil
 	}
-	existing, ok := credential.Get(alias)
-	if ok && existing.Username == username && existing.Password == password {
+	// Only a SCRAM credential holding exactly these values is a no-op re-add;
+	// anything else (a different password, an unreadable secret, another kind
+	// entirely) would silently change how the connections referencing it
+	// authenticate.
+	existing, err := credential.Resolve(alias)
+	if err == nil && existing.Kind == config.KindSCRAM &&
+		existing.Credential.Username == username &&
+		existing.Credential.Password == password {
 		return nil
 	}
 
@@ -76,10 +82,10 @@ func refuseCredentialOverwrite(alias, username, password, stripped string) error
 	if used := credential.ConnectionsUsing(alias); len(used) > 0 {
 		usedBy = " (used by connections: " + strings.Join(used, ", ") + ")"
 	}
-	err := fmt.Errorf(
+	refusal := fmt.Errorf(
 		"Credential %q already exists with different values%s. Refusing to overwrite it: connections referencing it would silently change auth.",
 		alias, usedBy)
-	return out.Wrap(err, out.FixableByAgent).WithHint(overwriteHint(alias, stripped))
+	return out.Wrap(refusal, out.FixableByAgent).WithHint(overwriteHint(alias, stripped))
 }
 
 // overwriteHint tailors the fix to what is actually changing: same host/URI

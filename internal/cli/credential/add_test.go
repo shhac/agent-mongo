@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
@@ -31,7 +30,7 @@ func TestAddPasswordFlagWinsOverStdin(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	cred, ok := credstore.Get("flagwins")
+	cred, ok := resolves("flagwins")
 	if !ok {
 		t.Fatal("credential not stored")
 	}
@@ -48,7 +47,7 @@ func TestAddStdinFillsPassword(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	cred, ok := credstore.Get("fromstdin")
+	cred, ok := resolves("fromstdin")
 	if !ok {
 		t.Fatal("credential not stored")
 	}
@@ -71,7 +70,7 @@ func TestAddErrorsWhenPasswordMissing(t *testing.T) {
 	if !strings.Contains(err.Error(), "password") {
 		t.Errorf("error = %q, want it to mention the missing password", err.Error())
 	}
-	if _, ok := credstore.Get("nopass"); ok {
+	if _, ok := resolves("nopass"); ok {
 		t.Error("credential should not have been stored when password is missing")
 	}
 }

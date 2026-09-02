@@ -20,7 +20,7 @@ func registerUpdate(parent *cobra.Command) {
 			alias := args[0]
 
 			if credentialAlias != "" {
-				if err := credential.Require(credentialAlias); err != nil {
+				if err := credential.RequireExists(credentialAlias); err != nil {
 					return err
 				}
 			}

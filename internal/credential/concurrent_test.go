@@ -45,10 +45,10 @@ func TestStoreConcurrentWritersAllSurvive(t *testing.T) {
 	}
 	for i := range concurrentWriters {
 		alias := fmt.Sprintf("cred-%02d", i)
-		if entries[alias].Password != sentinel {
+		if entries[alias].Password != Sentinel {
 			t.Errorf("%s should hold the keychain sentinel, got %+v", alias, entries[alias])
 		}
-		cred, ok := Get(alias)
+		cred, ok := resolves(alias)
 		if !ok {
 			t.Errorf("%s no longer resolves — its keychain secret is stranded", alias)
 			continue

@@ -109,7 +109,7 @@ func TestStoreKeychainRoundTrip(t *testing.T) {
 		t.Errorf("StorageType: got %q", StorageType("acme"))
 	}
 
-	cred, ok := Get("acme")
+	cred, ok := resolves("acme")
 	if !ok || cred.Username != "deploy" || cred.Password != "s3cret" {
 		t.Fatalf("Get round-trip failed: %+v ok=%v", cred, ok)
 	}
@@ -129,7 +129,7 @@ func TestGetUpgradesPlaintextToKeychain(t *testing.T) {
 	}
 
 	read := captureStderr(t)
-	cred, ok := Get("legacy")
+	cred, ok := resolves("legacy")
 	stderr := read()
 
 	if !ok || cred.Username != "user" || cred.Password != "pass" {
@@ -148,7 +148,7 @@ func TestGetUpgradesPlaintextToKeychain(t *testing.T) {
 
 	// Second read resolves via keychain silently.
 	read = captureStderr(t)
-	if _, ok := Get("legacy"); !ok {
+	if _, ok := resolves("legacy"); !ok {
 		t.Fatal("second Get failed")
 	}
 	if second := read(); second != "" {
@@ -169,8 +169,8 @@ func TestGetSentinelWithoutKeychainEntry(t *testing.T) {
 		t.Fatalf("seed config: %v", err)
 	}
 
-	if _, ok := Get("ghost"); ok {
-		t.Fatal("Get should fail when sentinel has no keychain entry")
+	if _, ok := resolves("ghost"); ok {
+		t.Fatal("Resolve should fail when sentinel has no keychain entry")
 	}
 }
 
@@ -219,7 +219,7 @@ func TestUpgradeSkippedWhenKeychainUnavailable(t *testing.T) {
 		t.Fatalf("seed config: %v", err)
 	}
 
-	cred, ok := Get("plain")
+	cred, ok := resolves("plain")
 	if !ok || cred.Password != "pass" {
 		t.Fatalf("Get: %+v ok=%v", cred, ok)
 	}

@@ -68,21 +68,33 @@ func registerList(parent *cobra.Command) {
 			entries := credstore.All()
 			items := make([]any, 0, len(entries))
 			for _, name := range credstore.Aliases() {
-				username := entries[name].Username
-				if username == "__KEYCHAIN__" {
-					username = "(keychain)"
-				}
-				items = append(items, map[string]any{
-					"name":     name,
-					"username": username,
-					"password": "***",
-					"storage":  credstore.StorageType(name),
-					"usedBy":   credstore.ConnectionsUsing(name),
-				})
+				items = append(items, listItem(name, entries[name]))
 			}
 			return output.PrintList(items, nil)
 		},
 	})
+}
+
+// listItem renders one `credential list` row. Username and password appear
+// only for the kind that has them, so a row never implies a credential holds
+// material it does not.
+func listItem(name string, entry config.Credential) map[string]any {
+	kind := entry.ResolvedKind()
+	item := map[string]any{
+		"name":    name,
+		"kind":    string(kind),
+		"storage": credstore.StorageType(name),
+		"usedBy":  credstore.ConnectionsUsing(name),
+	}
+	if kind == config.KindSCRAM {
+		username := entry.Username
+		if username == credstore.Sentinel {
+			username = "(keychain)"
+		}
+		item["username"] = username
+		item["password"] = "***"
+	}
+	return item
 }
 
 const usageText = `credential — Manage stored credentials for MongoDB authentication
