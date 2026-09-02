@@ -105,13 +105,13 @@ func TestStoreKeychainRoundTrip(t *testing.T) {
 	if entry.Username != "__KEYCHAIN__" || entry.Password != "__KEYCHAIN__" {
 		t.Fatalf("config entry should hold sentinels, got %+v", entry)
 	}
-	if StorageType("acme") != StorageKeychain {
-		t.Errorf("StorageType: got %q", StorageType("acme"))
+	if got := StorageType(All()["acme"]); got != StorageKeychain {
+		t.Errorf("StorageType: got %q", got)
 	}
 
-	cred, ok := resolves("acme")
-	if !ok || cred.Username != "deploy" || cred.Password != "s3cret" {
-		t.Fatalf("Get round-trip failed: %+v ok=%v", cred, ok)
+	res, err := Resolve("acme")
+	if err != nil || res.Credential.Username != "deploy" || res.Credential.Password != "s3cret" {
+		t.Fatalf("Resolve round-trip failed: %+v err=%v", res.Credential, err)
 	}
 }
 
@@ -129,11 +129,11 @@ func TestGetUpgradesPlaintextToKeychain(t *testing.T) {
 	}
 
 	read := captureStderr(t)
-	cred, ok := resolves("legacy")
+	res, err := Resolve("legacy")
 	stderr := read()
 
-	if !ok || cred.Username != "user" || cred.Password != "pass" {
-		t.Fatalf("Get: %+v ok=%v", cred, ok)
+	if err != nil || res.Credential.Username != "user" || res.Credential.Password != "pass" {
+		t.Fatalf("Resolve: %+v err=%v", res.Credential, err)
 	}
 	if !strings.Contains(stderr, `"notice"`) || !strings.Contains(stderr, "upgraded") {
 		t.Errorf("expected upgrade notice on stderr, got %q", stderr)
@@ -148,11 +148,11 @@ func TestGetUpgradesPlaintextToKeychain(t *testing.T) {
 
 	// Second read resolves via keychain silently.
 	read = captureStderr(t)
-	if _, ok := resolves("legacy"); !ok {
-		t.Fatal("second Get failed")
+	if _, err := Resolve("legacy"); err != nil {
+		t.Fatalf("second Resolve failed: %v", err)
 	}
 	if second := read(); second != "" {
-		t.Errorf("second Get should be silent, got %q", second)
+		t.Errorf("second Resolve should be silent, got %q", second)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestGetSentinelWithoutKeychainEntry(t *testing.T) {
 		t.Fatalf("seed config: %v", err)
 	}
 
-	if _, ok := resolves("ghost"); ok {
+	if _, err := Resolve("ghost"); err == nil {
 		t.Fatal("Resolve should fail when sentinel has no keychain entry")
 	}
 }
@@ -219,9 +219,9 @@ func TestUpgradeSkippedWhenKeychainUnavailable(t *testing.T) {
 		t.Fatalf("seed config: %v", err)
 	}
 
-	cred, ok := resolves("plain")
-	if !ok || cred.Password != "pass" {
-		t.Fatalf("Get: %+v ok=%v", cred, ok)
+	res, err := Resolve("plain")
+	if err != nil || res.Credential.Password != "pass" {
+		t.Fatalf("Resolve: %+v err=%v", res.Credential, err)
 	}
 	entry := config.Read().Credentials["plain"]
 	if entry.Username != "user" {

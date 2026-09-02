@@ -39,23 +39,9 @@ func runList(t *testing.T) []map[string]any {
 	return records
 }
 
-func stage(t *testing.T, alias string, cred config.Credential) {
-	t.Helper()
-	err := config.Update(func(cfg *config.Config) error {
-		if cfg.Credentials == nil {
-			cfg.Credentials = map[string]config.Credential{}
-		}
-		cfg.Credentials[alias] = cred
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("staging %q: %v", alias, err)
-	}
-}
-
 func TestListReportsKind(t *testing.T) {
 	testutil.IsolateConfig(t)
-	stage(t, "legacy", config.Credential{Username: "deploy", Password: "s3cret"})
+	testutil.StageCredential(t, "legacy", config.Credential{Username: "deploy", Password: "s3cret"})
 
 	records := runList(t)
 	if len(records) != 1 {
@@ -77,7 +63,7 @@ func TestListReportsKind(t *testing.T) {
 // looking for a password that was never set.
 func TestListOmitsSCRAMFieldsForOtherKinds(t *testing.T) {
 	testutil.IsolateConfig(t)
-	stage(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
 
 	records := runList(t)
 	if len(records) != 1 {
@@ -96,7 +82,7 @@ func TestListOmitsSCRAMFieldsForOtherKinds(t *testing.T) {
 
 func TestListRendersKeychainBackedUsername(t *testing.T) {
 	testutil.IsolateConfig(t)
-	stage(t, "acme", config.Credential{Username: "__KEYCHAIN__", Password: "__KEYCHAIN__"})
+	testutil.StageCredential(t, "acme", config.Credential{Username: "__KEYCHAIN__", Password: "__KEYCHAIN__"})
 
 	records := runList(t)
 	if got := records[0]["username"]; got != "(keychain)" {

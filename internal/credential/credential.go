@@ -7,19 +7,21 @@
 // service "app.paulie.agent-mongo" under the accounts "username:<alias>" and
 // "password:<alias>".
 //
-// Every path here dispatches on config.Kind. A kind this build does not
-// understand resolves to a named error rather than being guessed at as SCRAM,
-// because guessing would run the plaintext-upgrade path over a credential whose
-// empty username and password are correct rather than missing.
+// Every kind-sensitive operation dispatches through the kinds table rather than
+// testing for a kind inline, so registering a kind is one table entry instead of
+// a hunt for the places that branch. A kind this build does not implement is a
+// named error rather than a guess at SCRAM: guessing would run the
+// plaintext-upgrade path over a credential whose empty username and password
+// are correct rather than missing.
 package credential
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
-	"github.com/shhac/lib-agent-cli/creds"
 	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -35,110 +37,131 @@ const (
 	StorageConfig   = "config"
 )
 
-// State reports whether a stored credential can authenticate right now.
-type State string
-
-const (
-	// StateReady: the credential resolved to usable auth material.
-	StateReady State = "ready"
-	// StateMissing: no credential is stored under the alias.
-	StateMissing State = "missing"
-	// StateUnresolvable: the entry exists but its secret could not be read
-	// back out of the keychain.
-	StateUnresolvable State = "unresolvable"
-	// StateUnsupported: the entry names a kind this build does not implement.
-	StateUnsupported State = "unsupported"
+// The failure modes a caller may need to tell apart. They are discriminated
+// with errors.Is rather than by a parallel status field, so there is one
+// channel to keep honest instead of two.
+var (
+	// ErrNotFound: no credential is stored under the alias.
+	ErrNotFound = errors.New("credential not found")
+	// ErrUnresolvable: the entry exists but its secret could not be read back.
+	ErrUnresolvable = errors.New("credential secret unreadable")
+	// ErrUnsupportedKind: the entry names a kind this build does not implement.
+	ErrUnsupportedKind = errors.New("unsupported credential kind")
 )
 
-// Resolution is the outcome of resolving an alias to auth material. Alias,
-// Kind and State are always set; Credential carries resolved secrets only when
-// the State is StateReady.
+// Resolution is a credential resolved to usable auth material. It is only
+// meaningful alongside a nil error; Resolve returns the zero value on failure
+// so a caller cannot mistake an unresolved sentinel for a password.
 type Resolution struct {
 	Alias      string
 	Kind       config.Kind
-	State      State
 	Credential config.Credential
 }
 
-func (r Resolution) Ready() bool { return r.State == StateReady }
-
-// keychainStore is the seam over the OS keychain — satisfied by
-// *keyring.Keyring in production and by a fake in tests.
-type keychainStore interface {
-	Available() bool
-	Get(account string) (string, bool)
-	Set(account, secret string) error
-	Delete(account string) error
+// kindHandler is everything a credential kind has to supply. One entry in the
+// kinds table is the single place a kind is registered: an incomplete entry
+// fails to compile rather than falling through a switch nobody updated.
+type kindHandler struct {
+	// read fills in the entry's secrets from wherever this kind keeps them.
+	// It is pure: no writes, so an inspection cannot mutate what it inspects.
+	read func(alias string, entry config.Credential) (config.Credential, error)
+	// migrate opportunistically moves an entry to better storage after a
+	// successful read, and is called only on the authenticate path. Nil for a
+	// kind with nothing to migrate.
+	migrate func(alias string, entry config.Credential)
+	// store persists the credential, reporting which storage took the secret.
+	store func(alias string, cred config.Credential) (string, error)
+	// keychainAccounts names every keychain account the kind owns for an alias,
+	// so Remove can erase them without knowing what they hold.
+	keychainAccounts func(alias string) []string
+	// storageType reports where this entry's secret actually lives.
+	storageType func(entry config.Credential) string
 }
 
-var keychain keychainStore = creds.NewKeychain(Service)
+var kinds = map[config.Kind]kindHandler{
+	config.KindSCRAM: {
+		read:             readSCRAM,
+		migrate:          maybeUpgradeSCRAM,
+		store:            storeSCRAM,
+		keychainAccounts: scramAccounts,
+		storageType:      scramStorageType,
+	},
+}
 
-func usernameAccount(alias string) string { return "username:" + alias }
-func passwordAccount(alias string) string { return "password:" + alias }
+func handlerFor(kind config.Kind) (kindHandler, bool) {
+	h, ok := kinds[kind]
+	return h, ok
+}
+
+// SupportedKinds lists the kinds this build implements, derived from the
+// dispatch table so it cannot advertise a kind nothing drives. A hand-written
+// list fails by telling the reader to choose from a set that is not real.
+func SupportedKinds() []string {
+	names := make([]string, 0, len(kinds))
+	for kind := range kinds {
+		names = append(names, string(kind))
+	}
+	sort.Strings(names)
+	return names
+}
 
 // Resolve turns an alias into usable auth material, or returns a
-// self-correcting error naming the fix.
+// self-correcting error naming the fix. This is the authenticate path, and the
+// only one that may migrate an entry to better storage as a side effect.
 func Resolve(alias string) (Resolution, error) {
+	r, err := read(alias)
+	if err != nil {
+		return Resolution{}, err
+	}
+	if r.handler.migrate != nil {
+		r.handler.migrate(alias, r.entry)
+	}
+	return r.Resolution, nil
+}
+
+// Inspect resolves an alias exactly as Resolve does but writes nothing.
+//
+// Callers that want to know what is stored rather than to authenticate with it
+// use this. Going through Resolve would migrate a plaintext credential into the
+// keychain as a side effect of reading it, which is wrong on a path that may be
+// about to refuse the operation it was checking for.
+func Inspect(alias string) (Resolution, error) {
+	r, err := read(alias)
+	return r.Resolution, err
+}
+
+// reading is what the shared read produces: the resolution a caller wants, plus
+// the two things only the migration step needs — the entry as it is stored
+// (migration decides from that, not from what was resolved) and the handler
+// already looked up, so Resolve does not repeat the lookup.
+type reading struct {
+	Resolution
+	entry   config.Credential
+	handler kindHandler
+}
+
+// read is the pure half both entry points share: look the entry up, dispatch to
+// its kind, resolve its secrets. It writes nothing.
+func read(alias string) (reading, error) {
 	entry, ok := config.Read().Credentials[alias]
 	if !ok {
-		return Resolution{Alias: alias, State: StateMissing}, NotFoundError(alias)
+		return reading{}, NotFoundError(alias)
 	}
 
-	res := Resolution{Alias: alias, Kind: entry.ResolvedKind(), Credential: entry}
-	switch res.Kind {
-	case config.KindSCRAM:
-		return resolveSCRAM(res)
-	default:
-		res.State = StateUnsupported
-		return res, UnsupportedKindError(alias, res.Kind)
+	kind := entry.ResolvedKind()
+	h, ok := handlerFor(kind)
+	if !ok {
+		return reading{}, UnsupportedKindError(alias, kind)
 	}
-}
-
-// resolveSCRAM fills in whichever of username/password is keychain-backed.
-func resolveSCRAM(res Resolution) (Resolution, error) {
-	cred := res.Credential
-	if cred.Username != Sentinel && cred.Password != Sentinel {
-		maybeUpgrade(res.Alias, cred)
-		res.State = StateReady
-		return res, nil
+	cred, err := h.read(alias, entry)
+	if err != nil {
+		return reading{}, err
 	}
-	if cred.Username == Sentinel {
-		v, found := keychain.Get(usernameAccount(res.Alias))
-		if !found || v == "" {
-			res.State = StateUnresolvable
-			return res, UnresolvableError(res.Alias)
-		}
-		cred.Username = v
-	}
-	if cred.Password == Sentinel {
-		v, found := keychain.Get(passwordAccount(res.Alias))
-		if !found || v == "" {
-			res.State = StateUnresolvable
-			return res, UnresolvableError(res.Alias)
-		}
-		cred.Password = v
-	}
-	res.Credential = cred
-	res.State = StateReady
-	return res, nil
-}
-
-// maybeUpgrade migrates a plaintext SCRAM credential (created before keychain
-// support, or stored on a host without one) into the OS keychain the first
-// time it is read on a host with a usable keychain. Any failure leaves the
-// plaintext entry untouched.
-//
-// It is reachable only from resolveSCRAM: running it over another kind would
-// write empty-string secrets into the keychain and stamp sentinels over an
-// entry whose real material is not a username and password.
-func maybeUpgrade(alias string, cred config.Credential) {
-	if !keychain.Available() {
-		return
-	}
-	if storage, err := Store(alias, cred); err == nil && storage == StorageKeychain {
-		out.WriteNotice(os.Stderr,
-			fmt.Sprintf("credential %q upgraded from plaintext config to keychain storage", alias), "")
-	}
+	return reading{
+		Resolution: Resolution{Alias: alias, Kind: kind, Credential: cred},
+		entry:      entry,
+		handler:    h,
+	}, nil
 }
 
 // All returns the raw stored entries (sentinels intact, secrets unresolved).
@@ -167,52 +190,12 @@ func aliasesOf(entries map[string]config.Credential) []string {
 // Store persists a credential, dispatching on its kind. Returns which storage
 // held the secret ("keychain" or "config").
 func Store(alias string, cred config.Credential) (string, error) {
-	switch cred.ResolvedKind() {
-	case config.KindSCRAM:
-		return storeSCRAM(alias, cred)
-	default:
-		return "", UnsupportedKindError(alias, cred.ResolvedKind())
+	kind := cred.ResolvedKind()
+	h, ok := handlerFor(kind)
+	if !ok {
+		return "", UnsupportedKindError(alias, kind)
 	}
-}
-
-// storeSCRAM writes the username/password pair, preferring the OS keychain.
-//
-// The keychain writes happen inside config.Update's critical section rather
-// than before it, because the keychain and config.json have to agree: the
-// sentinel is only written when the secret really landed in the keychain, and
-// the partial-write cleanup only runs when the config entry is about to say
-// "plaintext". Splitting them would let a concurrent writer interleave between
-// the two halves.
-func storeSCRAM(alias string, cred config.Credential) (string, error) {
-	storage := StorageConfig
-	err := config.Update(func(cfg *config.Config) error {
-		if cfg.Credentials == nil {
-			cfg.Credentials = map[string]config.Credential{}
-		}
-
-		if keychain.Available() {
-			userErr := keychain.Set(usernameAccount(alias), cred.Username)
-			passErr := keychain.Set(passwordAccount(alias), cred.Password)
-			if userErr == nil && passErr == nil {
-				// Copy and overwrite rather than construct: every field this
-				// kind does not own has to survive the round trip.
-				stored := cred
-				stored.Username = Sentinel
-				stored.Password = Sentinel
-				cfg.Credentials[alias] = stored
-				storage = StorageKeychain
-				return nil
-			}
-		}
-
-		// Fallback: plaintext in config.json; clean up any partial keychain entries.
-		_ = keychain.Delete(usernameAccount(alias))
-		_ = keychain.Delete(passwordAccount(alias))
-		cfg.Credentials[alias] = cred
-		storage = StorageConfig
-		return nil
-	})
-	return storage, err
+	return h.store(alias, cred)
 }
 
 // ConnectionsUsing lists connection aliases that reference this credential.
@@ -248,60 +231,49 @@ func RequireExists(alias string) error {
 	return nil
 }
 
-// NotFoundError is the shared self-correcting error for a missing credential
-// reference (used by connection add/update validation and connect).
-func NotFoundError(alias string) error {
-	return fmt.Errorf(
-		"Credential %q not found. Available: %s. Run: agent-mongo credential add <alias> --form (or --username <user> --password <pass>)",
-		alias, config.JoinOrNone(Aliases()))
-}
-
-// UnresolvableError covers an entry whose keychain secret has gone missing —
-// distinct from "not found", and fixed by re-adding rather than by picking a
-// different alias.
-func UnresolvableError(alias string) error {
-	return fmt.Errorf(
-		"Credential %q is keychain-backed but its secret could not be read. Re-add it: agent-mongo credential add %s --form",
-		alias, alias)
-}
-
-// UnsupportedKindError names a kind config.json asks for that this build does
-// not implement — most likely a config written by a newer agent-mongo.
-func UnsupportedKindError(alias string, kind config.Kind) error {
-	return fmt.Errorf(
-		"Credential %q has unsupported kind %q. Supported: %s. Upgrade agent-mongo, or re-add the credential.",
-		alias, kind, config.JoinOrNone(config.SupportedKinds()))
-}
-
-// Remove deletes the keychain secrets inside the same critical section that
-// drops the config entry, so the two cannot be separated by a concurrent
+// Remove deletes the kind's keychain secrets inside the same critical section
+// that drops the config entry, so the two cannot be separated by a concurrent
 // writer re-adding the alias between them.
 func Remove(alias string) error {
 	return config.Update(func(cfg *config.Config) error {
-		if _, ok := cfg.Credentials[alias]; !ok {
-			return fmt.Errorf("Unknown credential: %q. Valid: %s", alias, config.JoinOrNone(aliasesOf(cfg.Credentials)))
+		entry, ok := cfg.Credentials[alias]
+		if !ok {
+			return notFoundError(alias, aliasesOf(cfg.Credentials))
 		}
 		if used := connectionsUsing(cfg.Connections, alias); len(used) > 0 {
 			return fmt.Errorf(
 				"Credential %q is used by connections: %s. Remove or update those connections first.",
 				alias, strings.Join(used, ", "))
 		}
-		_ = keychain.Delete(usernameAccount(alias))
-		_ = keychain.Delete(passwordAccount(alias))
+
+		// Ask the kind which accounts it owns rather than naming SCRAM's pair:
+		// a kind whose secret is not a username and password would otherwise
+		// keep live material in the keychain with nothing left to reference it.
+		if h, ok := handlerFor(entry.ResolvedKind()); ok {
+			for _, account := range h.keychainAccounts(alias) {
+				_ = keychain.Delete(account)
+			}
+		} else {
+			// An entry written by a newer build. Removing it is still the
+			// user's call — refusing would make the entry unremovable — but say
+			// plainly that its secret may outlive it.
+			out.WriteNotice(os.Stderr, fmt.Sprintf(
+				"credential %q has unsupported kind %q; any keychain secret it owns was left in place",
+				alias, entry.ResolvedKind()), "")
+		}
+
 		delete(cfg.Credentials, alias)
 		return nil
 	})
 }
 
-// StorageType reports where a credential's secret lives.
-func StorageType(alias string) string {
-	entry, ok := config.Read().Credentials[alias]
+// StorageType reports where an entry's secret lives. It takes the entry rather
+// than an alias so a caller rendering a list computes every column from one
+// read of config.json instead of one read per row.
+func StorageType(entry config.Credential) string {
+	h, ok := handlerFor(entry.ResolvedKind())
 	if !ok {
 		return StorageConfig
 	}
-	if entry.ResolvedKind() == config.KindSCRAM &&
-		entry.Username == Sentinel && entry.Password == Sentinel {
-		return StorageKeychain
-	}
-	return StorageConfig
+	return h.storageType(entry)
 }

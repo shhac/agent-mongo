@@ -1,28 +1,15 @@
 package credential
 
 import (
+	"errors"
 	"strings"
 	"testing"
+
+	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
-
-// writeRaw puts an entry into config.json verbatim, bypassing Store — the only
-// way to stage the shapes a hand-edited or newer-binary config can produce.
-func writeRaw(t *testing.T, alias string, cred config.Credential) {
-	t.Helper()
-	err := config.Update(func(cfg *config.Config) error {
-		if cfg.Credentials == nil {
-			cfg.Credentials = map[string]config.Credential{}
-		}
-		cfg.Credentials[alias] = cred
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("staging credential %q: %v", alias, err)
-	}
-}
 
 func TestResolvedKindDefaultsToSCRAM(t *testing.T) {
 	tests := []struct {
@@ -47,7 +34,7 @@ func TestResolvedKindDefaultsToSCRAM(t *testing.T) {
 // resolving as SCRAM with no migration step.
 func TestResolveTreatsKindlessEntryAsSCRAM(t *testing.T) {
 	testutil.IsolateConfig(t)
-	writeRaw(t, "legacy", config.Credential{Username: "deploy", Password: "s3cret"})
+	testutil.StageCredential(t, "legacy", config.Credential{Username: "deploy", Password: "s3cret"})
 
 	res, err := Resolve("legacy")
 	if err != nil {
@@ -55,9 +42,6 @@ func TestResolveTreatsKindlessEntryAsSCRAM(t *testing.T) {
 	}
 	if res.Kind != config.KindSCRAM {
 		t.Errorf("Kind = %q, want scram", res.Kind)
-	}
-	if !res.Ready() || res.State != StateReady {
-		t.Errorf("State = %q, want ready", res.State)
 	}
 	if res.Credential.Username != "deploy" || res.Credential.Password != "s3cret" {
 		t.Errorf("Credential = %+v, want deploy/s3cret", res.Credential)
@@ -111,14 +95,14 @@ func TestResolveDoesNotUpgradeUnsupportedKind(t *testing.T) {
 	isolateConfig(t)
 	fake := newFakeKeychain()
 	swapKeychain(t, fake)
-	writeRaw(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
 
-	res, err := Resolve("future")
+	_, err := Resolve("future")
 	if err == nil {
 		t.Fatal("Resolve accepted an unsupported kind")
 	}
-	if res.State != StateUnsupported {
-		t.Errorf("State = %q, want unsupported", res.State)
+	if !errors.Is(err, ErrUnsupportedKind) {
+		t.Errorf("error = %v, want it to wrap ErrUnsupportedKind", err)
 	}
 
 	entry := config.Read().Credentials["future"]
@@ -136,31 +120,37 @@ func TestResolveDoesNotUpgradeUnsupportedKind(t *testing.T) {
 func TestResolveStates(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
 		testutil.IsolateConfig(t)
-		res, err := Resolve("nope")
-		if err == nil {
-			t.Fatal("Resolve found a credential that was never stored")
-		}
-		if res.State != StateMissing {
-			t.Errorf("State = %q, want missing", res.State)
+		if _, err := Resolve("nope"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("error = %v, want it to wrap ErrNotFound", err)
 		}
 	})
 
 	t.Run("unresolvable", func(t *testing.T) {
 		isolateConfig(t)
 		swapKeychain(t, newFakeKeychain())
-		writeRaw(t, "ghost", config.Credential{Username: Sentinel, Password: Sentinel})
+		testutil.StageCredential(t, "ghost", config.Credential{Username: Sentinel, Password: Sentinel})
 
-		res, err := Resolve("ghost")
+		_, err := Resolve("ghost")
 		if err == nil {
 			t.Fatal("Resolve succeeded with no keychain entry behind the sentinel")
 		}
-		if res.State != StateUnresolvable {
-			t.Errorf("State = %q, want unresolvable", res.State)
-		}
 		// "Not found" would send the caller looking for a different alias; the
 		// fix is to re-add this one.
-		if !strings.Contains(err.Error(), "credential add ghost") {
-			t.Errorf("error = %q, want the re-add hint", err)
+		if !errors.Is(err, ErrUnresolvable) {
+			t.Errorf("error = %v, want it to wrap ErrUnresolvable", err)
+		}
+		if errors.Is(err, ErrNotFound) {
+			t.Error("an unreadable secret must not present as a missing credential")
+		}
+		var oerr *out.Error
+		if !out.As(err, &oerr) {
+			t.Fatalf("error = %v, want the family error contract", err)
+		}
+		if oerr.FixableBy != out.FixableByHuman {
+			t.Errorf("fixable_by = %q, want human: --form opens an OS dialog", oerr.FixableBy)
+		}
+		if !strings.Contains(oerr.Hint, "credential add ghost") {
+			t.Errorf("hint = %q, want the re-add command", oerr.Hint)
 		}
 	})
 }
@@ -170,7 +160,7 @@ func TestResolveStates(t *testing.T) {
 func TestRequireExistsAcceptsUnresolvableCredential(t *testing.T) {
 	isolateConfig(t)
 	swapKeychain(t, newFakeKeychain())
-	writeRaw(t, "ghost", config.Credential{Username: Sentinel, Password: Sentinel})
+	testutil.StageCredential(t, "ghost", config.Credential{Username: Sentinel, Password: Sentinel})
 
 	if _, err := Resolve("ghost"); err == nil {
 		t.Fatal("precondition: expected 'ghost' to be unresolvable")
@@ -185,9 +175,99 @@ func TestRequireExistsAcceptsUnresolvableCredential(t *testing.T) {
 
 func TestStorageTypeIgnoresSentinelsOnNonSCRAMKinds(t *testing.T) {
 	testutil.IsolateConfig(t)
-	writeRaw(t, "future", config.Credential{Kind: "oidc", Username: Sentinel, Password: Sentinel})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc", Username: Sentinel, Password: Sentinel})
 
-	if got := StorageType("future"); got != StorageConfig {
+	if got := StorageType(All()["future"]); got != StorageConfig {
 		t.Errorf("StorageType = %q, want config: the sentinels are not this kind's secrets", got)
+	}
+}
+
+// Inspect exists so a caller can compare what is stored without rewriting it.
+// The plaintext-to-keychain migration used to fire from the read path, so a
+// caller merely checking a credential mutated config.json and the keychain.
+func TestInspectResolvesWithoutMigrating(t *testing.T) {
+	isolateConfig(t)
+	fake := newFakeKeychain()
+	swapKeychain(t, fake)
+	testutil.StageCredential(t, "legacy", config.Credential{Username: "deploy", Password: "s3cret"})
+
+	res, err := Inspect("legacy")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if res.Credential.Username != "deploy" || res.Credential.Password != "s3cret" {
+		t.Errorf("Credential = %+v, want the stored values resolved", res.Credential)
+	}
+
+	entry := config.Read().Credentials["legacy"]
+	if entry.Username != "deploy" || entry.Password != "s3cret" {
+		t.Errorf("entry = %+v, want it still plaintext: Inspect must not migrate", entry)
+	}
+	if _, ok := fake.Get(usernameAccount("legacy")); ok {
+		t.Error("Inspect wrote the username into the keychain")
+	}
+
+	// The authenticate path still migrates: this is a split of responsibility,
+	// not a removal of the upgrade.
+	if _, err := Resolve("legacy"); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if got := config.Read().Credentials["legacy"].Username; got != Sentinel {
+		t.Errorf("entry username = %q after Resolve, want the sentinel", got)
+	}
+}
+
+// Remove asks the kind which accounts it owns. Naming SCRAM's pair directly
+// would leave a future kind's secret in the keychain with nothing referencing
+// it — the config entry is gone, so the CLI can no longer show or erase it.
+func TestRemoveErasesTheKindsKeychainAccounts(t *testing.T) {
+	isolateConfig(t)
+	fake := newFakeKeychain()
+	swapKeychain(t, fake)
+
+	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "s3cret"}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	for _, account := range scramAccounts("acme") {
+		if _, ok := fake.Get(account); !ok {
+			t.Fatalf("precondition: %q should hold a secret", account)
+		}
+	}
+
+	if err := Remove("acme"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	for _, account := range scramAccounts("acme") {
+		if _, ok := fake.Get(account); ok {
+			t.Errorf("%q survived Remove — a stranded secret", account)
+		}
+	}
+}
+
+// An entry from a newer build must stay removable; refusing would strand it in
+// config.json with no way to delete it from this binary.
+func TestRemoveDropsUnsupportedKindEntry(t *testing.T) {
+	isolateConfig(t)
+	swapKeychain(t, newFakeKeychain())
+	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
+
+	if err := Remove("future"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if _, ok := config.Read().Credentials["future"]; ok {
+		t.Error("entry survived Remove")
+	}
+}
+
+func TestSupportedKindsComesFromTheDispatchTable(t *testing.T) {
+	got := SupportedKinds()
+	if len(got) != len(kinds) {
+		t.Fatalf("SupportedKinds() = %v (%d), want one entry per dispatch-table kind (%d)",
+			got, len(got), len(kinds))
+	}
+	for _, name := range got {
+		if _, ok := kinds[config.Kind(name)]; !ok {
+			t.Errorf("SupportedKinds() advertises %q, which nothing in the table drives", name)
+		}
 	}
 }

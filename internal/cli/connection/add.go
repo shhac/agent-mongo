@@ -71,7 +71,12 @@ func refuseCredentialOverwrite(alias, username, password, stripped string) error
 	// anything else (a different password, an unreadable secret, another kind
 	// entirely) would silently change how the connections referencing it
 	// authenticate.
-	existing, err := credential.Resolve(alias)
+	//
+	// Inspect rather than Resolve: this path may be about to refuse, and
+	// Resolve migrates a plaintext credential into the keychain as a side
+	// effect of reading it. A refused `connection add` must not have rewritten
+	// config.json and the keychain on its way to the refusal.
+	existing, err := credential.Inspect(alias)
 	if err == nil && existing.Kind == config.KindSCRAM &&
 		existing.Credential.Username == username &&
 		existing.Credential.Password == password {

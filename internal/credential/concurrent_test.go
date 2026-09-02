@@ -48,13 +48,13 @@ func TestStoreConcurrentWritersAllSurvive(t *testing.T) {
 		if entries[alias].Password != Sentinel {
 			t.Errorf("%s should hold the keychain sentinel, got %+v", alias, entries[alias])
 		}
-		cred, ok := resolves(alias)
-		if !ok {
-			t.Errorf("%s no longer resolves — its keychain secret is stranded", alias)
+		res, err := Resolve(alias)
+		if err != nil {
+			t.Errorf("%s no longer resolves — its keychain secret is stranded: %v", alias, err)
 			continue
 		}
-		if want := fmt.Sprintf("pw-%02d-zdMk3q", i); cred.Password != want {
-			t.Errorf("%s password = %q, want %q", alias, cred.Password, want)
+		if want := fmt.Sprintf("pw-%02d-zdMk3q", i); res.Credential.Password != want {
+			t.Errorf("%s password = %q, want %q", alias, res.Credential.Password, want)
 		}
 	}
 }

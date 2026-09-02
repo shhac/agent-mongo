@@ -50,11 +50,11 @@ func TestAddExtractsEmbeddedCredentials(t *testing.T) {
 		t.Errorf("connection credential = %q, want matching alias 'staging'", conn.Credential)
 	}
 
-	cred, ok := resolves("staging")
-	if !ok {
-		t.Fatal("credential 'staging' not stored")
+	res, err := credential.Resolve("staging")
+	if err != nil {
+		t.Fatalf("credential 'staging' not stored: %v", err)
 	}
-	if cred.Username != "deploy" || cred.Password != canary {
+	if cred := res.Credential; cred.Username != "deploy" || cred.Password != canary {
 		t.Errorf("credential = %q/%q, want deploy/%s", cred.Username, cred.Password, canary)
 	}
 
@@ -108,9 +108,9 @@ func TestAddRefusesToClobberDifferentCredential(t *testing.T) {
 		t.Errorf("hint = %q, want the credential remove path", hint)
 	}
 
-	cred, ok := resolves("staging")
-	if !ok || cred.Username != "old-user" || cred.Password != "old-pass" {
-		t.Errorf("credential = %+v (ok=%v), want untouched old-user/old-pass", cred, ok)
+	res, err := credential.Resolve("staging")
+	if err != nil || res.Credential.Username != "old-user" || res.Credential.Password != "old-pass" {
+		t.Errorf("credential = %+v (err=%v), want untouched old-user/old-pass", res.Credential, err)
 	}
 	if _, ok := config.GetConnection("staging"); ok {
 		t.Error("connection stored despite refusal")

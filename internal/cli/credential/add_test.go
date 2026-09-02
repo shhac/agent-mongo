@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	credstore "github.com/shhac/agent-mongo/internal/credential"
+
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
@@ -30,11 +32,11 @@ func TestAddPasswordFlagWinsOverStdin(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	cred, ok := resolves("flagwins")
-	if !ok {
-		t.Fatal("credential not stored")
+	res, err := credstore.Resolve("flagwins")
+	if err != nil {
+		t.Fatalf("credential not stored: %v", err)
 	}
-	if cred.Password != "flag-password" {
+	if cred := res.Credential; cred.Password != "flag-password" {
 		t.Errorf("stored password = %q, want flag value 'flag-password' (flag must win over stdin)", cred.Password)
 	}
 }
@@ -47,10 +49,11 @@ func TestAddStdinFillsPassword(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	cred, ok := resolves("fromstdin")
-	if !ok {
-		t.Fatal("credential not stored")
+	res, err := credstore.Resolve("fromstdin")
+	if err != nil {
+		t.Fatalf("credential not stored: %v", err)
 	}
+	cred := res.Credential
 	if cred.Username != "deploy" {
 		t.Errorf("stored username = %q, want 'deploy'", cred.Username)
 	}
@@ -70,7 +73,7 @@ func TestAddErrorsWhenPasswordMissing(t *testing.T) {
 	if !strings.Contains(err.Error(), "password") {
 		t.Errorf("error = %q, want it to mention the missing password", err.Error())
 	}
-	if _, ok := resolves("nopass"); ok {
+	if _, err := credstore.Resolve("nopass"); err == nil {
 		t.Error("credential should not have been stored when password is missing")
 	}
 }
