@@ -86,7 +86,7 @@ func ClearSession(alias string) error {
 	if !ok {
 		return NotFoundError(alias)
 	}
-	if entry.ResolvedKind() != config.KindOIDC {
+	if !IsDeviceFlow(entry) {
 		return NoSessionToClearError(alias)
 	}
 
@@ -96,6 +96,17 @@ func ClearSession(alias string) error {
 		cfg.SetCredential(alias, entry)
 		return nil
 	})
+}
+
+// IsDeviceFlow reports whether a credential keeps a session.
+//
+// Asked in three places — logging out, describing a session, and rendering a
+// row — and previously written at three different strengths, so logging out an
+// OIDC credential on a platform-identity flow reported success and told the
+// person to log in again, for a credential that can never be logged in.
+func IsDeviceFlow(entry config.Credential) bool {
+	return entry.ResolvedKind() == config.KindOIDC &&
+		entry.Flow != nil && entry.Flow.Type == config.FlowDevice
 }
 
 // SessionInfo is what may safely be shown about a stored session: whether there
@@ -113,8 +124,7 @@ type SessionInfo struct {
 // session, an unreadable one, or a kind that keeps none all read as "not logged
 // in", because this answers a listing rather than an authentication.
 func DescribeSession(alias string, entry config.Credential) SessionInfo {
-	if entry.ResolvedKind() != config.KindOIDC || entry.Flow == nil ||
-		entry.Flow.Type != config.FlowDevice {
+	if !IsDeviceFlow(entry) {
 		return SessionInfo{}
 	}
 

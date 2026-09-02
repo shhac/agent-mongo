@@ -111,7 +111,12 @@ func deviceFlowToken(
 	// The token was issued for one deployment and is not shown to another. The
 	// driver binds nothing, and an agent can point a connection wherever it
 	// likes, so this is the check that makes a stored session safe to keep.
-	if host != "" && !strings.EqualFold(session.Host, host) {
+	//
+	// It fails closed. An empty target is a URI whose host could not be read,
+	// and an empty binding is a session that was never tied to a deployment;
+	// neither is a reason to hand over a token, and skipping the check for
+	// either would make an unreadable connection string the way around it.
+	if host == "" || session.Host == "" || !strings.EqualFold(session.Host, host) {
 		return "", SessionHostMismatchError(alias, session.Host, host)
 	}
 

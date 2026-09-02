@@ -55,7 +55,7 @@ func listItem(name string, entry config.Credential) map[string]any {
 			if entry.Flow.Path != "" {
 				item["path"] = entry.Flow.Path
 			}
-			if entry.Flow.Type == config.FlowDevice {
+			if credstore.IsDeviceFlow(entry) {
 				addSessionState(item, name, entry)
 			}
 			if len(entry.Flow.AllowedHosts) > 0 {

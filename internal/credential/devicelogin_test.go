@@ -242,3 +242,53 @@ func TestDeviceFlowCannotWidenItsAllowedHosts(t *testing.T) {
 		t.Error("the device flow reports that it may widen its allowed hosts")
 	}
 }
+
+// "Keeps a session" was asked at three different strengths, so logging out a
+// credential on a platform-identity flow reported success and told the person
+// to log in again — for a credential that can never be logged in.
+func TestClearSessionRejectsFlowsThatKeepNoSession(t *testing.T) {
+	tests := []struct {
+		name string
+		cred config.Credential
+	}{
+		{"scram", config.Credential{Username: "u", Password: "p"}},
+		{"oidc environment flow", testutil.OIDCCredential(config.EnvironmentK8s)},
+		{
+			name: "oidc file flow",
+			cred: config.Credential{
+				Kind: config.KindOIDC,
+				Flow: &config.Flow{Type: config.FlowFile, Path: "/var/run/token"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.IsolateConfig(t)
+			testutil.StageCredential(t, "cred", tt.cred)
+			if err := ClearSession("cred"); !errors.Is(err, ErrNotLoggedIn) {
+				t.Errorf("ClearSession = %v, want it to say there is no session to clear", err)
+			}
+		})
+	}
+}
+
+func TestIsDeviceFlow(t *testing.T) {
+	tests := []struct {
+		name string
+		cred config.Credential
+		want bool
+	}{
+		{"device", config.Credential{Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowDevice}}, true},
+		{"environment", testutil.OIDCCredential(config.EnvironmentK8s), false},
+		{"oidc with no flow", config.Credential{Kind: config.KindOIDC}, false},
+		{"scram", config.Credential{Username: "u", Password: "p"}, false},
+		{"absent kind", config.Credential{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsDeviceFlow(tt.cred); got != tt.want {
+				t.Errorf("IsDeviceFlow() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

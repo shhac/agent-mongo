@@ -293,3 +293,77 @@ func errHint(t *testing.T, err error) string {
 	}
 	return oerr.Hint
 }
+
+// The binding fails closed. A URI whose host cannot be read, or a session that
+// was never tied to a deployment, must not be a way around the check.
+func TestDeviceFlowHostBindingFailsClosed(t *testing.T) {
+	idp := useMockIDP(t, frozen)
+
+	tests := []struct {
+		name        string
+		sessionHost string
+		target      string
+	}{
+		{name: "unreadable target host", sessionHost: testHost, target: ""},
+		{name: "session bound to nothing", sessionHost: "", target: testHost},
+		{name: "neither known", sessionHost: "", target: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := liveSession(idp.Issuer())
+			session.Host = tt.sessionHost
+			if err := getToken(deviceResolution(t, session), tt.target); !errors.Is(err, ErrSessionHostMismatch) {
+				t.Errorf("error = %v, want ErrSessionHostMismatch", err)
+			}
+		})
+	}
+}
+
+// A failed renewal must leave the stored session alone: overwriting it with an
+// empty one would turn a transient provider outage into a forced re-login.
+func TestFailedRefreshLeavesTheStoredSessionIntact(t *testing.T) {
+	testutil.IsolateConfig(t)
+	idp := useMockIDP(t, frozen)
+	idp.TokenError = "temporarily_unavailable"
+
+	session := liveSession(idp.Issuer())
+	session.ExpiresAt = frozen.Add(-time.Minute)
+	cred := deviceCredential(t, session)
+	testutil.StageCredential(t, "corp", cred)
+
+	res := Resolution{Alias: "corp", Kind: config.KindOIDC, Credential: cred}
+	if _, err := res.AccessToken(context.Background(), testHost); err == nil {
+		t.Fatal("a failing refresh reported success")
+	}
+
+	stored, err := Resolve("corp")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	saved, err := decodeSession("corp", stored.Credential.Session)
+	if err != nil {
+		t.Fatalf("decodeSession: %v", err)
+	}
+	if saved.RefreshToken != "refresh-0" {
+		t.Errorf("stored refresh token = %q, want the original left untouched", saved.RefreshToken)
+	}
+}
+
+// A provider that supplies no expiry leaves the server as the authority: the
+// token is used, and a rejection comes back through here as a reauth.
+func TestSessionWithNoExpiryIsUsed(t *testing.T) {
+	idp := useMockIDP(t, frozen)
+	session := liveSession(idp.Issuer())
+	session.ExpiresAt = time.Time{}
+
+	token, err := deviceResolution(t, session).AccessToken(context.Background(), testHost)
+	if err != nil {
+		t.Fatalf("AccessToken: %v", err)
+	}
+	if token != "live-token" {
+		t.Errorf("token = %q, want the stored one used", token)
+	}
+	if idp.Refreshes != 0 {
+		t.Error("a session with no stated expiry was refreshed anyway")
+	}
+}
