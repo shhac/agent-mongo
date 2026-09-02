@@ -17,16 +17,18 @@ import (
 // newCredentialLoginCommand builds `credential login`. It lives here for the
 // reason given in this package's doc comment: it needs the driver.
 func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Command {
-	var connectionAlias string
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "login <credential>",
 		Short: "Log in an OIDC credential against its deployment",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			alias := args[0]
 
-			conn, connAlias, err := connectionForLogin(alias, connectionAlias)
+			// The root's -c/--connection, not a flag of our own: declaring
+			// one here shadowed the persistent flag, and cobra drops a
+			// persistent flag whose name is already taken, so "credential
+			// login corp -c prod" failed with "unknown shorthand flag".
+			conn, connAlias, err := connectionForLogin(alias, globals().Connection)
 			if err != nil {
 				return err
 			}
@@ -53,11 +55,6 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 			return output.PrintRaw(loginReceipt(alias, connAlias, session))
 		},
 	}
-
-	cmd.Flags().StringVar(&connectionAlias, "connection", "",
-		"Connection to log in against (default: the one connection using this credential)")
-	_ = globals
-	return cmd
 }
 
 // loginReceipt is what a completed login reports. Pure, so the shape can be

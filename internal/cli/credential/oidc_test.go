@@ -397,3 +397,29 @@ func TestListReportsSessionState(t *testing.T) {
 		}
 	})
 }
+
+// The expired field is the whole reason the row carries an expiry, and it had
+// only ever been asserted false.
+func TestListReportsAnExpiredSession(t *testing.T) {
+	testutil.IsolateConfig(t)
+	testutil.StageCredential(t, "corp", config.Credential{
+		Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowDevice},
+	})
+	past := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	if err := credstore.SaveSession("corp", credstore.Session{
+		AccessToken: "t", ExpiresAt: past, Host: "c0.abc.mongodb.net",
+	}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	rec := runList(t)[0]
+	if rec["loggedIn"] != true {
+		t.Errorf("loggedIn = %v, want true: there is a session, it is just stale", rec["loggedIn"])
+	}
+	if rec["expired"] != true {
+		t.Errorf("expired = %v, want true", rec["expired"])
+	}
+	if rec["expiresAt"] != past.Format(time.RFC3339) {
+		t.Errorf("expiresAt = %v, want %s", rec["expiresAt"], past.Format(time.RFC3339))
+	}
+}

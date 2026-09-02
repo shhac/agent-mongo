@@ -121,7 +121,7 @@ agent-mongo [-c <alias>] [-f <fmt>] [-F/--full] [-e/--expand <fields>] [-t/--tim
 │   │                    [--client-id <id>] [--allowed-hosts <a>,<b>]
 │   ├── add <name> --oidc --token-file <path> [--allowed-hosts <a>,<b>]
 │   ├── add <name> --oidc --device
-│   ├── login <name> [--connection <alias>]
+│   ├── login <name> [-c <alias>]
 │   ├── logout <name>
 │   ├── remove <name> [--force]
 │   ├── list

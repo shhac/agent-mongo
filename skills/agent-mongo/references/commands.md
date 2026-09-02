@@ -20,7 +20,7 @@ Run `agent-mongo <command> usage` for detailed per-command docs.
 - `agent-mongo credential add <name> --oidc --environment k8s|azure|gcp [--token-resource <aud>] [--client-id <id>]` — use the platform's own identity; nothing stored, no login
 - `agent-mongo credential add <name> --oidc --token-file <absolute path>` — use a JWT another tool wrote to disk; re-read on every authentication
 - `agent-mongo credential add <name> --oidc ... [--allowed-hosts <a>,<b>]` — widen where a token may be sent (default: MongoDB-owned domains and loopback); refused for --device, whose binding is fixed
-- `agent-mongo credential login <name> [--connection <alias>]` — complete a --device login; prints the code and URL as a {"notice": ...} on stderr. --connection only needed when several connections use the credential
+- `agent-mongo credential login <name> [-c <alias>]` — complete a --device login; prints the code and URL as a {"notice": ...} on stderr. -c only needed when several connections use the credential
 - `agent-mongo credential logout <name>` — end the session, keep the credential
 - `agent-mongo credential remove <name> [--force]` — remove credential (--force: remove even if referenced)
 - `agent-mongo credential list` — list credentials (passwords redacted) with kind, storage source and referencing connections; --device credentials also report loggedIn, boundTo and expiresAt

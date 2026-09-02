@@ -78,13 +78,19 @@ func decodeSession(alias, raw string) (Session, error) {
 }
 
 // storeSession writes a session back, preserving the rest of the credential.
+//
+// It goes straight to storeCredential with the OIDC kind's own fields rather
+// than through Store. Store re-dispatches on kind, so a refresh — reached from
+// inside the OIDC kind's own flow — would re-enter the kinds table, and that
+// loop is what made the two tables an initialization cycle. It also re-ran the
+// flow validation, on a recipe that had just been driven successfully.
 func storeSession(alias string, cred config.Credential, session Session) error {
 	encoded, err := encodeSession(session)
 	if err != nil {
 		return err
 	}
 	cred.Session = encoded
-	_, err = Store(alias, cred)
+	_, err = storeCredential(kindHandler{fields: oidcFields}, alias, cred)
 	return err
 }
 
@@ -159,7 +165,6 @@ type SessionInfo struct {
 	LoggedIn  bool
 	ExpiresAt time.Time
 	Host      string
-	Issuer    string
 }
 
 // DescribeSession reports a credential's session state for display.
@@ -188,7 +193,6 @@ func DescribeSession(alias string, entry config.Credential) SessionInfo {
 		LoggedIn:  session.AccessToken != "",
 		ExpiresAt: session.ExpiresAt,
 		Host:      session.Host,
-		Issuer:    session.Issuer,
 	}
 }
 

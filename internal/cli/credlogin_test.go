@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +102,29 @@ func TestConnectionForLogin(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Every other command takes -c; a local --connection flag here shadowed the
+// root's persistent one, and cobra drops a persistent flag whose name is
+// already taken, so "credential login corp -c prod" failed outright.
+func TestLoginAcceptsTheGlobalConnectionFlag(t *testing.T) {
+	testutil.IsolateConfig(t)
+	seed(t, "prod", "corp")
+
+	root := newRootCmd("test")
+	root.SetArgs([]string{"credential", "login", "corp", "-c", "prod"})
+	root.SetOut(io.Discard)
+	root.SetErr(io.Discard)
+
+	// It gets as far as connecting, which is as far as it can go here. What
+	// matters is that flag parsing did not reject -c.
+	err := root.Execute()
+	if err != nil && strings.Contains(err.Error(), "unknown shorthand flag") {
+		t.Fatalf("-c was rejected: %v", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("flag parsing failed: %v", err)
+	}
 }
 
 func TestSessionExpiry(t *testing.T) {

@@ -117,10 +117,10 @@ COMMANDS:
     is bound to the host it was obtained for and is not sent anywhere else,
     and --allowed-hosts is refused for this flow for the same reason.
 
-  credential login <name> [--connection <alias>]
+  credential login <name> [-c <alias>]
     Log in an --oidc --device credential against its deployment. Prints the
     code and verification URL as a {"notice": ...} on stderr; the person can
-    complete it on any device. --connection is needed only when several
+    complete it on any device. -c/--connection is needed only when several
     connections use the credential.
     Excluded from the MCP server, so completing an access window stays a
     deliberate act at a terminal.

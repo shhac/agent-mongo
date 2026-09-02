@@ -42,22 +42,13 @@ type kindHandler struct {
 	checkConnection func(entry config.Credential, uri string) error
 }
 
-// Populated in init rather than as a var initializer: the two tables are
-// mutually reachable — a kind validates through the flows table, and the device
-// flow stores a refreshed session back through Store, which dispatches on kinds
-// — and Go rejects that as an initialization cycle even though nothing runs at
-// startup.
-var kinds map[config.Kind]kindHandler
-
-func init() {
-	kinds = map[config.Kind]kindHandler{
-		config.KindSCRAM: {fields: scramFields},
-		config.KindOIDC: {
-			fields:          oidcFields,
-			validate:        validateOIDC,
-			checkConnection: checkOIDCConnection,
-		},
-	}
+var kinds = map[config.Kind]kindHandler{
+	config.KindSCRAM: {fields: scramFields},
+	config.KindOIDC: {
+		fields:          oidcFields,
+		validate:        validateOIDC,
+		checkConnection: checkOIDCConnection,
+	},
 }
 
 func handlerFor(kind config.Kind) (kindHandler, bool) {
