@@ -1,9 +1,11 @@
 package credential
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
 // The allowlist policy, separated from the check that applies it so the
@@ -92,13 +94,13 @@ func TestOIDCFlowStatesTheInvariant(t *testing.T) {
 
 func TestSupportedFlowTypesComesFromTheValidatorTable(t *testing.T) {
 	got := SupportedFlowTypes()
-	if len(got) != len(flowValidators) {
-		t.Fatalf("SupportedFlowTypes() = %v, want one entry per registered validator (%d)",
-			got, len(flowValidators))
+	if len(got) != len(flows) {
+		t.Fatalf("SupportedFlowTypes() = %v, want one entry per registered flow (%d)",
+			got, len(flows))
 	}
 	for _, name := range got {
-		if _, ok := flowValidators[config.FlowType(name)]; !ok {
-			t.Errorf("SupportedFlowTypes() advertises %q, which no validator drives", name)
+		if _, ok := flows[config.FlowType(name)]; !ok {
+			t.Errorf("SupportedFlowTypes() advertises %q, which nothing in the flows table drives", name)
 		}
 	}
 }
@@ -139,5 +141,14 @@ func TestResolutionCheckConnection(t *testing.T) {
 	unknown := Resolution{Alias: "future", Kind: "x509"}
 	if err := unknown.CheckConnection("mongodb+srv://c0.abc.mongodb.net/app"); err == nil {
 		t.Error("a kind this build cannot drive was accepted")
+	}
+}
+
+func TestCheckConnectionByAliasRejectsAnUnsupportedKind(t *testing.T) {
+	testutil.IsolateConfig(t)
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509"})
+
+	if err := CheckConnection("future", "mongodb+srv://c0.abc.mongodb.net/app"); !errors.Is(err, ErrUnsupportedKind) {
+		t.Errorf("error = %v, want ErrUnsupportedKind", err)
 	}
 }

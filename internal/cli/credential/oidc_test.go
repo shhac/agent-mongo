@@ -266,3 +266,14 @@ func TestListRendersTheTokenPath(t *testing.T) {
 		t.Errorf("path = %v, want the token path", rec["path"])
 	}
 }
+
+// An empty value for a selector flag is an empty path to complain about, not a
+// missing flow: selection is by which flag was given.
+func TestAddOIDCTreatsAnEmptySelectorValueAsGiven(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "eks", "--oidc", "--token-file", "")
+	if !errors.Is(err, credstore.ErrInvalidFlow) {
+		t.Errorf("error = %v, want ErrInvalidFlow about the empty path", err)
+	}
+}

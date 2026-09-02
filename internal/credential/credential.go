@@ -16,6 +16,7 @@
 package credential
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -82,6 +83,30 @@ func (r Resolution) OIDCFlow() (config.Flow, error) {
 		return config.Flow{}, MissingFlowError(r.Alias)
 	}
 	return *r.Credential.Flow, nil
+}
+
+// AccessToken returns the token agent-mongo holds for this credential.
+//
+// It exists so flow execution stays in this package: internal/mongo wraps it in
+// a driver callback and knows nothing about files, keychains or refreshes. The
+// clock and HTTP seams the flows need are here too.
+//
+// Not every flow has one. The platform-identity flows leave the driver to fetch
+// the token itself, and asking those for one is a programming error rather than
+// a runtime condition.
+func (r Resolution) AccessToken(ctx context.Context) (string, error) {
+	flow, err := r.OIDCFlow()
+	if err != nil {
+		return "", err
+	}
+	h, ok := flowHandlerFor(flow.Type)
+	if !ok {
+		return "", UnsupportedFlowError(r.Alias, flow.Type)
+	}
+	if h.token == nil {
+		return "", FlowSuppliesNoTokenError(r.Alias, flow.Type)
+	}
+	return h.token(ctx, r.Alias, flow)
 }
 
 // CheckConnection asks this credential's kind whether it may authenticate

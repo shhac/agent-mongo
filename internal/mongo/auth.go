@@ -48,9 +48,10 @@ func applyAuth(
 // authSource is deliberately left empty — the driver requires it to be empty or
 // "$external" for MONGODB-OIDC and fills it in itself.
 //
-// The switch has one arm today. It exists rather than assuming the environment
-// flow because the later flows fail here: a dead session has to surface as a
-// self-correcting error before the driver swallows it into a callback failure.
+// Only the platform-identity flows are named here. Every other flow is one
+// where agent-mongo holds the token, and this package deliberately knows
+// nothing about how: it asks the resolution, so files, keychains and refreshes
+// stay in internal/credential where the clock and HTTP seams live.
 func oidcCredential(res credential.Resolution) (options.Credential, error) {
 	flow, err := res.OIDCFlow()
 	if err != nil {
@@ -70,27 +71,21 @@ func oidcCredential(res credential.Resolution) (options.Credential, error) {
 			// k8s providers ignore it, and it is empty for them anyway.
 			Username: flow.ClientID,
 		}, nil
-	case config.FlowFile:
-		return options.Credential{
-			AuthMechanism:       oidcMechanism,
-			OIDCMachineCallback: tokenFileCallback(flow.Path),
-		}, nil
 	default:
-		return options.Credential{}, credential.UnsupportedFlowError(res.Alias, flow.Type)
-	}
-}
-
-// tokenFileCallback hands the driver a way to fetch the token rather than the
-// token itself, so the file is read when authentication happens rather than
-// when options are built. A token rotated underneath a running process is then
-// picked up, and a reauth after the server expires a session re-reads it.
-func tokenFileCallback(path string) options.OIDCCallback {
-	return func(context.Context, *options.OIDCArgs) (*options.OIDCCredential, error) {
-		token, err := credential.ReadTokenFile(path)
-		if err != nil {
-			return nil, err
-		}
-		return &options.OIDCCredential{AccessToken: token}, nil
+		// Every other flow is one where agent-mongo holds the token. The
+		// driver is handed a callback rather than the token itself, so it is
+		// fetched when authentication happens: a rotated file is picked up,
+		// and a reauth after the server expires a session re-reads it.
+		return options.Credential{
+			AuthMechanism: oidcMechanism,
+			OIDCMachineCallback: func(ctx context.Context, _ *options.OIDCArgs) (*options.OIDCCredential, error) {
+				token, err := res.AccessToken(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return &options.OIDCCredential{AccessToken: token}, nil
+			},
+		}, nil
 	}
 }
 

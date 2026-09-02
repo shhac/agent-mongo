@@ -152,23 +152,35 @@ func TokenFileError(path string, cause error) error {
 		"Check the file exists and this process can read it; whatever issues the token may need to run again.")
 }
 
-// MalformedTokenError covers a token file whose contents are not a JWT, which
-// is worth catching here because the server's rejection says only that
-// authentication failed.
-func MalformedTokenError(path string) error {
+// MalformedTokenError covers a token that is not a JWT, which is worth
+// catching here because the server's rejection says only that authentication
+// failed. source names where it came from, so the message reads correctly for a
+// file and for a stored session alike.
+func MalformedTokenError(source string) error {
 	return out.New(
-		fmt.Sprintf("The OIDC token file %q does not contain a JWT", path),
+		fmt.Sprintf("The OIDC token in %s is not a JWT", source),
 		out.FixableByHuman,
 	).WithCause(ErrTokenUnreadable).WithHint(
-		"The file should hold a single JSON Web Token: three dot-separated segments, nothing else.")
+		"It should be a single JSON Web Token: three dot-separated segments, nothing else.")
 }
 
 // ExpiredTokenError reports a token that has already expired, so the caller is
 // told to refresh it rather than left to read a generic authentication failure.
-func ExpiredTokenError(path string, expiry time.Time) error {
+func ExpiredTokenError(source string, expiry time.Time) error {
 	return out.New(
-		fmt.Sprintf("The OIDC token in %q expired at %s", path, expiry.UTC().Format(time.RFC3339)),
+		fmt.Sprintf("The OIDC token in %s expired at %s", source, expiry.UTC().Format(time.RFC3339)),
 		out.FixableByHuman,
 	).WithCause(ErrTokenExpired).WithHint(
-		"Whatever issues this token needs to run again to refresh the file.")
+		"Whatever issues this token needs to run again to refresh it.")
+}
+
+// FlowSuppliesNoTokenError covers asking for a token from a flow where the
+// driver fetches it directly. It is a programming error rather than something a
+// user can hit, and says so.
+func FlowSuppliesNoTokenError(alias string, flowType config.FlowType) error {
+	return out.New(
+		fmt.Sprintf("Credential %q uses the %q flow, where the driver obtains the token itself", alias, flowType),
+		out.FixableByAgent,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"This flow needs no token from agent-mongo; nothing should be asking for one.")
 }

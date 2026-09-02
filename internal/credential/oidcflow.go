@@ -1,25 +1,50 @@
 package credential
 
 import (
+	"context"
 	"path/filepath"
 	"sort"
 
 	"github.com/shhac/agent-mongo/internal/config"
 )
 
-// flowValidators registers the flows this build can drive. It is the flow-level
-// twin of the kinds table, and exists for the same reason: SupportedFlowTypes
-// is derived from its keys, so the list an error tells the reader to choose
-// from cannot name a flow nothing implements.
-var flowValidators = map[config.FlowType]func(alias string, flow *config.Flow) error{
-	config.FlowEnvironment: validateEnvironmentFlow,
-	config.FlowFile:        validateFileFlow,
+// flowHandler is what an OIDC flow supplies. One entry in the flows table is
+// the single place a flow is registered — the same reason the kinds table
+// exists, applied one level down, after the flow's policy and its validation
+// briefly lived in two separate maps.
+type flowHandler struct {
+	// validate rejects a recipe this build cannot drive.
+	validate func(alias string, flow *config.Flow) error
+	// mayWidenHosts says whether an operator may replace this flow's
+	// allowed-hosts list. See flowsThatMayWidenHosts' reasoning in oidchosts.go.
+	mayWidenHosts bool
+	// token fetches the access token when agent-mongo is the one holding it.
+	// Nil when the driver obtains the token itself, as it does for the
+	// platform-identity flows.
+	token func(ctx context.Context, alias string, flow config.Flow) (string, error)
+}
+
+var flows = map[config.FlowType]flowHandler{
+	config.FlowEnvironment: {
+		validate:      validateEnvironmentFlow,
+		mayWidenHosts: true,
+	},
+	config.FlowFile: {
+		validate:      validateFileFlow,
+		mayWidenHosts: true,
+		token:         readFileFlowToken,
+	},
+}
+
+func flowHandlerFor(flowType config.FlowType) (flowHandler, bool) {
+	h, ok := flows[flowType]
+	return h, ok
 }
 
 // SupportedFlowTypes lists the flows this build implements.
 func SupportedFlowTypes() []string {
-	names := make([]string, 0, len(flowValidators))
-	for flowType := range flowValidators {
+	names := make([]string, 0, len(flows))
+	for flowType := range flows {
 		names = append(names, string(flowType))
 	}
 	sort.Strings(names)
@@ -32,11 +57,19 @@ func ValidateFlow(alias string, flow *config.Flow) error {
 	if flow == nil {
 		return MissingFlowError(alias)
 	}
-	validate, ok := flowValidators[flow.Type]
+	h, ok := flowHandlerFor(flow.Type)
 	if !ok {
 		return UnsupportedFlowError(alias, flow.Type)
 	}
-	return validate(alias, flow)
+	return h.validate(alias, flow)
+}
+
+// FlowMayWidenHosts reports whether an operator may replace this flow's
+// allowed-hosts list, so the CLI can refuse the flag rather than storing a
+// value the policy will ignore.
+func FlowMayWidenHosts(flowType config.FlowType) bool {
+	h, ok := flowHandlerFor(flowType)
+	return ok && h.mayWidenHosts
 }
 
 // oidcEnvironment is one platform identity provider the driver implements.
@@ -86,4 +119,8 @@ func validateFileFlow(alias string, flow *config.Flow) error {
 		return RelativeTokenPathError(alias, flow.Path)
 	}
 	return nil
+}
+
+func readFileFlowToken(_ context.Context, _ string, flow config.Flow) (string, error) {
+	return ReadTokenFile(flow.Path)
 }

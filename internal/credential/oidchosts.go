@@ -28,21 +28,16 @@ var DefaultAllowedHosts = []string{
 	"::1",
 }
 
-// flowsThatMayWidenHosts are the flows whose allowlist an operator may replace.
+// Whether a flow may replace its allowed-hosts list is recorded on the flow
+// itself (flowHandler.mayWidenHosts), so registering a flow is one entry.
 //
-// The environment flows may: their token is already reachable by anything that
-// can run agent-mongo — a projected Kubernetes token is a file on disk, an
-// Azure or GCP identity is one metadata request away — so the allowlist is
-// defence in depth, and a self-hosted deployment is a real case that needs it.
-// A flow holding a keychain-backed session is the opposite: that material is
-// exactly what an agent cannot otherwise obtain, so its binding is not
-// overridable and it is deliberately absent from this set.
-var flowsThatMayWidenHosts = map[config.FlowType]bool{
-	config.FlowEnvironment: true,
-	// The file flow's token is a file the caller already named, readable by
-	// anything that can run agent-mongo, so the same reasoning applies.
-	config.FlowFile: true,
-}
+// The environment and file flows may: their token is already reachable by
+// anything that can run agent-mongo — a projected Kubernetes token is a file on
+// disk, an Azure or GCP identity is one metadata request away, and the file
+// flow's token is a path the caller named. The allowlist is defence in depth
+// there, and a self-hosted deployment is a real case that needs it. A flow
+// holding a keychain-backed session is the opposite: that material is exactly
+// what an agent cannot otherwise obtain, so its binding is not overridable.
 
 // allowedHostsFor is the allowlist policy, kept separate from the check that
 // applies it so the decision is visible and testable without a config or a URI.
@@ -50,7 +45,7 @@ func allowedHostsFor(flow *config.Flow) []string {
 	if flow == nil || len(flow.AllowedHosts) == 0 {
 		return DefaultAllowedHosts
 	}
-	if !flowsThatMayWidenHosts[flow.Type] {
+	if !FlowMayWidenHosts(flow.Type) {
 		return DefaultAllowedHosts
 	}
 	return flow.AllowedHosts

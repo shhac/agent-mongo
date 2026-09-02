@@ -1,14 +1,18 @@
 package credential
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shhac/agent-mongo/internal/config"
 )
 
 // fixedClock pins the package clock for the duration of a test, so an expiry
@@ -121,4 +125,164 @@ func TestReadTokenFile(t *testing.T) {
 			}
 		}
 	})
+}
+
+func fileFlowResolution(t *testing.T, path string) Resolution {
+	t.Helper()
+	return Resolution{
+		Alias:      "eks",
+		Kind:       config.KindOIDC,
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowFile, Path: path}},
+	}
+}
+
+// AccessToken fetches when asked rather than caching, so a token rotated
+// underneath a running process is picked up and a reauth re-reads it.
+func TestAccessTokenRereadsTheFile(t *testing.T) {
+	path := writeToken(t, "aGVhZGVy.eyJzdWIiOiJhIn0.c2ln")
+	res := fileFlowResolution(t, path)
+
+	first, err := res.AccessToken(context.Background())
+	if err != nil {
+		t.Fatalf("first AccessToken: %v", err)
+	}
+
+	rotated := "aGVhZGVy.eyJzdWIiOiJiIn0.c2ln"
+	if err := os.WriteFile(path, []byte(rotated), 0o600); err != nil {
+		t.Fatalf("rotate token: %v", err)
+	}
+	second, err := res.AccessToken(context.Background())
+	if err != nil {
+		t.Fatalf("second AccessToken: %v", err)
+	}
+
+	if first == second {
+		t.Error("the token was cached; a rotated file would never be picked up")
+	}
+	if second != rotated {
+		t.Errorf("AccessToken = %q, want the rotated token", second)
+	}
+}
+
+func TestAccessTokenSurfacesAnUnreadableToken(t *testing.T) {
+	res := fileFlowResolution(t, filepath.Join(t.TempDir(), "absent"))
+	if _, err := res.AccessToken(context.Background()); !errors.Is(err, ErrTokenUnreadable) {
+		t.Errorf("error = %v, want ErrTokenUnreadable", err)
+	}
+}
+
+// The platform-identity flows leave the driver to fetch the token, so asking
+// them for one is a programming error and says so rather than returning "".
+func TestAccessTokenRefusedForAFlowThatSuppliesNone(t *testing.T) {
+	res := Resolution{
+		Alias:      "ci",
+		Kind:       config.KindOIDC,
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowEnvironment, Environment: "k8s"}},
+	}
+	if _, err := res.AccessToken(context.Background()); err == nil {
+		t.Error("an environment-flow credential yielded a token")
+	}
+}
+
+func TestAccessTokenRejectsANonOIDCCredential(t *testing.T) {
+	res := Resolution{Alias: "acme", Kind: config.KindSCRAM}
+	if _, err := res.AccessToken(context.Background()); err == nil {
+		t.Error("a SCRAM credential yielded an OIDC token")
+	}
+}
+
+// RFC 7519 says exp is a NumericDate, not an integer. Decoding straight to
+// int64 failed on a float or exponent, which silently turned the expiry check
+// off for exactly the issuers it exists to help.
+func TestTokenExpiryAcceptsEveryNumericDateForm(t *testing.T) {
+	frozen := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	expired := frozen.Add(-time.Hour).Unix()
+
+	tests := []struct {
+		name    string
+		payload string
+		expired bool
+	}{
+		{"integer", `{"exp":` + strconv.FormatInt(expired, 10) + `}`, true},
+		{"float", `{"exp":` + strconv.FormatInt(expired, 10) + `.0}`, true},
+		{"exponent", `{"exp":1.7568e9}`, true},
+		{"fractional seconds", `{"exp":` + strconv.FormatInt(expired, 10) + `.75}`, true},
+		{"future integer", `{"exp":` + strconv.FormatInt(frozen.Add(time.Hour).Unix(), 10) + `}`, false},
+		// exp is optional; absent or unusable means the server decides.
+		{"absent", `{"sub":"svc"}`, false},
+		{"zero", `{"exp":0}`, false},
+		{"not a number", `{"exp":true}`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixedClock(t, frozen)
+			enc := base64.RawURLEncoding.EncodeToString
+			raw := enc([]byte(`{"alg":"RS256"}`)) + "." + enc([]byte(tt.payload)) + ".c2ln"
+
+			_, _, err := ParseToken("the token file \"t\"", raw)
+			if tt.expired && !errors.Is(err, ErrTokenExpired) {
+				t.Errorf("ParseToken(%s) error = %v, want ErrTokenExpired", tt.payload, err)
+			}
+			if !tt.expired && err != nil {
+				t.Errorf("ParseToken(%s) error = %v, want nil", tt.payload, err)
+			}
+		})
+	}
+}
+
+// A JWT's segments are unpadded base64url, but a padded payload should still
+// have its expiry read rather than be treated as having none.
+func TestTokenExpiryAcceptsAPaddedPayload(t *testing.T) {
+	frozen := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	fixedClock(t, frozen)
+
+	payload := []byte(`{"exp":` + strconv.FormatInt(frozen.Add(-time.Hour).Unix(), 10) + `}`)
+	raw := "aGVhZGVy." + base64.URLEncoding.EncodeToString(payload) + ".c2ln"
+
+	if _, _, err := ParseToken("the token file \"t\"", raw); !errors.Is(err, ErrTokenExpired) {
+		t.Errorf("error = %v, want ErrTokenExpired for a padded payload", err)
+	}
+}
+
+// ParseToken reports the expiry it read, which is what a refresh decision needs.
+func TestParseTokenReportsTheExpiry(t *testing.T) {
+	frozen := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	fixedClock(t, frozen)
+	want := frozen.Add(time.Hour)
+
+	_, expiry, err := ParseToken("the session for \"corp\"", jwt(t, map[string]any{"exp": want.Unix()}))
+	if err != nil {
+		t.Fatalf("ParseToken: %v", err)
+	}
+	if !expiry.Equal(want) {
+		t.Errorf("expiry = %s, want %s", expiry, want)
+	}
+}
+
+// A payload that is not base64 at all leaves the expiry unknown rather than
+// failing: the claim is optional and the server remains the authority.
+func TestTokenExpiryIgnoresAnUndecodablePayload(t *testing.T) {
+	fixedClock(t, time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC))
+
+	token, expiry, err := ParseToken("the token file \"t\"", "aGVhZGVy.!!!not-base64!!!.c2ln")
+	if err != nil {
+		t.Fatalf("ParseToken: %v", err)
+	}
+	if !expiry.IsZero() {
+		t.Errorf("expiry = %s, want the zero time when it cannot be read", expiry)
+	}
+	if token == "" {
+		t.Error("the token was discarded; only the expiry is unknown")
+	}
+}
+
+func TestAccessTokenRejectsAnUnregisteredFlow(t *testing.T) {
+	res := Resolution{
+		Alias:      "corp",
+		Kind:       config.KindOIDC,
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("device")}},
+	}
+	if _, err := res.AccessToken(context.Background()); !errors.Is(err, ErrInvalidFlow) {
+		t.Errorf("error = %v, want ErrInvalidFlow", err)
+	}
 }

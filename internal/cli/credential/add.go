@@ -48,7 +48,7 @@ func registerAdd(parent *cobra.Command) {
 				return err
 			}
 			if kind == config.KindOIDC {
-				return addOIDC(args[0], flags)
+				return addOIDC(cmd, args[0], flags)
 			}
 			return addSCRAM(cmd, args[0], flags)
 		},
