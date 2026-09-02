@@ -63,14 +63,14 @@ func TestListReportsKind(t *testing.T) {
 // looking for a password that was never set.
 func TestListOmitsSCRAMFieldsForOtherKinds(t *testing.T) {
 	testutil.IsolateConfig(t)
-	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509"})
 
 	records := runList(t)
 	if len(records) != 1 {
 		t.Fatalf("got %d records, want 1", len(records))
 	}
-	if got := records[0]["kind"]; got != "oidc" {
-		t.Errorf("kind = %v, want oidc", got)
+	if got := records[0]["kind"]; got != "x509" {
+		t.Errorf("kind = %v, want x509", got)
 	}
 	if _, ok := records[0]["username"]; ok {
 		t.Error("username rendered for a kind that has none")

@@ -47,6 +47,12 @@ var (
 	ErrUnresolvable = errors.New("credential secret unreadable")
 	// ErrUnsupportedKind: the entry names a kind this build does not implement.
 	ErrUnsupportedKind = errors.New("unsupported credential kind")
+	// ErrInvalidFlow: an OIDC credential's flow recipe is missing or unusable.
+	ErrInvalidFlow = errors.New("invalid credential flow")
+	// ErrInsecureConnection: the endpoint would carry a token in cleartext.
+	ErrInsecureConnection = errors.New("insecure connection for token auth")
+	// ErrHostNotAllowed: the endpoint is outside the credential's allowlist.
+	ErrHostNotAllowed = errors.New("host not allowed for this credential")
 )
 
 // Resolution is a credential resolved to usable auth material. It is only
@@ -76,6 +82,9 @@ type kindHandler struct {
 	keychainAccounts func(alias string) []string
 	// storageType reports where this entry's secret actually lives.
 	storageType func(entry config.Credential) string
+	// checkConnection rejects an endpoint this kind must not be used with.
+	// Nil when the kind places no constraints on where it authenticates.
+	checkConnection func(entry config.Credential, uri string) error
 }
 
 var kinds = map[config.Kind]kindHandler{
@@ -85,6 +94,13 @@ var kinds = map[config.Kind]kindHandler{
 		store:            storeSCRAM,
 		keychainAccounts: scramAccounts,
 		storageType:      scramStorageType,
+	},
+	config.KindOIDC: {
+		read:             readOIDC,
+		store:            storeOIDC,
+		keychainAccounts: oidcAccounts,
+		storageType:      oidcStorageType,
+		checkConnection:  checkOIDCConnection,
 	},
 }
 
@@ -265,6 +281,30 @@ func Remove(alias string) error {
 		delete(cfg.Credentials, alias)
 		return nil
 	})
+}
+
+// CheckConnection asks the credential's kind whether it may be used with this
+// connection string.
+//
+// It runs both when a connection is wired up and again at connect: the first so
+// a mistake is caught while the user is still looking at it, the second because
+// the connection string can change afterwards and the check is a safety
+// boundary, not a convenience. A credential that does not resolve is not this
+// function's problem, so an unreadable secret passes here and fails later with
+// its own error.
+func CheckConnection(alias, uri string) error {
+	entry, ok := config.Read().Credentials[alias]
+	if !ok {
+		return NotFoundError(alias)
+	}
+	h, ok := handlerFor(entry.ResolvedKind())
+	if !ok {
+		return UnsupportedKindError(alias, entry.ResolvedKind())
+	}
+	if h.checkConnection == nil {
+		return nil
+	}
+	return h.checkConnection(entry, uri)
 }
 
 // StorageType reports where an entry's secret lives. It takes the entry rather

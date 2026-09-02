@@ -115,3 +115,44 @@ func unescape(s string) string {
 	}
 	return decoded
 }
+
+// ParseHostFromURI returns the first host in a connection string, without its
+// port, or "" when unparseable. Hand-parsed for the same reason splitUserinfo
+// is: url.Parse cannot cope with a multi-host URI, and the first host is enough
+// to decide whether a deployment is one a credential may authenticate against.
+func ParseHostFromURI(uri string) string {
+	schemeEnd := strings.Index(uri, "://")
+	if schemeEnd < 0 {
+		return ""
+	}
+	authority := uri[schemeEnd+3:]
+	if end := strings.IndexAny(authority, "/?"); end >= 0 {
+		authority = authority[:end]
+	}
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		authority = authority[at+1:]
+	}
+	host, _, _ := strings.Cut(authority, ",")
+
+	// An IPv6 literal is bracketed, and its own colons must not be read as a
+	// port separator.
+	if literal, rest, ok := strings.Cut(strings.TrimPrefix(host, "["), "]"); ok {
+		_ = rest
+		return literal
+	}
+	host, _, _ = strings.Cut(host, ":")
+	return host
+}
+
+// IsTLS reports whether a connection string will use TLS: mongodb+srv:// always
+// does, and any other URI only when it says so explicitly.
+func IsTLS(uri string) bool {
+	if strings.HasPrefix(uri, "mongodb+srv://") {
+		// srv implies TLS unless the URI turns it off.
+		return !isFalse(uriOption(uri, "tls")) && !isFalse(uriOption(uri, "ssl"))
+	}
+	return isTrue(uriOption(uri, "tls")) || isTrue(uriOption(uri, "ssl"))
+}
+
+func isTrue(v string) bool  { return strings.EqualFold(v, "true") }
+func isFalse(v string) bool { return strings.EqualFold(v, "false") }

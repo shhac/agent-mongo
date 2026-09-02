@@ -19,7 +19,7 @@ func TestResolvedKindDefaultsToSCRAM(t *testing.T) {
 	}{
 		{"absent kind is scram", config.Credential{Username: "u", Password: "p"}, config.KindSCRAM},
 		{"explicit scram", config.Credential{Kind: config.KindSCRAM}, config.KindSCRAM},
-		{"unknown kind is preserved, not defaulted", config.Credential{Kind: "oidc"}, "oidc"},
+		{"unknown kind is preserved, not defaulted", config.Credential{Kind: "x509"}, "x509"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestStorePreservesKindThroughKeychainRoundTrip(t *testing.T) {
 func TestStoreRejectsUnsupportedKind(t *testing.T) {
 	testutil.IsolateConfig(t)
 
-	_, err := Store("future", config.Credential{Kind: "oidc"})
+	_, err := Store("future", config.Credential{Kind: "x509"})
 	if err == nil {
 		t.Fatal("Store accepted an unsupported kind")
 	}
@@ -95,7 +95,7 @@ func TestResolveDoesNotUpgradeUnsupportedKind(t *testing.T) {
 	isolateConfig(t)
 	fake := newFakeKeychain()
 	swapKeychain(t, fake)
-	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509"})
 
 	_, err := Resolve("future")
 	if err == nil {
@@ -106,7 +106,7 @@ func TestResolveDoesNotUpgradeUnsupportedKind(t *testing.T) {
 	}
 
 	entry := config.Read().Credentials["future"]
-	if entry.Kind != "oidc" || entry.Username != "" || entry.Password != "" {
+	if entry.Kind != "x509" || entry.Username != "" || entry.Password != "" {
 		t.Errorf("entry = %+v, want it untouched by the upgrade path", entry)
 	}
 	if _, ok := fake.Get(usernameAccount("future")); ok {
@@ -175,7 +175,7 @@ func TestRequireExistsAcceptsUnresolvableCredential(t *testing.T) {
 
 func TestStorageTypeIgnoresSentinelsOnNonSCRAMKinds(t *testing.T) {
 	testutil.IsolateConfig(t)
-	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc", Username: Sentinel, Password: Sentinel})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509", Username: Sentinel, Password: Sentinel})
 
 	if got := StorageType(All()["future"]); got != StorageConfig {
 		t.Errorf("StorageType = %q, want config: the sentinels are not this kind's secrets", got)
@@ -249,7 +249,7 @@ func TestRemoveErasesTheKindsKeychainAccounts(t *testing.T) {
 func TestRemoveDropsUnsupportedKindEntry(t *testing.T) {
 	isolateConfig(t)
 	swapKeychain(t, newFakeKeychain())
-	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509"})
 
 	if err := Remove("future"); err != nil {
 		t.Fatalf("Remove: %v", err)

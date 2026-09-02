@@ -36,13 +36,24 @@ func listItem(name string, entry config.Credential) map[string]any {
 		"storage": credstore.StorageType(entry),
 		"usedBy":  credstore.ConnectionsUsing(name),
 	}
-	if kind == config.KindSCRAM {
+	switch kind {
+	case config.KindSCRAM:
 		username := entry.Username
 		if username == credstore.Sentinel {
 			username = "(keychain)"
 		}
 		item["username"] = username
 		item["password"] = "***"
+	case config.KindOIDC:
+		if entry.Flow != nil {
+			item["flow"] = string(entry.Flow.Type)
+			if entry.Flow.Environment != "" {
+				item["environment"] = entry.Flow.Environment
+			}
+			if len(entry.Flow.AllowedHosts) > 0 {
+				item["allowedHosts"] = entry.Flow.AllowedHosts
+			}
+		}
 	}
 	return item
 }

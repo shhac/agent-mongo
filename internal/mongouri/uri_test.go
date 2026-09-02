@@ -227,3 +227,56 @@ func TestParseAuthMechanismFromURI(t *testing.T) {
 		})
 	}
 }
+
+func TestParseHostFromURI(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{"simple", "mongodb://host.example.net:27017/app", "host.example.net"},
+		{"no port", "mongodb://host.example.net/app", "host.example.net"},
+		{"no path", "mongodb://host.example.net", "host.example.net"},
+		{"srv", "mongodb+srv://c0.abc.mongodb.net/app", "c0.abc.mongodb.net"},
+		{"first of several hosts", "mongodb://a.example.net:27017,b.example.net:27017/app", "a.example.net"},
+		{"userinfo stripped", "mongodb://user:pass@host.example.net:27017/app", "host.example.net"},
+		{"password containing an @", "mongodb://user:p@ss@host.example.net/app", "host.example.net"},
+		{"ipv4", "mongodb://127.0.0.1:27017", "127.0.0.1"},
+		{"ipv6 literal keeps its colons", "mongodb://[::1]:27017/app", "::1"},
+		{"query only", "mongodb://host.example.net?tls=true", "host.example.net"},
+		{"not a connection string", "host.example.net:27017", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseHostFromURI(tt.uri); got != tt.want {
+				t.Errorf("ParseHostFromURI(%q) = %q, want %q", tt.uri, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsTLS(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want bool
+	}{
+		{"srv implies tls", "mongodb+srv://c0.abc.mongodb.net/app", true},
+		{"srv with tls=true", "mongodb+srv://c0.abc.mongodb.net/app?tls=true", true},
+		{"srv turned off explicitly", "mongodb+srv://c0.abc.mongodb.net/app?tls=false", false},
+		{"srv turned off via ssl", "mongodb+srv://c0.abc.mongodb.net/app?ssl=false", false},
+		{"plain is not tls", "mongodb://host:27017/app", false},
+		{"plain with tls=true", "mongodb://host:27017/app?tls=true", true},
+		{"plain with ssl=true", "mongodb://host:27017/app?ssl=true", true},
+		{"case-insensitive key and value", "mongodb://host:27017/app?TLS=TRUE", true},
+		{"tls among other options", "mongodb://host:27017/app?retryWrites=true&tls=true", true},
+		{"tls=false is not tls", "mongodb://host:27017/app?tls=false", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsTLS(tt.uri); got != tt.want {
+				t.Errorf("IsTLS(%q) = %v, want %v", tt.uri, got, tt.want)
+			}
+		})
+	}
+}

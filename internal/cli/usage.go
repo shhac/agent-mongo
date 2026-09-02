@@ -12,6 +12,7 @@ const usageText = `agent-mongo — MongoDB CLI for AI agents (NDJSON output, rea
 COMMANDS:
   connection add|remove|update|list|test|set-default   Manage MongoDB connections
   credential add|remove|list                           Manage stored credentials
+                                                       (--oidc for identity-provider auth)
   config get|set|reset|list-keys                       Persistent settings
 
   database list                                         List all databases
@@ -36,6 +37,8 @@ QUERY FLAG: --echo-query echoes the executed query on an {"@query": ...} line
 
 CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
   Connections can reference stored credentials via --credential for shared auth.
+  Credentials are scram (username/password) or oidc (identity provider, no
+  stored secret; requires TLS and an allowed host).
   A user:pass embedded in an added URI is auto-extracted into a credential
   named after the connection alias; displayed connection strings redact passwords.
 

@@ -117,6 +117,9 @@ COMMANDS:
     Set which connection is used when -c is not specified.
 
 CREDENTIALS: Use "credential add" to store reusable auth. Reference via --credential.
+  An oidc credential additionally requires the connection to use TLS and to
+  point at one of that credential's allowed hosts; both are checked when the
+  connection is wired up and again at connect.
 
 RESOLUTION ORDER: -c flag > AGENT_MONGO_CONNECTION env > config default > error
 

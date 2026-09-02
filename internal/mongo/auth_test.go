@@ -62,7 +62,7 @@ func TestClientOptionsPropagatesUnresolvableCredential(t *testing.T) {
 
 func TestClientOptionsRejectsUnsupportedKind(t *testing.T) {
 	testutil.IsolateConfig(t)
-	testutil.StageCredential(t, "future", config.Credential{Kind: "oidc"})
+	testutil.StageCredential(t, "future", config.Credential{Kind: "x509"})
 
 	_, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017/db",
@@ -178,7 +178,7 @@ func TestClientOptionsKeepsURIAuthMechanism(t *testing.T) {
 func TestApplyAuthRejectsAKindItCannotDrive(t *testing.T) {
 	_, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
 		Alias: "future",
-		Kind:  "oidc",
+		Kind:  "x509",
 	})
 	if err == nil {
 		t.Fatal("applyAuth silently applied no auth for a kind it cannot drive")

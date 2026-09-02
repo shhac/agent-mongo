@@ -55,6 +55,9 @@ func resolveCredential(alias, connectionString, credentialAlias string) (credent
 		if err := credential.RequireExists(credentialAlias); err != nil {
 			return credentialResolution{}, err
 		}
+		if err := credential.CheckConnection(credentialAlias, connectionString); err != nil {
+			return credentialResolution{}, err
+		}
 	}
 	return credentialResolution{ConnectionString: connectionString, Alias: credentialAlias}, nil
 }

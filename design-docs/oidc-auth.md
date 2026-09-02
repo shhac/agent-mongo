@@ -271,7 +271,27 @@ The binding has to be agent-mongo's own:
 - a session records the `issuer` and the connection `host` it was obtained for
 - the callback refuses to present a session to a host that does not match, with
   a `fixable_by` error naming the mismatch
-- `ALLOWED_HOSTS` stays at the driver default and never becomes a flag
+- `ALLOWED_HOSTS` stays at the driver default and is never passed to the driver
+
+**The driver's gap is wider than the human flow.** `validateConnectionAddressWithAllowedHosts`
+runs only inside `doAuthHuman` (`x/mongo/driver/auth/oidc.go:525`), so a *machine*
+flow will hand a platform identity token to whatever host the connection string
+names, with no check at all. agent-mongo therefore applies the allowlist itself,
+to every OIDC flow, at both `connection add`/`update` and connect.
+
+`credential add --oidc` accepts `--allowed-hosts` to widen it. An earlier draft
+of this document said an override must never sit on a flag an agent can pass,
+and that is right for the device flow but wrong for the machine flows, for a
+reason worth writing down: with `environment`, the token is *already* reachable
+by anything that can run agent-mongo — a projected Kubernetes token is a file on
+disk, and Azure and GCP identities are one IMDS request away. An agent that
+could abuse the flag could read the token directly and skip agent-mongo
+entirely. The allowlist is defence in depth there, and a self-hosted Enterprise
+deployment is a real case that needs it widened.
+
+The device flow is the opposite: its refresh token lives in the OS keychain,
+which is exactly the material an agent cannot otherwise obtain. Its session
+binding is therefore recorded at login and is **not** overridable by a flag.
 
 **OIDC requires TLS.** The driver applies no TLS requirement for OIDC, and
 `clientOptions` (`internal/mongo/client.go:68-88`) passes the stored URI through

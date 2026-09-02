@@ -23,6 +23,16 @@ func registerUpdate(parent *cobra.Command) {
 				if err := credential.RequireExists(credentialAlias); err != nil {
 					return err
 				}
+				// Checked against the connection string already stored: this
+				// command changes which credential is used, not where it
+				// connects, so the endpoint the check needs is the saved one.
+				conn, ok := config.GetConnection(alias)
+				if !ok {
+					return config.UnknownConnectionError(alias)
+				}
+				if err := credential.CheckConnection(credentialAlias, conn.ConnectionString); err != nil {
+					return err
+				}
 			}
 
 			var updates config.ConnectionUpdates

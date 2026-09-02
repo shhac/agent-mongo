@@ -73,13 +73,29 @@ COMMANDS:
     Same, fully non-interactive. Prefer --form: flag values land in shell
     history and agent context.
 
+  credential add <name> --oidc --environment k8s|azure|gcp
+    Store an OIDC credential: authentication goes through an identity
+    provider, so no password is stored anywhere. The driver reads the
+    identity the platform already gave this process — a projected Kubernetes
+    service-account token (k8s, which also covers EKS/IRSA, AKS and GKE), an
+    Azure managed identity (azure), or a GCE service account (gcp).
+    --token-resource <audience> is required for azure and gcp.
+    --client-id <id> selects the managed identity on azure.
+    --allowed-hosts <a>,<b> limits where the token may be sent; the default
+    is MongoDB-owned domains and loopback. Widen it only for a self-hosted
+    deployment, and only deliberately: a connection pointing somewhere else
+    would otherwise be handed a live platform token.
+    OIDC connections must use TLS (mongodb+srv:// or tls=true).
+    Requires MongoDB 7.0+ Enterprise or Atlas M10+.
+
   credential remove <name>
     Remove a stored credential. Fails if any connection references it.
     --force removes anyway and clears credential refs from those connections.
 
   credential list
     List all stored credentials (passwords always redacted).
-    Shows which connections reference each credential.
+    Shows each credential's kind, which connections reference it, and for
+    oidc credentials the flow, environment and any allowed-hosts override.
 
 WORKFLOW:
   1. Store credential:   agent-mongo credential add acme --form
@@ -88,8 +104,15 @@ WORKFLOW:
   3. Rotate password:    agent-mongo credential add acme --form
      All connections referencing "acme" pick up the new password automatically.
 
+KINDS:
+  scram  username + password (the default; an absent kind reads as scram)
+  oidc   MONGODB-OIDC via an identity provider; holds a flow, not a secret
+
 RESOLUTION: When a connection references a credential, auth is passed to the MongoDB
-driver. Connections without a credential use the URI as-is (backward compatible).
+driver. A scram credential supplies the username and password, keeping whatever
+authSource and authMechanism the URI asked for. An oidc credential supplies the
+flow and the driver obtains the token itself. Connections without a credential
+use the URI as-is (backward compatible).
 
 KEYCHAIN: Credentials are stored in the OS keychain when available (macOS
   Keychain, Linux Secret Service, Windows Credential Manager); otherwise they

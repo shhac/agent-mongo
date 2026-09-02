@@ -52,6 +52,12 @@ func StoreConnection(alias string, conn Connection) error {
 	})
 }
 
+// UnknownConnectionError is the shared self-correcting error for an alias that
+// names no stored connection.
+func UnknownConnectionError(alias string) error {
+	return unknownConnectionError(alias, Read())
+}
+
 func unknownConnectionError(alias string, cfg Config) error {
 	valid := make([]string, 0, len(cfg.Connections))
 	for a := range cfg.Connections {
