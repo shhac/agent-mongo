@@ -364,3 +364,59 @@ func TestOIDCStorageTypeIsAlwaysConfig(t *testing.T) {
 		t.Errorf("StorageType = %q, want config", got)
 	}
 }
+
+func TestValidateFileFlow(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+		wantIn  string
+	}{
+		{name: "absolute path", path: "/var/run/secrets/token"},
+		{name: "no path", wantErr: true, wantIn: "no token path"},
+		{name: "relative path", path: "token", wantErr: true, wantIn: "relative"},
+		{name: "dot-relative path", path: "./token", wantErr: true, wantIn: "relative"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFlow("eks", &config.Flow{Type: config.FlowFile, Path: tt.path})
+			if tt.wantErr == (err == nil) {
+				t.Fatalf("ValidateFlow() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				return
+			}
+			if !errors.Is(err, ErrInvalidFlow) {
+				t.Errorf("error = %v, want ErrInvalidFlow", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantIn) {
+				t.Errorf("error = %q, want it to mention %q", err, tt.wantIn)
+			}
+		})
+	}
+}
+
+// The path is not read when the credential is stored: a token file that does
+// not exist yet, or has been rotated away, is an authentication-time failure,
+// not a reason to refuse to save the recipe.
+func TestStoreFileFlowDoesNotReadTheToken(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if _, err := Store("eks", config.Credential{
+		Kind: config.KindOIDC,
+		Flow: &config.Flow{Type: config.FlowFile, Path: "/definitely/not/here"},
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	if _, err := Resolve("eks"); err != nil {
+		t.Errorf("Resolve: %v", err)
+	}
+}
+
+func TestFileFlowMayWidenItsAllowedHosts(t *testing.T) {
+	widened := []string{"mongo.corp.example.com"}
+	got := allowedHostsFor(&config.Flow{Type: config.FlowFile, AllowedHosts: widened})
+	if len(got) != 1 || got[0] != widened[0] {
+		t.Errorf("allowedHostsFor = %v, want the override %v", got, widened)
+	}
+}

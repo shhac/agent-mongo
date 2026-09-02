@@ -197,3 +197,72 @@ func TestAddRejectsPasswordWithOIDCFlags(t *testing.T) {
 		t.Error("a credential was written anyway")
 	}
 }
+
+func TestAddOIDCStoresAFileFlow(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if err := runAdd(t, "", "eks", "--oidc", "--token-file", "/var/run/secrets/token"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	flow := credstore.All()["eks"].Flow
+	if flow.Type != config.FlowFile || flow.Path != "/var/run/secrets/token" {
+		t.Errorf("flow = %+v, want the file flow with the given path", flow)
+	}
+}
+
+func TestAddOIDCRejectsTwoFlowSelectors(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "x", "--oidc", "--environment", "k8s", "--token-file", "/var/run/secrets/token")
+	if err == nil {
+		t.Fatal("two flow selectors were accepted")
+	}
+	if !strings.Contains(err.Error(), "different OIDC flows") {
+		t.Errorf("error = %q, want it to say the selectors conflict", err)
+	}
+}
+
+func TestAddOIDCRequiresAFlowSelector(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "x", "--oidc")
+	if err == nil {
+		t.Fatal("--oidc with no flow was accepted")
+	}
+	var oerr *out.Error
+	if !out.As(err, &oerr) {
+		t.Fatalf("error = %v, want the family error contract", err)
+	}
+	// Both ways forward have to be named: an agent cannot guess which applies.
+	if !strings.Contains(oerr.Hint, "--environment") || !strings.Contains(oerr.Hint, "--token-file") {
+		t.Errorf("hint = %q, want it to name both flow selectors", oerr.Hint)
+	}
+}
+
+func TestAddOIDCRejectsARelativeTokenPath(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "eks", "--oidc", "--token-file", "token")
+	if !errors.Is(err, credstore.ErrInvalidFlow) {
+		t.Fatalf("error = %v, want ErrInvalidFlow", err)
+	}
+	if _, ok := credstore.All()["eks"]; ok {
+		t.Error("a credential with a relative path was written anyway")
+	}
+}
+
+func TestListRendersTheTokenPath(t *testing.T) {
+	testutil.IsolateConfig(t)
+	testutil.StageCredential(t, "eks", config.Credential{
+		Kind: config.KindOIDC,
+		Flow: &config.Flow{Type: config.FlowFile, Path: "/var/run/secrets/token"},
+	})
+
+	rec := runList(t)[0]
+	if rec["flow"] != "file" {
+		t.Errorf("flow = %v, want file", rec["flow"])
+	}
+	if rec["path"] != "/var/run/secrets/token" {
+		t.Errorf("path = %v, want the token path", rec["path"])
+	}
+}

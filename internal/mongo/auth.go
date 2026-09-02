@@ -1,6 +1,8 @@
 package mongo
 
 import (
+	"context"
+
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -68,8 +70,27 @@ func oidcCredential(res credential.Resolution) (options.Credential, error) {
 			// k8s providers ignore it, and it is empty for them anyway.
 			Username: flow.ClientID,
 		}, nil
+	case config.FlowFile:
+		return options.Credential{
+			AuthMechanism:       oidcMechanism,
+			OIDCMachineCallback: tokenFileCallback(flow.Path),
+		}, nil
 	default:
 		return options.Credential{}, credential.UnsupportedFlowError(res.Alias, flow.Type)
+	}
+}
+
+// tokenFileCallback hands the driver a way to fetch the token rather than the
+// token itself, so the file is read when authentication happens rather than
+// when options are built. A token rotated underneath a running process is then
+// picked up, and a reauth after the server expires a session re-reads it.
+func tokenFileCallback(path string) options.OIDCCallback {
+	return func(context.Context, *options.OIDCArgs) (*options.OIDCCredential, error) {
+		token, err := credential.ReadTokenFile(path)
+		if err != nil {
+			return nil, err
+		}
+		return &options.OIDCCredential{AccessToken: token}, nil
 	}
 }
 

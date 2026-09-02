@@ -88,6 +88,15 @@ COMMANDS:
     OIDC connections must use TLS (mongodb+srv:// or tls=true).
     Requires MongoDB 7.0+ Enterprise or Atlas M10+.
 
+  credential add <name> --oidc --token-file <absolute path>
+    Store an OIDC credential that reads a token another tool already wrote
+    to disk — az, gcloud, a sidecar, or any platform the driver has no
+    built-in provider for. The file is read each time the credential
+    authenticates, so a rotated token is picked up without re-adding
+    anything, and a token that is missing, malformed or already expired is
+    reported as such rather than as a generic authentication failure.
+    Takes --allowed-hosts like the environment flow.
+
   credential remove <name>
     Remove a stored credential. Fails if any connection references it.
     --force removes anyway and clears credential refs from those connections.
@@ -107,6 +116,7 @@ WORKFLOW:
 KINDS:
   scram  username + password (the default; an absent kind reads as scram)
   oidc   MONGODB-OIDC via an identity provider; holds a flow, not a secret
+         flows: environment (platform identity), file (a token on disk)
 
 RESOLUTION: When a connection references a credential, auth is passed to the MongoDB
 driver. A scram credential supplies the username and password, keeping whatever

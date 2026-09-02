@@ -50,6 +50,9 @@ func listItem(name string, entry config.Credential) map[string]any {
 			if entry.Flow.Environment != "" {
 				item["environment"] = entry.Flow.Environment
 			}
+			if entry.Flow.Path != "" {
+				item["path"] = entry.Flow.Path
+			}
 			if len(entry.Flow.AllowedHosts) > 0 {
 				item["allowedHosts"] = entry.Flow.AllowedHosts
 			}

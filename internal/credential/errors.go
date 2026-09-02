@@ -2,6 +2,7 @@ package credential
 
 import (
 	"fmt"
+	"time"
 
 	out "github.com/shhac/lib-agent-output"
 
@@ -120,4 +121,54 @@ func HostNotAllowedError(host string, allowed []string) error {
 		out.FixableByHuman,
 	).WithCause(ErrHostNotAllowed).WithHint(
 		"Point the connection at an allowed host, or widen the credential deliberately: agent-mongo credential add <alias> --oidc --allowed-hosts <pattern>,<pattern>")
+}
+
+// MissingTokenPathError covers a file flow with no path to read.
+func MissingTokenPathError(alias string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q has no token path: a file flow needs the file holding the token", alias),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"Re-add it with the path: agent-mongo credential add " + alias + " --oidc --token-file /path/to/token")
+}
+
+// RelativeTokenPathError rejects a path that would resolve differently
+// depending on where the command was run from.
+func RelativeTokenPathError(alias, path string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q has a relative token path %q: a saved credential is used from wherever the command runs", alias, path),
+		out.FixableByHuman,
+	).WithCause(ErrInvalidFlow).WithHint(
+		"Re-add it with an absolute path: agent-mongo credential add " + alias + " --oidc --token-file /path/to/token")
+}
+
+// TokenFileError covers a token file that could not be read at authentication
+// time — deleted, rotated away, or unreadable by this process.
+func TokenFileError(path string, cause error) error {
+	return out.New(
+		fmt.Sprintf("Could not read the OIDC token file %q: %v", path, cause),
+		out.FixableByHuman,
+	).WithCause(ErrTokenUnreadable).WithHint(
+		"Check the file exists and this process can read it; whatever issues the token may need to run again.")
+}
+
+// MalformedTokenError covers a token file whose contents are not a JWT, which
+// is worth catching here because the server's rejection says only that
+// authentication failed.
+func MalformedTokenError(path string) error {
+	return out.New(
+		fmt.Sprintf("The OIDC token file %q does not contain a JWT", path),
+		out.FixableByHuman,
+	).WithCause(ErrTokenUnreadable).WithHint(
+		"The file should hold a single JSON Web Token: three dot-separated segments, nothing else.")
+}
+
+// ExpiredTokenError reports a token that has already expired, so the caller is
+// told to refresh it rather than left to read a generic authentication failure.
+func ExpiredTokenError(path string, expiry time.Time) error {
+	return out.New(
+		fmt.Sprintf("The OIDC token in %q expired at %s", path, expiry.UTC().Format(time.RFC3339)),
+		out.FixableByHuman,
+	).WithCause(ErrTokenExpired).WithHint(
+		"Whatever issues this token needs to run again to refresh the file.")
 }

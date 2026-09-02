@@ -53,6 +53,10 @@ var (
 	ErrInsecureConnection = errors.New("insecure connection for token auth")
 	// ErrHostNotAllowed: the endpoint is outside the credential's allowlist.
 	ErrHostNotAllowed = errors.New("host not allowed for this credential")
+	// ErrTokenUnreadable: a token could not be read, or is not a JWT.
+	ErrTokenUnreadable = errors.New("oidc token unreadable")
+	// ErrTokenExpired: a token was read but has already expired.
+	ErrTokenExpired = errors.New("oidc token expired")
 )
 
 // Resolution is a credential resolved to usable auth material. It is only

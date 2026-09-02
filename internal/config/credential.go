@@ -19,6 +19,10 @@ const (
 	// Azure managed identity, a GCE service account. Nothing is stored and
 	// nothing expires from agent-mongo's point of view.
 	FlowEnvironment FlowType = "environment"
+	// FlowFile: a token some other tool already wrote to disk. Covers the
+	// platforms the driver has no built-in provider for, and lets whatever
+	// already holds an identity (az, gcloud, a sidecar) do the issuing.
+	FlowFile FlowType = "file"
 )
 
 // Environment values the driver implements for FlowEnvironment.
@@ -41,6 +45,9 @@ type Flow struct {
 	// ClientID identifies which managed identity to use on azure. Ignored by
 	// the gcp and k8s providers.
 	ClientID string `json:"client_id,omitempty"`
+	// Path is the file holding the token, for FlowFile. Absolute, because a
+	// CLI is run from wherever the caller happens to be.
+	Path string `json:"path,omitempty"`
 	// AllowedHosts limits the hosts this credential's token may be sent to.
 	// Empty means the built-in default; see credential.DefaultAllowedHosts.
 	AllowedHosts []string `json:"allowed_hosts,omitempty"`

@@ -39,6 +39,9 @@ var DefaultAllowedHosts = []string{
 // overridable and it is deliberately absent from this set.
 var flowsThatMayWidenHosts = map[config.FlowType]bool{
 	config.FlowEnvironment: true,
+	// The file flow's token is a file the caller already named, readable by
+	// anything that can run agent-mongo, so the same reasoning applies.
+	config.FlowFile: true,
 }
 
 // allowedHostsFor is the allowlist policy, kept separate from the check that

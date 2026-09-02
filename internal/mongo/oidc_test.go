@@ -1,7 +1,10 @@
 package mongo
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -145,5 +148,88 @@ func TestOIDCCredentialRejectsAMissingFlow(t *testing.T) {
 	})
 	if !errors.Is(err, credential.ErrInvalidFlow) {
 		t.Fatalf("error = %v, want ErrInvalidFlow", err)
+	}
+}
+
+// The file flow hands the driver a callback rather than a token, so the file is
+// read when authentication happens. This exercises the callback the way the
+// driver would.
+func TestFileFlowSuppliesAMachineCallback(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	token := "aGVhZGVy.eyJzdWIiOiJzdmMifQ.c2ln"
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+		t.Fatalf("write token: %v", err)
+	}
+
+	if _, err := credential.Store("eks", config.Credential{
+		Kind: config.KindOIDC,
+		Flow: &config.Flow{Type: config.FlowFile, Path: path},
+	}); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+
+	opts, err := clientOptions(config.Connection{
+		ConnectionString: "mongodb+srv://c0.abc.mongodb.net/app",
+		Credential:       "eks",
+	}, 0)
+	if err != nil {
+		t.Fatalf("clientOptions: %v", err)
+	}
+	if opts.Auth.AuthMechanism != "MONGODB-OIDC" {
+		t.Errorf("AuthMechanism = %q, want MONGODB-OIDC", opts.Auth.AuthMechanism)
+	}
+	if opts.Auth.OIDCMachineCallback == nil {
+		t.Fatal("no machine callback; the driver has no way to obtain a token")
+	}
+	if opts.Auth.OIDCHumanCallback != nil {
+		t.Error("a human callback was set; the driver rejects both being present")
+	}
+
+	cred, err := opts.Auth.OIDCMachineCallback(context.Background(), &options.OIDCArgs{})
+	if err != nil {
+		t.Fatalf("callback: %v", err)
+	}
+	if cred.AccessToken != token {
+		t.Errorf("AccessToken = %q, want the trimmed file contents %q", cred.AccessToken, token)
+	}
+}
+
+// The callback reads at authentication time, so a token rotated underneath the
+// process is picked up rather than cached from when options were built.
+func TestFileFlowCallbackRereadsTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("aGVhZGVy.eyJzdWIiOiJhIn0.c2ln"), 0o600); err != nil {
+		t.Fatalf("write token: %v", err)
+	}
+	callback := tokenFileCallback(path)
+
+	first, err := callback(context.Background(), &options.OIDCArgs{})
+	if err != nil {
+		t.Fatalf("first callback: %v", err)
+	}
+
+	rotated := "aGVhZGVy.eyJzdWIiOiJiIn0.c2ln"
+	if err := os.WriteFile(path, []byte(rotated), 0o600); err != nil {
+		t.Fatalf("rotate token: %v", err)
+	}
+	second, err := callback(context.Background(), &options.OIDCArgs{})
+	if err != nil {
+		t.Fatalf("second callback: %v", err)
+	}
+
+	if first.AccessToken == second.AccessToken {
+		t.Error("the callback cached the token; a rotated file would never be picked up")
+	}
+	if second.AccessToken != rotated {
+		t.Errorf("AccessToken = %q, want the rotated token", second.AccessToken)
+	}
+}
+
+func TestFileFlowCallbackSurfacesAnUnreadableToken(t *testing.T) {
+	callback := tokenFileCallback(filepath.Join(t.TempDir(), "absent"))
+	if _, err := callback(context.Background(), &options.OIDCArgs{}); !errors.Is(err, credential.ErrTokenUnreadable) {
+		t.Errorf("error = %v, want ErrTokenUnreadable", err)
 	}
 }

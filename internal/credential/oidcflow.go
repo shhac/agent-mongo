@@ -1,6 +1,7 @@
 package credential
 
 import (
+	"path/filepath"
 	"sort"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -12,6 +13,7 @@ import (
 // from cannot name a flow nothing implements.
 var flowValidators = map[config.FlowType]func(alias string, flow *config.Flow) error{
 	config.FlowEnvironment: validateEnvironmentFlow,
+	config.FlowFile:        validateFileFlow,
 }
 
 // SupportedFlowTypes lists the flows this build implements.
@@ -70,4 +72,18 @@ func validateEnvironmentFlow(alias string, flow *config.Flow) error {
 		return nil
 	}
 	return UnknownEnvironmentError(alias, flow.Environment)
+}
+
+// validateFileFlow checks the token path is one this process can act on. The
+// file itself is not read here: it is read at authentication time so a rotated
+// token is picked up, and a missing file then is an auth failure with its own
+// error rather than a reason to refuse to store the credential.
+func validateFileFlow(alias string, flow *config.Flow) error {
+	if flow.Path == "" {
+		return MissingTokenPathError(alias)
+	}
+	if !filepath.IsAbs(flow.Path) {
+		return RelativeTokenPathError(alias, flow.Path)
+	}
+	return nil
 }

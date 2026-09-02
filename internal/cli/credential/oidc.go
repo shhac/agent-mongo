@@ -1,22 +1,42 @@
 package credential
 
 import (
+	out "github.com/shhac/lib-agent-output"
+
 	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// flowFromFlags builds the recipe the flags describe. Pure, and the single
-// place the flow-type decision grows: --oidc alone means the environment flow
-// today, and a later flow adds its arm here rather than inside addOIDC.
-func flowFromFlags(flags addFlags) *config.Flow {
-	return &config.Flow{
-		Type:          config.FlowEnvironment,
-		Environment:   flags.environment,
-		TokenResource: flags.tokenResource,
-		ClientID:      flags.clientID,
-		AllowedHosts:  flags.allowedHosts,
+// flowFromFlags builds the recipe the flags describe, and is the single place
+// the flow-type decision lives.
+//
+// The type is chosen by which selector was given rather than by a --flow name,
+// because each flow's selector is also the option it cannot work without.
+func flowFromFlags(flags addFlags) (*config.Flow, error) {
+	flow := &config.Flow{AllowedHosts: flags.allowedHosts}
+
+	switch {
+	case flags.tokenFile != "" && flags.environment != "":
+		return nil, out.New(
+			"--token-file and --environment select different OIDC flows",
+			out.FixableByAgent,
+		).WithHint("Pass one: --environment for a platform identity, --token-file for a token another tool wrote.")
+	case flags.tokenFile != "":
+		flow.Type = config.FlowFile
+		flow.Path = flags.tokenFile
+	case flags.environment != "":
+		flow.Type = config.FlowEnvironment
+		flow.Environment = flags.environment
+		flow.TokenResource = flags.tokenResource
+		flow.ClientID = flags.clientID
+	default:
+		return nil, out.New(
+			"--oidc needs a flow: nothing said how this credential obtains a token",
+			out.FixableByAgent,
+		).WithHint("Add --environment k8s|azure|gcp for a platform identity, or --token-file <path> for a token another tool wrote.")
 	}
+	return flow, nil
 }
 
 // addOIDC stores a flow recipe. Nothing secret is written: the environment
@@ -26,7 +46,10 @@ func flowFromFlags(flags addFlags) *config.Flow {
 // The recipe is validated by Store before anything is written, so there is no
 // pre-check here to keep in step with it.
 func addOIDC(name string, flags addFlags) error {
-	flow := flowFromFlags(flags)
+	flow, err := flowFromFlags(flags)
+	if err != nil {
+		return err
+	}
 	storage, err := credstore.Store(name, config.Credential{
 		Kind: config.KindOIDC,
 		Flow: flow,
@@ -46,6 +69,9 @@ func addOIDC(name string, flags addFlags) error {
 	}
 	if flow.Environment != "" {
 		result["environment"] = flow.Environment
+	}
+	if flow.Path != "" {
+		result["path"] = flow.Path
 	}
 	return output.PrintRaw(result)
 }
