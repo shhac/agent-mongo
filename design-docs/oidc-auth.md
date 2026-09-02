@@ -1,8 +1,9 @@
 # MONGODB-OIDC authentication
 
-**Status: PROPOSED** — no code written. Reviewed once against the driver source
-by an independent pass; the findings are folded in and noted where they changed
-the design.
+**Status: COMPLETE** — all four phases shipped. The design below is what was
+built; where the implementation diverged from the plan, the reason is recorded
+inline. Reviewed against the driver source before building, and after each
+phase by a structural pass.
 
 ## Why
 
@@ -374,47 +375,58 @@ and treats a decode error as an empty config that a later write can overwrite
 
 ## Phasing
 
-Reordered from the first draft, which put the resolution refactor after the
-phases that depend on it.
+All four landed, in this order.
 
-1. **Credential model.** Add `kind`, default it on read, make `Store` preserve
-   the full struct, guard `maybeUpgrade` on kind, replace the `Get` boolean with
-   a resolution result, split `Require`, make `credential list` kind-aware, and
-   branch the `--form` hint. Ships with `scram` as the only kind: no behaviour
-   change, no new commands, and it is the release that makes downgrades safe.
-2. **`flow.type: environment`.** Driver passthrough via `AuthMechanismProperties`,
-   plus the two guards that must exist before any OIDC connection is possible:
-   TLS enforcement, and the issuer/host binding rules. Covers k8s, AKS, EKS/IRSA,
-   GKE, and Azure/GCP VMs.
-3. **`flow.type: file`.** An `OIDCMachineCallback` that reads and trims a JWT
-   from a path. Small once phase 1 exists.
-4. **`flow.type: device`, `credential login`/`logout`.** The device-code client,
-   the keychain session store with issuer/host binding, agent-mongo's own expiry
-   check and refresh, and the `@notice` prompt record. The phase that earns the
-   per-human Atlas audit trail.
+1. **Credential model** (`3636b68`, restructured in `dbf20ab`). `kind` added
+   with `scram` as what an absent kind reads as. Two bugs blocked any second
+   kind: `Store` rebuilt the entry from scratch on the keychain path, dropping
+   every field it did not name, and `Get` classified an entry with an empty
+   username and password as plaintext SCRAM and sent it through the keychain
+   upgrade that overwrites both. `Get` became `Resolve`, and `Require` split so
+   the connection commands stopped demanding a credential authenticate at the
+   moment it is wired up.
+2. **`flow.type: environment`** (`5a8ff7f`). Driver passthrough, plus the two
+   guards the driver does not supply: TLS, and the allowlist the driver applies
+   only to the human flow.
+3. **`flow.type: file`** (`9a78011`). A JWT another tool wrote, re-read at every
+   authentication so a rotated token is picked up.
+4. **`flow.type: device`** (`2750923`), on the protocol client added in
+   `929da37`. Device-code login, a keychain-backed session, agent-mongo-owned
+   refresh, and host binding.
 
-## Testing
+### What the plan got wrong
 
-MongoDB supports OIDC only in Enterprise and Atlas; Community does not implement
-the mechanism. The integration harness runs the community `mongo:8` image
-(`Makefile:17`), so no amount of mocking makes an end-to-end OIDC test possible
-against it.
+- **The `Get` refactor was scheduled after the phases that needed it.** Moved to
+  first; phases 2 and 3 could not have shipped without it.
+- **`Resolution` shipped with a `State` enum alongside its error**, two channels
+  for one fact that had already drifted — a failed resolve handed back a
+  credential still holding the sentinel. No production code read `State`;
+  removed in favour of wrapped sentinel errors.
+- **The allowlist was described as the driver's job.** It is not: the driver
+  checks it for the human flow only, so agent-mongo applies it to every flow.
+- **`--allowed-hosts` was ruled out entirely.** It is right for the flows whose
+  token is already reachable by anything that can run agent-mongo, and wrong for
+  the device flow. Gated on the flow rather than banned.
+- **The `exp` claim was read as an integer.** RFC 7519 says NumericDate, so a
+  provider emitting `1756814400.0` silently disabled the expiry check that is
+  the whole reason for checking before the driver sends the token.
 
-**Tier 1 — `mockidp`, no server. Build this.** An `httptest` IdP serving
-`/.well-known/openid-configuration`, `/device/authorize` and `/token`, with a
-fixed RSA keypair and canned JWTs. It covers nearly all the new code: the
-device-code client and its `authorization_pending` / `slow_down` handling, the
-refresh grant, session persistence and removal, the expiry decision, and the
-callback contract — including that the callback stays non-interactive and
-idempotent when the driver calls it twice (`x/mongo/driver/auth/oidc.go:414-446`).
-The `environment` and `file` flows need less still: assert the
-`options.Credential` that `clientOptions` produces, with no server at all.
+### Bugs found while building
 
-**Tier 2 — an enterprise mongod. Deferred.** `mongodb-enterprise-server`
-configured with `oidcIdentityProviders` pointing at the mockidp. It proves only
-the wiring the driver already tests, and costs a second image plus a licence
-question. Phase 4 is gated instead on one manual end-to-end run against a real
-Atlas M10 before release.
+Each fixed and committed on its own.
+
+- **`authSource` and `authMechanism` were dropped** whenever a connection
+  referenced a stored credential, so a URI that authenticated inline stopped
+  working once `connection add` extracted its userinfo, falling back to `admin`
+  with nothing in the error to say so (`15ab557`). Pre-existing, found by adding
+  the coverage `applyAuth` never had.
+- **The host allowlist only understood a leading `*.`** and was case-sensitive
+  in that arm, so `--allowed-hosts 'db-*.corp.example.com'` matched nothing and
+  a pasted `C0.ABC.MONGODB.NET` was refused (`07b19ce`).
+- **The device flow's host binding failed open** when either host was unknown,
+  making an unreadable connection string the way around it (`4731e85`).
+- **`credential logout` reported success** for an OIDC credential on a
+  platform-identity flow, which can never be logged in (`4731e85`).
 
 ## Non-goals
 
@@ -429,10 +441,19 @@ Atlas M10 before release.
 
 ## Open questions
 
-- Does the driver's Linux qualification
-  (`mongo/client_examples_test.go:464-466`) actually affect the `environment`
-  flows on macOS in practice?
-- Does tier 2 testing ever earn its cost, or does the manual Atlas gate stay the
-  answer permanently?
-- Per-principal sessions behind a remote MCP host: a follow-up design, not a
-  question this doc has to answer.
+Still open after shipping.
+
+- Nothing here has been run against a real MongoDB deployment. OIDC is
+  Enterprise and Atlas only, and the integration harness runs the community
+  image, so `internal/oidc` is tested against a mock provider and the driver
+  mapping is asserted on the options it produces. One manual run against an
+  Atlas M10 with workforce federation is the outstanding gate.
+- MongoDB documents driver OIDC support as Linux-qualified in v2.7.0
+  (`mongo/client_examples_test.go:464-466`). Whether that affects the
+  `environment` flows on macOS in practice is unknown.
+- The `mcp` server re-reads the keychain per tool call rather than holding a
+  session, which is the safe default. Whether a resident server should cache one
+  is a question for whoever measures it hurting.
+- Per-principal sessions behind a remote MCP host, so several people share one
+  server without sharing a session. The seam exists (`lib-agent-mcp`'s
+  `WithIdentityBinding`); the design does not.

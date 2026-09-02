@@ -117,6 +117,12 @@ agent-mongo [-c <alias>] [-f <fmt>] [-F/--full] [-e/--expand <fields>] [-t/--tim
 │   └── usage
 ├── credential
 │   ├── add <name> [--username <user>] [--password <pass>] [--form]
+│   ├── add <name> --oidc --environment k8s|azure|gcp [--token-resource <aud>]
+│   │                    [--client-id <id>] [--allowed-hosts <a>,<b>]
+│   ├── add <name> --oidc --token-file <path> [--allowed-hosts <a>,<b>]
+│   ├── add <name> --oidc --device
+│   ├── login <name> [--connection <alias>]
+│   ├── logout <name>
 │   ├── remove <name> [--force]
 │   ├── list
 │   └── usage
@@ -221,6 +227,62 @@ agent-mongo connection update legacy --clear-credential
 ```
 
 Connections without a `--credential` use the connection string as-is (backward compatible).
+
+## Identity-provider authentication (MONGODB-OIDC)
+
+Rather than handing out database passwords, authenticate against your identity
+provider. A credential of kind `oidc` holds a *flow* — how it obtains a token —
+instead of a secret. Requires MongoDB 7.0+ Enterprise or Atlas M10+, and the
+connection must use TLS.
+
+```bash
+# A person logs in; agent-mongo keeps and renews the session (workforce)
+agent-mongo credential add corp --oidc --device
+agent-mongo connection add prod "mongodb+srv://c0.abc.mongodb.net/app" --credential corp
+agent-mongo credential login corp
+# -> {"notice":"To finish signing in, open https://idp/activate?user_code=WDJB-MJHT ..."}
+
+# The platform's own identity, no login and nothing stored (workload)
+agent-mongo credential add ci --oidc --environment k8s
+agent-mongo credential add azfn --oidc --environment azure --token-resource api://mongodb-atlas
+
+# A token some other tool already wrote to disk
+agent-mongo credential add eks --oidc --token-file /var/run/secrets/token
+
+# End the access window without unpicking the configuration
+agent-mongo credential logout corp
+```
+
+| Flow | Obtains a token by | Needs a person | Stores |
+| --- | --- | --- | --- |
+| `--device` | RFC 8628 device code against the deployment's IdP | at login, then roughly weekly | session in the OS keychain |
+| `--environment` | the driver reads the platform identity (`k8s`, `azure`, `gcp`) | never | nothing |
+| `--token-file` | reads a JWT another tool issued | never | nothing |
+
+After `credential login`, ordinary commands renew the session silently. A person
+is needed again only when the refresh token expires or is revoked — weeks, not
+invocations. `credential list` reports whether a credential is logged in, the
+host its session is bound to, and when it expires; `connection test` adds the
+expiry to its receipt.
+
+Why this is worth the setup for an agent-driven CLI: the token dies in about an
+hour, a new one cannot be minted without a person completing a login, the agent
+inherits exactly the database roles that person's IdP groups map to, and Atlas
+audit logs name a real human instead of a shared service account.
+
+**Where a token may be sent.** An OIDC credential refuses a plaintext
+connection, and only sends a token to a host on its allowlist — by default
+MongoDB-owned domains and loopback. The driver applies its own list to the
+interactive flow alone, so without this a workload flow would hand a live
+platform token to whatever host the connection string named, and agent-mongo
+lets an agent add connections. `--allowed-hosts` widens it for a self-hosted
+deployment. A device session is additionally bound to the deployment it was
+obtained for and is never presented elsewhere; that binding is deliberately not
+overridable, because its refresh token is the one thing in the keychain an agent
+cannot otherwise reach.
+
+`credential login` and `logout` are excluded from the MCP server, so opening an
+access window stays a deliberate act at a terminal.
 
 Credentials are stored in the OS secret store when available (macOS Keychain, Linux Secret Service, Windows Credential Manager) and fall back to plaintext config otherwise. `credential list` shows the `storage` source (`keychain` or `config`) per credential. Set `AGENT_MONGO_NO_KEYCHAIN=1` to force plaintext config storage. Plaintext credentials (from older versions or keychain-less hosts) are upgraded to the keychain automatically the first time they are used on a host with a usable keychain.
 

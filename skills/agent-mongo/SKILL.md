@@ -40,6 +40,29 @@ exists holding different values, the add is refused; follow the error's hint
 with `--credential`). `connection list` always redacts passwords in
 connection strings.
 
+### Identity-provider auth (no password)
+
+Where the deployment uses MONGODB-OIDC, a credential holds a *flow* rather
+than a secret. The connection must use TLS.
+
+```bash
+# The platform's own identity — nothing stored, no login step
+agent-mongo credential add ci --oidc --environment k8s
+
+# A person logs in once; the session is kept and renewed for weeks
+agent-mongo credential add corp --oidc --device
+agent-mongo credential login corp
+```
+
+`credential login` prints the code and URL as a `{"notice": ...}` on stderr —
+relay it to the person; they can complete it on any device. Everything after
+that renews silently.
+
+**When a query fails with `fixable_by: human` naming `credential login`, stop
+and ask the person to run it.** No retry will fix it, and the command cannot
+be completed by an agent: that is the point of the design. `credential list`
+shows `loggedIn` and `expiresAt` so this can be checked before it bites.
+
 ## Exploring a database
 
 ```bash

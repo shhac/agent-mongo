@@ -12,21 +12,26 @@ internal/
 │   ├── root.go                # lib-agent-cli NewRoot + domain flags -c/--expand/--full
 │   ├── usage.go               # top-level LLM reference card
 │   ├── conntest.go            # `connection test` (kept here for the driver dep)
+│   ├── credlogin.go           # `credential login` (same reason)
 │   ├── mcp.go                 # `mcp` server via lib-agent-mcp (registered last)
 │   ├── shared/                # GlobalFlags DTO, WithSession, defaults, RegisterUsage
 │   ├── connection/            # connection add/remove/update/list/set-default
-│   ├── credential/            # credential add (--form dialog)/remove/list
+│   ├── credential/            # credential add (--form dialog)/remove/list/logout
 │   ├── configcmd/             # config get/set/reset/list-keys — keyDef table
 │   ├── database/              # database list/stats
 │   ├── collection/            # collection list/schema/indexes/stats
 │   └── query/                 # find/get/count/sample/distinct/aggregate, one
 │                              #   file each + echo.go (--echo-query)
 ├── config/                    # ~/.config/agent-mongo/config.json I/O + settings
-├── credential/                # __KEYCHAIN__ sentinel store via lib-agent-keyring
+├── credential/                # kinds table (scram, oidc) + __KEYCHAIN__ sentinel
+│                              #   store via lib-agent-keyring; OIDC flows,
+│                              #   allowed-hosts policy, device-flow session
 ├── mongo/                     # client factory, databases, collections, indexes,
 │                              #   schema inference, query, aggregate
-├── mongouri/                  # driver-free connection-string parsing:
-│                              #   db-name extraction, credential split, redaction
+├── mongouri/                  # driver-free connection-string parsing: db name,
+│                              #   credential split, redaction, host, TLS, options
+├── oidc/                      # OpenID Connect client: discovery, RFC 8628
+│                              #   device grant, refresh (+ oidctest mock IdP)
 ├── serialize/                 # BSON → JSON-safe (ObjectId→hex, Date→ISO, …)
 ├── truncation/                # any-string truncation + {field}Length companion
 ├── ejson/                     # Extended JSON parsing for --filter/--sort/--pipeline
@@ -68,7 +73,28 @@ internal/
   default > error listing available aliases. Connections reference named
   credentials; `__KEYCHAIN__` sentinel in config.json means the real values
   live in the OS keychain (service `app.paulie.agent-mongo`, accounts
-  `username:<alias>` / `password:<alias>`).
+  `username:<alias>` / `password:<alias>` / `session:<alias>`).
+- **Credential kinds**: a credential declares a `kind` (absent reads as
+  `scram`). One entry in `internal/credential`'s `kinds` table registers a kind:
+  the fields it keeps in the keychain, its validation, and any endpoint policy.
+  Storage, resolution, migration, removal cleanup and the storage-type report
+  are all generic over the declared fields, so a kind holding no secret gets
+  them for free. `SupportedKinds` derives from the table so it cannot advertise
+  a kind nothing drives.
+- **OIDC flows**: an `oidc` credential holds a flow, not a secret. `flows` in
+  `internal/credential` registers each one (validation, whether its
+  allowed-hosts may be widened, how it obtains a token). `environment` leaves
+  the driver to read a platform identity; `file` reads a JWT another tool wrote;
+  `device` logs a person in and keeps a keychain-backed session that
+  agent-mongo refreshes itself — the driver never hands a per-process CLI its
+  refresh token and never checks expiry.
+- **OIDC safety**: an OIDC connection must use TLS and must point at a host on
+  the credential's allowlist, checked when a connection is wired up and again
+  at connect. The driver applies its own list only to the human flow, so a
+  machine flow would otherwise send a platform token wherever the connection
+  string named. A device session is additionally bound to the host it was
+  obtained for and fails closed when either host is unknown; its binding is not
+  overridable, unlike the other flows' `--allowed-hosts`.
 - **Error messages include valid values** so LLMs can self-correct (e.g.
   `Connection "x" not found. Available: local, staging`).
 - **BSON serialization** (`internal/serialize`): ObjectId → hex, Date →
