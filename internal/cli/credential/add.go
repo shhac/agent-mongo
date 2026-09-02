@@ -24,6 +24,7 @@ type addFlags struct {
 	tokenResource string
 	clientID      string
 	tokenFile     string
+	device        bool
 	allowedHosts  []string
 }
 
@@ -32,7 +33,7 @@ type addFlags struct {
 // to the other kind is a named error rather than silently ignored.
 var (
 	scramFlagNames = []string{"username", "password", "form"}
-	oidcFlagNames  = []string{"environment", "token-resource", "client-id", "token-file", "allowed-hosts"}
+	oidcFlagNames  = []string{"environment", "token-resource", "client-id", "token-file", "device", "allowed-hosts"}
 )
 
 func registerAdd(parent *cobra.Command) {
@@ -67,6 +68,8 @@ func registerAdd(parent *cobra.Command) {
 		"OIDC token audience (required for --environment azure and gcp)")
 	cmd.Flags().StringVar(&flags.clientID, "client-id", "",
 		"OIDC managed-identity client id (azure only)")
+	cmd.Flags().BoolVar(&flags.device, "device", false,
+		"Log in interactively against the deployment's identity provider (workforce federation)")
 	cmd.Flags().StringVar(&flags.tokenFile, "token-file", "",
 		"Absolute path to a file holding an OIDC token issued by something else")
 	cmd.Flags().StringSliceVar(&flags.allowedHosts, "allowed-hosts", nil,

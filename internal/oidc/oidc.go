@@ -282,7 +282,7 @@ func (c *Client) do(req *http.Request, out any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Bounded so a misconfigured endpoint returning something enormous cannot
 	// be read into memory in full.

@@ -40,6 +40,13 @@ var flowSelectors = []flowSelector{
 		flowType: config.FlowFile,
 		build:    func(flags addFlags, flow *config.Flow) { flow.Path = flags.tokenFile },
 	},
+	{
+		// A bare boolean: the device flow stores no issuer or client id,
+		// because the deployment supplies both at login.
+		flag:     "device",
+		flowType: config.FlowDevice,
+		build:    func(addFlags, *config.Flow) {},
+	},
 }
 
 func selectorFlagNames() []string {
@@ -128,6 +135,9 @@ func addOIDC(cmd *cobra.Command, name string, flags addFlags) error {
 		"storage":    storage,
 		"hint": "Use with: agent-mongo connection add <alias> <uri> --credential " + name +
 			" (the URI must use TLS)",
+	}
+	if flow.Type == config.FlowDevice {
+		result["hint"] = "Log in before querying: agent-mongo credential login " + name
 	}
 	if flow.Environment != "" {
 		result["environment"] = flow.Environment

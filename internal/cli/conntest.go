@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
+	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/output"
 	"github.com/shhac/agent-mongo/internal/serialize"
 )
@@ -29,12 +33,36 @@ func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command
 				if err != nil {
 					return err
 				}
-				return output.PrintRaw(map[string]any{
+				receipt := map[string]any{
 					"ok":    true,
 					"alias": ctx.Session.Alias,
 					"ping":  serialize.Document(result),
-				})
+				}
+				// A session can be revoked while still unexpired, so the ping
+				// is the real check; the expiry is added so a person can see
+				// the next login coming rather than being surprised by it.
+				addSessionExpiry(receipt, ctx.Session.Alias)
+				return output.PrintRaw(receipt)
 			})
 		},
 	}
+}
+
+// addSessionExpiry annotates a successful ping with when the credential's
+// session runs out, when it has one.
+func addSessionExpiry(receipt map[string]any, connAlias string) {
+	conn, ok := config.GetConnection(connAlias)
+	if !ok || conn.Credential == "" {
+		return
+	}
+	entry, ok := config.Read().Credentials[conn.Credential]
+	if !ok {
+		return
+	}
+	info := credential.DescribeSession(conn.Credential, entry)
+	if !info.LoggedIn || info.ExpiresAt.IsZero() {
+		return
+	}
+	receipt["credential"] = conn.Credential
+	receipt["sessionExpiresAt"] = info.ExpiresAt.UTC().Format(time.RFC3339)
 }

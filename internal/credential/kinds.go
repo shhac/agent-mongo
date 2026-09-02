@@ -42,12 +42,22 @@ type kindHandler struct {
 	checkConnection func(entry config.Credential, uri string) error
 }
 
-var kinds = map[config.Kind]kindHandler{
-	config.KindSCRAM: {fields: scramFields},
-	config.KindOIDC: {
-		validate:        validateOIDC,
-		checkConnection: checkOIDCConnection,
-	},
+// Populated in init rather than as a var initializer: the two tables are
+// mutually reachable — a kind validates through the flows table, and the device
+// flow stores a refreshed session back through Store, which dispatches on kinds
+// — and Go rejects that as an initialization cycle even though nothing runs at
+// startup.
+var kinds map[config.Kind]kindHandler
+
+func init() {
+	kinds = map[config.Kind]kindHandler{
+		config.KindSCRAM: {fields: scramFields},
+		config.KindOIDC: {
+			fields:          oidcFields,
+			validate:        validateOIDC,
+			checkConnection: checkOIDCConnection,
+		},
+	}
 }
 
 func handlerFor(kind config.Kind) (kindHandler, bool) {
@@ -132,7 +142,14 @@ func writeFieldsToKeychain(
 ) (config.Credential, bool) {
 	stored := cred
 	for _, field := range fields {
-		if err := keychain.Set(field.account(alias), *field.value(&cred)); err != nil {
+		value := *field.value(&cred)
+		if value == "" {
+			// A field this credential does not use: an OIDC credential on a
+			// platform-identity flow holds no session. Nothing to store, and
+			// stamping a sentinel over it would invent one.
+			continue
+		}
+		if err := keychain.Set(field.account(alias), value); err != nil {
 			return config.Credential{}, false
 		}
 		*field.value(&stored) = Sentinel
@@ -148,13 +165,22 @@ func writeFieldsToKeychain(
 // It runs only on the authenticate path, and decides for itself whether there
 // is anything to do, so that path can call it unconditionally.
 func migrateToKeychain(h kindHandler, alias string, entry config.Credential) {
-	if len(h.fields) == 0 || !keychain.Available() {
+	if !keychain.Available() {
 		return
 	}
+	migratable := false
 	for _, field := range h.fields {
-		if *field.value(&entry) == Sentinel {
+		switch *field.value(&entry) {
+		case Sentinel:
 			return // already keychain-backed
+		case "":
+			continue // nothing stored in this field
+		default:
+			migratable = true
 		}
+	}
+	if !migratable {
+		return
 	}
 	if storage, err := storeCredential(h, alias, entry); err == nil && storage == StorageKeychain {
 		out.WriteNotice(os.Stderr,
@@ -176,13 +202,19 @@ func keychainAccountsFor(fields []secretField, alias string) []string {
 // backed by it. A kind that declares none has nothing in the keychain to
 // report, however the entry is otherwise shaped.
 func storageTypeFor(fields []secretField, entry config.Credential) string {
-	if len(fields) == 0 {
-		return StorageConfig
-	}
+	keychainBacked := false
 	for _, field := range fields {
-		if *field.value(&entry) != Sentinel {
+		switch *field.value(&entry) {
+		case "":
+			continue // a field this credential does not use
+		case Sentinel:
+			keychainBacked = true
+		default:
 			return StorageConfig
 		}
+	}
+	if !keychainBacked {
+		return StorageConfig
 	}
 	return StorageKeychain
 }

@@ -48,7 +48,7 @@ func TestValidateFlow(t *testing.T) {
 		},
 		{
 			name:    "unknown flow type",
-			flow:    &config.Flow{Type: "device"},
+			flow:    &config.Flow{Type: "browser"},
 			wantErr: true,
 			wantIn:  "environment",
 		},

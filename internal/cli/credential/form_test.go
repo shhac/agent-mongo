@@ -186,7 +186,7 @@ func TestCredentialAddFormDoesNotLeakSecretToStdout(t *testing.T) {
 	stdout, restore := testutil.CaptureStdout(t)
 
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root)
+	Register(root, nil)
 	root.SetArgs([]string{"credential", "add", "leak-test", "--username", "deploy", "--form"})
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)

@@ -17,7 +17,7 @@ import (
 func runAdd(t *testing.T, stdin string, args ...string) error {
 	t.Helper()
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root)
+	Register(root, nil)
 	root.SetArgs(append([]string{"credential", "add"}, args...))
 	root.SetIn(strings.NewReader(stdin))
 	root.SetOut(io.Discard)

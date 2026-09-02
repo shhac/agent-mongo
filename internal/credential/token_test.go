@@ -142,7 +142,7 @@ func TestAccessTokenRereadsTheFile(t *testing.T) {
 	path := writeToken(t, "aGVhZGVy.eyJzdWIiOiJhIn0.c2ln")
 	res := fileFlowResolution(t, path)
 
-	first, err := res.AccessToken(context.Background())
+	first, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net")
 	if err != nil {
 		t.Fatalf("first AccessToken: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestAccessTokenRereadsTheFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(rotated), 0o600); err != nil {
 		t.Fatalf("rotate token: %v", err)
 	}
-	second, err := res.AccessToken(context.Background())
+	second, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net")
 	if err != nil {
 		t.Fatalf("second AccessToken: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestAccessTokenRereadsTheFile(t *testing.T) {
 
 func TestAccessTokenSurfacesAnUnreadableToken(t *testing.T) {
 	res := fileFlowResolution(t, filepath.Join(t.TempDir(), "absent"))
-	if _, err := res.AccessToken(context.Background()); !errors.Is(err, ErrTokenUnreadable) {
+	if _, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net"); !errors.Is(err, ErrTokenUnreadable) {
 		t.Errorf("error = %v, want ErrTokenUnreadable", err)
 	}
 }
@@ -179,14 +179,14 @@ func TestAccessTokenRefusedForAFlowThatSuppliesNone(t *testing.T) {
 		Kind:       config.KindOIDC,
 		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowEnvironment, Environment: "k8s"}},
 	}
-	if _, err := res.AccessToken(context.Background()); err == nil {
+	if _, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net"); err == nil {
 		t.Error("an environment-flow credential yielded a token")
 	}
 }
 
 func TestAccessTokenRejectsANonOIDCCredential(t *testing.T) {
 	res := Resolution{Alias: "acme", Kind: config.KindSCRAM}
-	if _, err := res.AccessToken(context.Background()); err == nil {
+	if _, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net"); err == nil {
 		t.Error("a SCRAM credential yielded an OIDC token")
 	}
 }
@@ -280,9 +280,9 @@ func TestAccessTokenRejectsAnUnregisteredFlow(t *testing.T) {
 	res := Resolution{
 		Alias:      "corp",
 		Kind:       config.KindOIDC,
-		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("device")}},
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("browser")}},
 	}
-	if _, err := res.AccessToken(context.Background()); !errors.Is(err, ErrInvalidFlow) {
+	if _, err := res.AccessToken(context.Background(), "c0.abc.mongodb.net"); !errors.Is(err, ErrInvalidFlow) {
 		t.Errorf("error = %v, want ErrInvalidFlow", err)
 	}
 }

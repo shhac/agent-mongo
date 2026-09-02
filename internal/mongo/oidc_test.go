@@ -129,10 +129,10 @@ func TestClientOptionsRefusesOIDCToADisallowedHost(t *testing.T) {
 // is still where the error has to appear, because that is where every
 // token-holding flow reports one.
 func TestOIDCCallbackRejectsAFlowItCannotDrive(t *testing.T) {
-	opts, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
+	opts, err := applyAuth(options.Client(), config.Connection{ConnectionString: "mongodb+srv://c0.abc.mongodb.net/app"}, credential.Resolution{
 		Alias:      "corp",
 		Kind:       config.KindOIDC,
-		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("device")}},
+		Credential: config.Credential{Flow: &config.Flow{Type: config.FlowType("browser")}},
 	})
 	if err != nil {
 		t.Fatalf("applyAuth: %v", err)
@@ -145,7 +145,7 @@ func TestOIDCCallbackRejectsAFlowItCannotDrive(t *testing.T) {
 // A Resolution is a plain struct, so a caller can build one with an OIDC kind
 // and no flow. That must be an error, not a nil dereference.
 func TestOIDCCredentialRejectsAMissingFlow(t *testing.T) {
-	_, err := applyAuth(options.Client(), config.Connection{}, credential.Resolution{
+	_, err := applyAuth(options.Client(), config.Connection{ConnectionString: "mongodb+srv://c0.abc.mongodb.net/app"}, credential.Resolution{
 		Alias: "corp",
 		Kind:  config.KindOIDC,
 	})

@@ -58,7 +58,7 @@ func newRootCmd(version string) *cobra.Command {
 	pf.BoolVarP(&g.Full, "full", "F", false, "Show full content for all truncated fields")
 
 	cliconnection.Register(root, newConnectionTestCommand(g.shared))
-	clicredential.Register(root)
+	clicredential.Register(root, newCredentialLoginCommand(g.shared))
 	configcmd.Register(root)
 	clidatabase.Register(root, g.shared)
 	clicollection.Register(root, g.shared)

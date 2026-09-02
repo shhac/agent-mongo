@@ -11,7 +11,7 @@ const usageText = `agent-mongo — MongoDB CLI for AI agents (NDJSON output, rea
 
 COMMANDS:
   connection add|remove|update|list|test|set-default   Manage MongoDB connections
-  credential add|remove|list                           Manage stored credentials
+  credential add|remove|list|login|logout              Manage stored credentials
                                                        (--oidc for identity-provider auth)
   config get|set|reset|list-keys                       Persistent settings
 

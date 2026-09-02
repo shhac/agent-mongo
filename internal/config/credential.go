@@ -23,6 +23,11 @@ const (
 	// platforms the driver has no built-in provider for, and lets whatever
 	// already holds an identity (az, gcloud, a sidecar) do the issuing.
 	FlowFile FlowType = "file"
+	// FlowDevice: a person logs in against the identity provider with RFC 8628
+	// device code, and agent-mongo keeps the resulting session. The only flow
+	// where agent-mongo holds material of its own, and the only one that can
+	// require a human before a query will run.
+	FlowDevice FlowType = "device"
 )
 
 // Environment values the driver implements for FlowEnvironment.
@@ -58,6 +63,10 @@ type Credential struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	Flow     *Flow  `json:"flow,omitempty"`
+	// Session is the stored device-flow session, as JSON. Holds the keychain
+	// sentinel whenever a keychain is available, which is the normal case: it
+	// is the one piece of OIDC material agent-mongo keeps.
+	Session string `json:"session,omitempty"`
 }
 
 // ResolvedKind is the only reader of Kind: it supplies the SCRAM default so no

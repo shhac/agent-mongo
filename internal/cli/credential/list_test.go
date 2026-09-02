@@ -17,7 +17,7 @@ func runList(t *testing.T) []map[string]any {
 	t.Helper()
 	buf, restore := testutil.CaptureStdout(t)
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root)
+	Register(root, nil)
 	root.SetArgs([]string{"credential", "list"})
 	err := root.Execute()
 	restore()

@@ -1,12 +1,14 @@
 package credential
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/oidc"
 )
 
 // The family error contract puts the next command in `hint`, not in the
@@ -183,4 +185,106 @@ func FlowSuppliesNoTokenError(alias string, flowType config.FlowType) error {
 		out.FixableByAgent,
 	).WithCause(ErrInvalidFlow).WithHint(
 		"This flow needs no token from agent-mongo; nothing should be asking for one.")
+}
+
+// The device flow's failures. Each is fixable_by human because each ends at the
+// same place: a person completing a login at a terminal. That classification is
+// the signal an agent branches on — it can stop and say so rather than retrying
+// something no retry will fix.
+
+// NotLoggedInError covers a device credential that has never been logged in.
+func NotLoggedInError(alias string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q has no session: nobody has logged in with it yet", alias),
+		out.FixableByHuman,
+	).WithCause(ErrNotLoggedIn).WithHint(
+		"Log in: agent-mongo credential login " + alias)
+}
+
+// SessionExpiredError covers a session whose refresh token is gone or refused.
+func SessionExpiredError(alias string) error {
+	return out.New(
+		fmt.Sprintf("The session for credential %q has expired and cannot be renewed", alias),
+		out.FixableByHuman,
+	).WithCause(ErrSessionExpired).WithHint(
+		"Log in again: agent-mongo credential login " + alias)
+}
+
+// CorruptSessionError covers a stored session that will not parse — a
+// hand-edited config, or a keychain entry from a different tool.
+func CorruptSessionError(alias string) error {
+	return out.New(
+		fmt.Sprintf("The stored session for credential %q could not be read", alias),
+		out.FixableByHuman,
+	).WithCause(ErrSessionExpired).WithHint(
+		"Log in again to replace it: agent-mongo credential login " + alias)
+}
+
+// SessionHostMismatchError refuses to present a session to a deployment it was
+// not obtained for.
+//
+// The driver binds a token to nothing, and an agent can point a connection
+// wherever it likes, so this is what makes keeping a session safe.
+func SessionHostMismatchError(alias, boundTo, target string) error {
+	return out.New(
+		fmt.Sprintf("The session for credential %q was obtained for %q and will not be sent to %q",
+			alias, boundTo, target),
+		out.FixableByHuman,
+	).WithCause(ErrSessionHostMismatch).WithHint(fmt.Sprintf(
+		"Point the connection at %s, or log in again for this host: agent-mongo credential login %s --connection <alias>",
+		boundTo, alias))
+}
+
+// RefreshFailedError covers a renewal that failed for a reason other than the
+// refresh token being refused — the provider was unreachable, or answered with
+// something unexpected.
+func RefreshFailedError(alias string, cause error) error {
+	return out.New(
+		fmt.Sprintf("Could not renew the session for credential %q: %v", alias, cause),
+		out.FixableByRetry,
+	).WithCause(ErrRefreshFailed).WithHint(
+		"The identity provider could not be reached or refused the renewal. Retry; if it persists, log in again: agent-mongo credential login " + alias)
+}
+
+// LoginFailedError wraps whatever went wrong during an interactive login,
+// classified by whether trying again could help.
+func LoginFailedError(cause error) error {
+	switch {
+	case errors.Is(cause, oidc.ErrDenied):
+		return out.New(
+			"The login was declined at the identity provider",
+			out.FixableByHuman,
+		).WithCause(cause).WithHint("Run the login again and approve the request.")
+	case errors.Is(cause, oidc.ErrCodeExpired):
+		return out.New(
+			"The login code expired before it was entered",
+			out.FixableByRetry,
+		).WithCause(cause).WithHint("Run the login again and enter the code before it expires.")
+	default:
+		return out.New(
+			fmt.Sprintf("The login could not be completed: %v", cause),
+			out.FixableByRetry,
+		).WithCause(cause).WithHint(
+			"The identity provider could not be reached or refused the request. Check network access to it and try again.")
+	}
+}
+
+// NoSessionToClearError covers logging out a credential that keeps no session.
+func NoSessionToClearError(alias string) error {
+	return out.New(
+		fmt.Sprintf("Credential %q keeps no session, so there is nothing to log out of", alias),
+		out.FixableByAgent,
+	).WithCause(ErrNotLoggedIn).WithHint(
+		"Only an oidc credential on the device flow holds a session. See: agent-mongo credential list")
+}
+
+// LoginNotAttemptedError covers a login that connected and authenticated
+// without the callback ever running — a deployment not configured for OIDC, or
+// one that accepted the connection some other way.
+func LoginNotAttemptedError() error {
+	return out.New(
+		"The deployment did not ask for an identity-provider login",
+		out.FixableByHuman,
+	).WithCause(ErrNotLoggedIn).WithHint(
+		"Check the cluster has workforce identity federation configured, and that the connection points at it. OIDC needs MongoDB 7.0+ Enterprise or Atlas M10+.")
 }

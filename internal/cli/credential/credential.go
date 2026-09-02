@@ -11,11 +11,18 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-func Register(root *cobra.Command) {
+// Register builds the credential group. loginCmd is injected because logging in
+// needs a MongoDB connection, and this package is kept free of driver
+// dependencies; it may be nil where that command is not wanted.
+func Register(root *cobra.Command, loginCmd *cobra.Command) {
 	cmd := &cobra.Command{Use: "credential", Short: "Manage stored credentials"}
 	registerAdd(cmd)
 	registerRemove(cmd)
 	registerList(cmd)
+	registerLogout(cmd)
+	if loginCmd != nil {
+		cmd.AddCommand(loginCmd)
+	}
 	shared.RegisterUsage(cmd, "credential", usageText)
 	root.AddCommand(cmd)
 }
@@ -97,6 +104,31 @@ COMMANDS:
     reported as such rather than as a generic authentication failure.
     Takes --allowed-hosts like the environment flow.
 
+  credential add <name> --oidc --device
+    Store an OIDC credential a person logs in to: workforce identity
+    federation. Nothing is stored until someone runs "credential login",
+    which asks the deployment which identity provider guards it, shows a
+    short code to enter, and keeps the resulting session in the OS keychain.
+    Ordinary commands renew that session silently; a person is needed again
+    only when the refresh token expires or is revoked, which is weeks rather
+    than invocations.
+    The issuer is never stored in config: the deployment is the authority on
+    it, so a hand-edited config cannot point the login elsewhere. The session
+    is bound to the host it was obtained for and is not sent anywhere else,
+    and --allowed-hosts is refused for this flow for the same reason.
+
+  credential login <name> [--connection <alias>]
+    Log in an --oidc --device credential against its deployment. Prints the
+    code and verification URL as a {"notice": ...} on stderr; the person can
+    complete it on any device. --connection is needed only when several
+    connections use the credential.
+    Excluded from the MCP server, so completing an access window stays a
+    deliberate act at a terminal.
+
+  credential logout <name>
+    End the session, keep the credential. What to run to stop access without
+    unpicking configuration that connections still reference.
+
   credential remove <name>
     Remove a stored credential. Fails if any connection references it.
     --force removes anyway and clears credential refs from those connections.
@@ -105,6 +137,8 @@ COMMANDS:
     List all stored credentials (passwords always redacted).
     Shows each credential's kind, which connections reference it, and for
     oidc credentials the flow, environment and any allowed-hosts override.
+    A device credential also reports whether it is logged in, the host its
+    session is bound to, and when that session expires. Never any token.
 
 WORKFLOW:
   1. Store credential:   agent-mongo credential add acme --form
@@ -116,7 +150,8 @@ WORKFLOW:
 KINDS:
   scram  username + password (the default; an absent kind reads as scram)
   oidc   MONGODB-OIDC via an identity provider; holds a flow, not a secret
-         flows: environment (platform identity), file (a token on disk)
+         flows: environment (platform identity), file (a token on disk),
+                device (a person logs in; the session is kept and renewed)
 
 RESOLUTION: When a connection references a credential, auth is passed to the MongoDB
 driver. A scram credential supplies the username and password, keeping whatever

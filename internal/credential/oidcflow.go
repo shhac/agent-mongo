@@ -21,7 +21,11 @@ type flowHandler struct {
 	// token fetches the access token when agent-mongo is the one holding it.
 	// Nil when the driver obtains the token itself, as it does for the
 	// platform-identity flows.
-	token func(ctx context.Context, alias string, flow config.Flow) (string, error)
+	//
+	// It takes the whole credential because a flow may keep material outside
+	// the recipe, and the target host because a stored session is bound to the
+	// deployment it was obtained for.
+	token func(ctx context.Context, alias string, cred config.Credential, host string) (string, error)
 }
 
 var flows = map[config.FlowType]flowHandler{
@@ -33,6 +37,13 @@ var flows = map[config.FlowType]flowHandler{
 		validate:      validateFileFlow,
 		mayWidenHosts: true,
 		token:         readFileFlowToken,
+	},
+	config.FlowDevice: {
+		validate: validateDeviceFlow,
+		// Deliberately absent from the widen set: this flow's refresh token
+		// lives in the keychain, which is exactly the material an agent cannot
+		// otherwise obtain, so its binding is not overridable.
+		token: deviceFlowToken,
 	},
 }
 
@@ -121,6 +132,13 @@ func validateFileFlow(alias string, flow *config.Flow) error {
 	return nil
 }
 
-func readFileFlowToken(_ context.Context, _ string, flow config.Flow) (string, error) {
-	return ReadTokenFile(flow.Path)
+func readFileFlowToken(
+	_ context.Context, _ string, cred config.Credential, _ string,
+) (string, error) {
+	return ReadTokenFile(cred.Flow.Path)
 }
+
+// validateDeviceFlow has nothing to check. The flow stores no issuer and no
+// client id on purpose: the server supplies both at login, so a hand-edited
+// config cannot point the login at a different identity provider.
+func validateDeviceFlow(string, *config.Flow) error { return nil }

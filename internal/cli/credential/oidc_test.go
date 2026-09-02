@@ -1,9 +1,14 @@
 package credential
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/spf13/cobra"
 
 	out "github.com/shhac/lib-agent-output"
 
@@ -276,4 +281,119 @@ func TestAddOIDCTreatsAnEmptySelectorValueAsGiven(t *testing.T) {
 	if !errors.Is(err, credstore.ErrInvalidFlow) {
 		t.Errorf("error = %v, want ErrInvalidFlow about the empty path", err)
 	}
+}
+
+func TestAddOIDCStoresADeviceFlow(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	if err := runAdd(t, "", "corp", "--oidc", "--device"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	flow := credstore.All()["corp"].Flow
+	if flow == nil || flow.Type != config.FlowDevice {
+		t.Errorf("flow = %+v, want the device flow", flow)
+	}
+}
+
+// The device flow's host binding is not overridable, so the flag is refused
+// rather than stored and silently ignored.
+func TestAddOIDCRejectsAllowedHostsOnTheDeviceFlow(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	err := runAdd(t, "", "corp", "--oidc", "--device", "--allowed-hosts", "evil.example.com")
+	if err == nil {
+		t.Fatal("--allowed-hosts was accepted for the device flow")
+	}
+	if !strings.Contains(err.Error(), "not overridable") {
+		t.Errorf("error = %q, want it to say the binding is not overridable", err)
+	}
+	if _, ok := credstore.All()["corp"]; ok {
+		t.Error("a credential was written anyway")
+	}
+}
+
+func TestLogoutClearsTheSession(t *testing.T) {
+	testutil.IsolateConfig(t)
+	testutil.StageCredential(t, "corp", config.Credential{
+		Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowDevice},
+	})
+	if err := credstore.SaveSession("corp", credstore.Session{
+		AccessToken: "t", Issuer: "https://idp.example.com", Host: "c0.abc.mongodb.net",
+	}); err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	root := &cobra.Command{Use: "agent-mongo"}
+	Register(root, nil)
+	root.SetArgs([]string{"credential", "logout", "corp"})
+	root.SetOut(io.Discard)
+	buf, restore := testutil.CaptureStdout(t)
+	err := root.Execute()
+	restore()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(buf.String(), `"loggedOut":true`) {
+		t.Errorf("stdout = %q, want it to confirm the logout", buf.String())
+	}
+
+	entry, ok := credstore.All()["corp"]
+	if !ok {
+		t.Fatal("logout removed the credential; it should only end the session")
+	}
+	if entry.Session != "" {
+		t.Errorf("Session = %q, want it cleared", entry.Session)
+	}
+}
+
+func TestListReportsSessionState(t *testing.T) {
+	testutil.IsolateConfig(t)
+	testutil.StageCredential(t, "corp", config.Credential{
+		Kind: config.KindOIDC, Flow: &config.Flow{Type: config.FlowDevice},
+	})
+
+	t.Run("before logging in", func(t *testing.T) {
+		rec := runList(t)[0]
+		if rec["loggedIn"] != false {
+			t.Errorf("loggedIn = %v, want false", rec["loggedIn"])
+		}
+		if _, ok := rec["expiresAt"]; ok {
+			t.Error("an expiry was reported for a credential with no session")
+		}
+	})
+
+	t.Run("after logging in", func(t *testing.T) {
+		expiry := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+		if err := credstore.SaveSession("corp", credstore.Session{
+			AccessToken: "secret-token", RefreshToken: "secret-refresh",
+			ExpiresAt: expiry, Issuer: "https://idp.example.com", Host: "c0.abc.mongodb.net",
+		}); err != nil {
+			t.Fatalf("SaveSession: %v", err)
+		}
+
+		rec := runList(t)[0]
+		if rec["loggedIn"] != true {
+			t.Errorf("loggedIn = %v, want true", rec["loggedIn"])
+		}
+		if rec["boundTo"] != "c0.abc.mongodb.net" {
+			t.Errorf("boundTo = %v, want the host the session was obtained for", rec["boundTo"])
+		}
+		if rec["expiresAt"] != expiry.Format(time.RFC3339) {
+			t.Errorf("expiresAt = %v, want %s", rec["expiresAt"], expiry.Format(time.RFC3339))
+		}
+		if rec["expired"] != false {
+			t.Errorf("expired = %v, want false", rec["expired"])
+		}
+
+		// The row is what a person reads; the tokens must not be in it.
+		encoded, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatalf("marshal record: %v", err)
+		}
+		for _, secret := range []string{"secret-token", "secret-refresh"} {
+			if strings.Contains(string(encoded), secret) {
+				t.Errorf("credential list leaked %q", secret)
+			}
+		}
+	})
 }

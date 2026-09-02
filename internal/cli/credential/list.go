@@ -1,6 +1,8 @@
 package credential
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/config"
@@ -53,10 +55,31 @@ func listItem(name string, entry config.Credential) map[string]any {
 			if entry.Flow.Path != "" {
 				item["path"] = entry.Flow.Path
 			}
+			if entry.Flow.Type == config.FlowDevice {
+				addSessionState(item, name, entry)
+			}
 			if len(entry.Flow.AllowedHosts) > 0 {
 				item["allowedHosts"] = entry.Flow.AllowedHosts
 			}
 		}
 	}
 	return item
+}
+
+// addSessionState reports whether a device credential can be used right now.
+// Never the tokens themselves: this is the row a person reads to decide whether
+// they have to log in again.
+func addSessionState(item map[string]any, name string, entry config.Credential) {
+	info := credstore.DescribeSession(name, entry)
+	item["loggedIn"] = info.LoggedIn
+	if !info.LoggedIn {
+		return
+	}
+	if info.Host != "" {
+		item["boundTo"] = info.Host
+	}
+	if !info.ExpiresAt.IsZero() {
+		item["expiresAt"] = info.ExpiresAt.UTC().Format(time.RFC3339)
+		item["expired"] = info.SessionExpired()
+	}
 }

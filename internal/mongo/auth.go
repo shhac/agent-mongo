@@ -29,7 +29,7 @@ func applyAuth(
 	case config.KindSCRAM:
 		return clientOpts.SetAuth(scramCredential(clientOpts, conn, res)), nil
 	case config.KindOIDC:
-		cred, err := oidcCredential(res)
+		cred, err := oidcCredential(conn, res)
 		if err != nil {
 			return nil, err
 		}
@@ -52,7 +52,7 @@ func applyAuth(
 // where agent-mongo holds the token, and this package deliberately knows
 // nothing about how: it asks the resolution, so files, keychains and refreshes
 // stay in internal/credential where the clock and HTTP seams live.
-func oidcCredential(res credential.Resolution) (options.Credential, error) {
+func oidcCredential(conn config.Connection, res credential.Resolution) (options.Credential, error) {
 	flow, err := res.OIDCFlow()
 	if err != nil {
 		return options.Credential{}, err
@@ -79,7 +79,7 @@ func oidcCredential(res credential.Resolution) (options.Credential, error) {
 		return options.Credential{
 			AuthMechanism: oidcMechanism,
 			OIDCMachineCallback: func(ctx context.Context, _ *options.OIDCArgs) (*options.OIDCCredential, error) {
-				token, err := res.AccessToken(ctx)
+				token, err := res.AccessToken(ctx, mongouri.ParseHostFromURI(conn.ConnectionString))
 				if err != nil {
 					return nil, err
 				}

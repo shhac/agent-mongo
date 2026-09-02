@@ -58,6 +58,14 @@ var (
 	ErrTokenUnreadable = errors.New("oidc token unreadable")
 	// ErrTokenExpired: a token was read but has already expired.
 	ErrTokenExpired = errors.New("oidc token expired")
+	// ErrNotLoggedIn: a device credential has no session yet.
+	ErrNotLoggedIn = errors.New("no session for this credential")
+	// ErrSessionExpired: the session cannot be renewed without a person.
+	ErrSessionExpired = errors.New("session expired")
+	// ErrSessionHostMismatch: the session belongs to a different deployment.
+	ErrSessionHostMismatch = errors.New("session bound to a different host")
+	// ErrRefreshFailed: renewal failed for a reason a retry might fix.
+	ErrRefreshFailed = errors.New("session refresh failed")
 )
 
 // Resolution is a credential resolved to usable auth material. It is only
@@ -94,7 +102,10 @@ func (r Resolution) OIDCFlow() (config.Flow, error) {
 // Not every flow has one. The platform-identity flows leave the driver to fetch
 // the token itself, and asking those for one is a programming error rather than
 // a runtime condition.
-func (r Resolution) AccessToken(ctx context.Context) (string, error) {
+//
+// host is the deployment the token is about to be sent to, so a flow holding a
+// stored session can refuse to present it anywhere else.
+func (r Resolution) AccessToken(ctx context.Context, host string) (string, error) {
 	flow, err := r.OIDCFlow()
 	if err != nil {
 		return "", err
@@ -106,7 +117,7 @@ func (r Resolution) AccessToken(ctx context.Context) (string, error) {
 	if h.token == nil {
 		return "", FlowSuppliesNoTokenError(r.Alias, flow.Type)
 	}
-	return h.token(ctx, r.Alias, flow)
+	return h.token(ctx, r.Alias, r.Credential, host)
 }
 
 // CheckConnection asks this credential's kind whether it may authenticate
