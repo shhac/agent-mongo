@@ -134,13 +134,29 @@ their own database — never point them at real data.
 
 ## Release
 
+Two tag series, and they are not the same thing.
+
 ```bash
+# Binary release: cross-build, GitHub Release, Homebrew formula, and skill sync
 git tag vX.Y.Z && git push origin main vX.Y.Z
+
+# Skill-only republish: no binary release
+git tag "skill-v$(git tag --list 'v*' --sort=-v:refname | head -1 | tr -d v)-$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-The tag push triggers `.github/workflows/release.yml` (shared
-`shhac/homebrew-tap` go-release workflow): cross-builds, GitHub Release, and
-Homebrew formula update. No version file — `main.version` comes from ldflags.
+`v*` triggers `.github/workflows/release.yml` (shared `shhac/homebrew-tap`
+go-release workflow) *and* `publish-skill.yml`. `skill-v*` triggers only
+`publish-skill.yml` — it does not start with `v`, so the release workflow
+ignores it. No version file — `main.version` comes from ldflags.
+
+A skill tag names the binary version it was cut against plus a UTC timestamp
+(`skill-v0.13.0-20260903T091622Z`). It is not a version of its own: the skill
+has none, and the older `skill-vX.Y.Z` form read as though the skill were a
+release ahead of the binary when the numbers were unrelated.
+
+**Finding the current binary version:** `git tag --list 'v*' --sort=-v:refname |
+head -1`. Not `git describe --tags --abbrev=0`, which returns whichever tag is
+nearest in history regardless of series and will hand back a `skill-v*` one.
 
 ## Keeping docs in sync
 

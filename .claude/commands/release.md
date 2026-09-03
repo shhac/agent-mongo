@@ -1,6 +1,6 @@
 ---
 description: Release via tag push — CI builds, publishes, and bumps the Homebrew formula
-argument-hint: <patch|minor|major>
+argument-hint: <patch|minor|major|skill>
 ---
 
 # Release
@@ -15,7 +15,9 @@ formula bump.**
 
 ## Steps
 
-1. `$ARGUMENTS` must be `patch`, `minor`, or `major` — else stop and ask.
+1. `$ARGUMENTS` must be `patch`, `minor`, `major`, or `skill` — else stop and
+   ask. `skill` republishes the skill without releasing a binary; see
+   **Skill-only publish** below and skip the rest of these steps.
 2. Pre-flight (CI re-runs tests on the tag, but check locally first):
    - Clean tree (`git status --short`), on `main`, up to date with `origin/main`.
    - Tests, vet, and lint pass (e.g. `make test` / `go test ./...`, `go vet ./...`,
@@ -23,9 +25,19 @@ formula bump.**
      (`-ldflags -X main.version=…`) — there is no version file to edit.
    - Optionally run `make test-integration` (needs docker) for release-critical
      changes to query/mongo code.
-3. Compute the new version by bumping the latest tag
-   (`git describe --tags --abbrev=0`): patch → x.y.(z+1), minor → x.(y+1).0,
-   major → (x+1).0.0.
+3. Compute the new version by bumping the latest **release** tag:
+
+   ```bash
+   latest=$(git tag --list 'v*' --sort=-v:refname | head -1)
+   ```
+
+   patch → x.y.(z+1), minor → x.(y+1).0, major → (x+1).0.0.
+
+   Do **not** use `git describe --tags --abbrev=0` here. This repo also carries
+   `skill-v*` tags for skill-only publishes, and describe returns whichever tag
+   is nearest regardless of series — so it can hand back a `skill-v*` tag and
+   bump the wrong one. Filtering on `v*` cannot match `skill-v*`, which does
+   not start with `v`.
 4. Tag and push — this is the whole release:
    ```bash
    git tag "v${new_version}"
@@ -37,6 +49,34 @@ formula bump.**
    gh release view "v${new_version}" --repo shhac/agent-mongo   # 6 assets
    ```
    Install / upgrade: `brew install shhac/tap/agent-mongo` · `brew upgrade shhac/tap/agent-mongo`
+
+## Skill-only publish
+
+When only `skills/agent-mongo/**` changed, the binary does not need releasing —
+but `publish-skill.yml` fires on `skill-v*` as well as `v*`, so a skill tag
+republishes it on its own.
+
+```bash
+binary=$(git tag --list 'v*' --sort=-v:refname | head -1)     # e.g. v0.13.0
+stamp=$(date -u +%Y%m%dT%H%M%SZ)                              # e.g. 20260903T091622Z
+git tag "skill-${binary}-${stamp}"
+git push origin "skill-${binary}-${stamp}"
+```
+
+The tag names the binary version the skill was cut against, plus a UTC
+timestamp — so `skill-v0.13.0-20260903T091622Z` reads as "the skill as of this
+moment, against binary 0.13.0". The timestamp is what makes it orderable when a
+skill is republished several times against one binary version.
+
+Deliberately *not* a version of its own: the skill has no independent version,
+and the old `skill-vX.Y.Z` form invited exactly the misreading that it did —
+`skill-v0.12.2` sitting beside binary `v0.12.1` looks like the skill is a
+release ahead, when the numbers are unrelated. Existing `skill-vX.Y.Z` tags are
+left alone; they are history.
+
+Verify with `gh run list --repo shhac/agent-mongo --limit 2` — only **Publish
+skill** should run, not **Release**. (`skill-v*` does not match the `v*` trigger
+in `release.yml`, since it does not start with `v`.)
 
 ## Manual fallback (only if the workflow itself is broken)
 
