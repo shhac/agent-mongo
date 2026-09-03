@@ -4,7 +4,8 @@ description: |
   Read-only MongoDB CLI. Use when exploring databases, collections, schemas,
   or indexes, querying documents (find, get by id, count, sample, distinct,
   aggregate), checking database or collection statistics, or managing
-  MongoDB connections and credentials.
+  MongoDB connections and credentials — including identity-provider login
+  (MONGODB-OIDC, workforce/workload identity federation, SSO).
 allowed-tools: Bash(agent-mongo *) Read Grep Glob
 ---
 
@@ -40,28 +41,13 @@ exists holding different values, the add is refused; follow the error's hint
 with `--credential`). `connection list` always redacts passwords in
 connection strings.
 
-### Identity-provider auth (no password)
+Some deployments authenticate against an identity provider instead
+(MONGODB-OIDC) — see [references/auth.md](references/auth.md) to set one up.
 
-Where the deployment uses MONGODB-OIDC, a credential holds a *flow* rather
-than a secret. The connection must use TLS.
-
-```bash
-# The platform's own identity — nothing stored, no login step
-agent-mongo credential add ci --oidc --environment k8s
-
-# A person logs in once; the session is kept and renewed for weeks
-agent-mongo credential add corp --oidc --device
-agent-mongo credential login corp
-```
-
-`credential login` prints the code and URL as a `{"notice": ...}` on stderr —
-relay it to the person; they can complete it on any device. Everything after
-that renews silently.
-
-**When a query fails with `fixable_by: human` naming `credential login`, stop
-and ask the person to run it.** No retry will fix it, and the command cannot
-be completed by an agent: that is the point of the design. `credential list`
-shows `loggedIn` and `expiresAt` so this can be checked before it bites.
+**If any command fails with `fixable_by: human` naming `credential login`,
+stop and ask the person to run it.** No retry fixes it and no agent can
+complete it: the login is deliberately human-only. This is the one auth
+failure that is not a bug to work around.
 
 ## Exploring a database
 
@@ -234,5 +220,6 @@ Use `agent-mongo <command> usage` when you need deep detail on a specific domain
 
 ## References
 
+- [references/auth.md](references/auth.md): identity-provider (OIDC) credentials
 - [references/commands.md](references/commands.md): full command map + all flags
 - [references/output.md](references/output.md): NDJSON output shapes + field details
