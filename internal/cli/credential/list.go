@@ -46,23 +46,25 @@ func listItem(name string, entry config.Credential) map[string]any {
 		item["username"] = username
 		item["password"] = "***"
 	case config.KindOIDC:
-		if entry.Flow != nil {
-			item["flow"] = string(entry.Flow.Type)
-			if entry.Flow.Environment != "" {
-				item["environment"] = entry.Flow.Environment
-			}
-			if entry.Flow.Path != "" {
-				item["path"] = entry.Flow.Path
-			}
-			if credstore.IsDeviceFlow(entry) {
-				addSessionState(item, name, entry)
-			}
-			if len(entry.Flow.AllowedHosts) > 0 {
-				item["allowedHosts"] = entry.Flow.AllowedHosts
-			}
-		}
+		addFlowFields(item, name, entry)
 	}
 	return item
+}
+
+// addFlowFields describes an OIDC credential's flow recipe; empty fields are
+// pruned from the row, so only what the flow uses appears.
+func addFlowFields(item map[string]any, name string, entry config.Credential) {
+	flow := entry.Flow
+	if flow == nil {
+		return
+	}
+	item["flow"] = string(flow.Type)
+	item["environment"] = flow.Environment
+	item["path"] = flow.Path
+	item["allowedHosts"] = flow.AllowedHosts
+	if credstore.IsDeviceFlow(entry) {
+		addSessionState(item, name, entry)
+	}
 }
 
 // addSessionState reports whether a device credential can be used right now.

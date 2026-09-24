@@ -6,7 +6,6 @@ package output
 import (
 	"maps"
 	"os"
-	"slices"
 
 	out "github.com/shhac/lib-agent-output"
 
@@ -32,7 +31,7 @@ func ResolveFormat() out.Format {
 // pruneTruncate is the pruner for data-bearing output: strip empty fields
 // first, then truncate oversized strings — truncating first could leave a
 // companion {field}Length key whose field was later pruned.
-func pruneTruncate(v any) any { return truncation.Apply(out.PruneEmpty(v)) }
+var pruneTruncate = out.Chain(out.PruneEmpty, truncation.Apply)
 
 // A record built as an out.Ordered is one whose encoded shape is itself the
 // data — in this CLI, an index key spec or an echoed query filter. Field order
@@ -101,16 +100,7 @@ func printOne(item any, prune out.Pruner, meta map[string]any) error {
 		return out.Print(os.Stdout, item, format, prune)
 	}
 	if format == out.FormatNDJSON {
-		if err := out.Print(os.Stdout, item, format, prune); err != nil {
-			return err
-		}
-		writer := out.NewNDJSONWriter(os.Stdout)
-		for _, key := range slices.Sorted(maps.Keys(meta)) {
-			if err := writer.WriteMetaLine(key, meta[key]); err != nil {
-				return err
-			}
-		}
-		return nil
+		return out.WriteList(os.Stdout, format, []any{item}, meta, prune)
 	}
 
 	merged := map[string]any{}

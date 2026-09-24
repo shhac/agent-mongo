@@ -83,3 +83,30 @@ func TestEnhancePassesContractErrorsThrough(t *testing.T) {
 		t.Errorf("a classified error was re-wrapped: %v", got)
 	}
 }
+
+// A credential error raised inside the driver's OIDC callback ("run credential
+// login") reaches here wrapped in the driver's connection error. It must keep
+// its own advice, not be relabelled a generic authentication failure by the
+// "auth error" text the driver puts around it.
+func TestEnhanceKeepsAContractErrorTheDriverWrapped(t *testing.T) {
+	inner := out.New("Credential \"corp\" is not logged in", out.FixableByHuman).
+		WithHint("agent-mongo credential login corp")
+	wrapped := topology.ConnectionError{Wrapped: fmt.Errorf("auth error: %w", inner)}
+
+	var got *out.Error
+	if !out.As(Enhance(wrapped, Context{Connecting: true}), &got) {
+		t.Fatal("not a contract error")
+	}
+	if got.Hint != inner.Hint || got.FixableBy != out.FixableByHuman {
+		t.Errorf("got %s / %q, want the callback's own advice", got.FixableBy, got.Hint)
+	}
+}
+
+func TestEnhanceRecognisesADriverAuthFailureByItsText(t *testing.T) {
+	err := stderrors.New("auth error: sasl conversation error: unable to authenticate using mechanism \"SCRAM-SHA-256\"")
+	var got *out.Error
+	if !out.As(Enhance(err, Context{Connecting: true}), &got) || got.FixableBy != out.FixableByHuman ||
+		!strings.Contains(got.Hint, "credential list") {
+		t.Errorf("got %+v", got)
+	}
+}
