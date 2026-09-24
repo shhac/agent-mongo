@@ -5,7 +5,12 @@ package config
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"os"
+	"slices"
+	"strings"
+
+	out "github.com/shhac/lib-agent-output"
 )
 
 type Connection struct {
@@ -28,13 +33,40 @@ func Connections() map[string]Connection {
 	return conns
 }
 
-func ConnectionAliases() []string {
-	aliases := make([]string, 0, len(Connections()))
-	for alias := range Connections() {
-		aliases = append(aliases, alias)
+func ConnectionAliases() []string { return slices.Sorted(maps.Keys(Connections())) }
+
+// ResolveAlias resolves the connection to use:
+// -c flag > AGENT_MONGO_CONNECTION env > config default > error. A process
+// pinned by IdentityEnv gets its bound connection, whatever it asks for.
+func ResolveAlias(flag string) (string, error) {
+	if pinned, ok, err := PinnedConnection(flag); ok {
+		return pinned, err
 	}
-	sort.Strings(aliases)
-	return aliases
+	if trimmed := strings.TrimSpace(flag); trimmed != "" {
+		return trimmed, nil
+	}
+	if env := strings.TrimSpace(os.Getenv("AGENT_MONGO_CONNECTION")); env != "" {
+		return env, nil
+	}
+	if def := DefaultConnectionAlias(); def != "" {
+		return def, nil
+	}
+	return "", out.New(
+		"No connection specified. Use -c <alias> or set a default. Available: "+JoinOrNone(ConnectionAliases()),
+		out.FixableByAgent).WithHint(addConnectionHint)
+}
+
+// ResolveConnection is ResolveAlias and the connection it names.
+func ResolveConnection(flag string) (string, Connection, error) {
+	alias, err := ResolveAlias(flag)
+	if err != nil {
+		return "", Connection{}, err
+	}
+	conn, ok := GetConnection(alias)
+	if !ok {
+		return "", Connection{}, UnknownConnectionError(alias)
+	}
+	return alias, conn, nil
 }
 
 func DefaultConnectionAlias() string { return Read().DefaultConnection }
@@ -58,13 +90,13 @@ func UnknownConnectionError(alias string) error {
 	return unknownConnectionError(alias, Read())
 }
 
+const addConnectionHint = "Add one with: agent-mongo connection add <alias> <connection-string>"
+
 func unknownConnectionError(alias string, cfg Config) error {
-	valid := make([]string, 0, len(cfg.Connections))
-	for a := range cfg.Connections {
-		valid = append(valid, a)
-	}
-	sort.Strings(valid)
-	return fmt.Errorf("Unknown connection: %q. Valid: %s", alias, JoinOrNone(valid))
+	return out.New(
+		fmt.Sprintf("Connection %q not found. Available: %s",
+			alias, JoinOrNone(slices.Sorted(maps.Keys(cfg.Connections)))),
+		out.FixableByAgent).WithHint(addConnectionHint)
 }
 
 func RemoveConnection(alias string) error {
@@ -75,12 +107,7 @@ func RemoveConnection(alias string) error {
 		delete(cfg.Connections, alias)
 		if cfg.DefaultConnection == alias {
 			cfg.DefaultConnection = ""
-			remaining := make([]string, 0, len(cfg.Connections))
-			for a := range cfg.Connections {
-				remaining = append(remaining, a)
-			}
-			sort.Strings(remaining)
-			if len(remaining) > 0 {
+			if remaining := slices.Sorted(maps.Keys(cfg.Connections)); len(remaining) > 0 {
 				cfg.DefaultConnection = remaining[0]
 			}
 		}

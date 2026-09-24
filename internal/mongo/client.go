@@ -4,9 +4,6 @@ package mongo
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
@@ -71,31 +68,6 @@ type ConnectOpts struct {
 	Comment string
 }
 
-func availableConnections() string {
-	return config.JoinOrNone(config.ConnectionAliases())
-}
-
-// ResolveAlias resolves the connection to use:
-// -c flag > AGENT_MONGO_CONNECTION env > config default > error. A process
-// pinned by config.IdentityEnv gets its bound connection, whatever it asks for.
-func ResolveAlias(flag string) (string, error) {
-	if pinned, ok, err := config.PinnedConnection(flag); ok {
-		return pinned, err
-	}
-	if trimmed := strings.TrimSpace(flag); trimmed != "" {
-		return trimmed, nil
-	}
-	if env := strings.TrimSpace(os.Getenv("AGENT_MONGO_CONNECTION")); env != "" {
-		return env, nil
-	}
-	if def := config.DefaultConnectionAlias(); def != "" {
-		return def, nil
-	}
-	return "", fmt.Errorf(
-		"No connection specified. Use -c <alias> or set a default. Available: %s. Run: agent-mongo connection add <alias> <connection-string>",
-		availableConnections())
-}
-
 // baseClientOptions is the pool shape every agent-mongo connection uses: a
 // short-lived, single-shot CLI process wants exactly one pooled connection and
 // no warm minimum, because anything larger only slows process exit.
@@ -154,15 +126,9 @@ func clientOptions(
 // Connect resolves the alias, builds client options (CLI-friendly pool
 // settings, optional named credential), and connects.
 func Connect(opts ConnectOpts) (*Session, error) {
-	alias, err := ResolveAlias(opts.AliasFlag)
+	alias, conn, err := config.ResolveConnection(opts.AliasFlag)
 	if err != nil {
 		return nil, err
-	}
-	conn, ok := config.GetConnection(alias)
-	if !ok {
-		return nil, fmt.Errorf(
-			"Connection %q not found. Available: %s. Run: agent-mongo connection add <alias> <connection-string>",
-			alias, availableConnections())
 	}
 
 	clientOpts, err := clientOptions(conn, opts)

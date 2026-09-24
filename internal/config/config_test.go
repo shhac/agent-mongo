@@ -148,8 +148,8 @@ func TestSetDefaultConnectionErrorsForUnknownAlias(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "Unknown connection") {
-		t.Errorf("error = %q, want it to mention 'Unknown connection'", err)
+	if !strings.Contains(err.Error(), "not found. Available:") {
+		t.Errorf("error = %q, want the shared not-found message", err)
 	}
 }
 
@@ -188,8 +188,8 @@ func TestRemoveConnectionErrorsForUnknownAlias(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "Unknown connection") {
-		t.Errorf("error = %q, want it to mention 'Unknown connection'", err)
+	if !strings.Contains(err.Error(), "not found. Available:") {
+		t.Errorf("error = %q, want the shared not-found message", err)
 	}
 }
 

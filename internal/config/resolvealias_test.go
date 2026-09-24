@@ -1,22 +1,19 @@
-package mongo
+package config
 
 import (
 	"strings"
 	"testing"
-
-	"github.com/shhac/agent-mongo/internal/config"
-	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
 func TestResolveAliasPrecedence(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	seed := config.Config{
+	seed := Config{
 		DefaultConnection: "default-conn",
-		Connections: map[string]config.Connection{
+		Connections: map[string]Connection{
 			"default-conn": {ConnectionString: "mongodb://localhost/db"},
 		},
 	}
-	if err := config.Write(seed); err != nil {
+	if err := Write(seed); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -58,13 +55,13 @@ func TestResolveAliasPrecedence(t *testing.T) {
 // A pinned process never falls back to the operator's env or default
 // connection: those are exactly what a bound principal was not given.
 func TestResolveAliasWhenPinned(t *testing.T) {
-	testutil.IsolateConfig(t)
-	if err := config.StoreConnection("prod", config.Connection{ConnectionString: "mongodb://prod/app"}); err != nil {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := StoreConnection("prod", Connection{ConnectionString: "mongodb://prod/app"}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("AGENT_MONGO_CONNECTION", "prod")
-	t.Setenv(config.IdentityEnv, "1")
-	t.Setenv(config.BoundConnectionEnv, "staging")
+	t.Setenv(IdentityEnv, "1")
+	t.Setenv(BoundConnectionEnv, "staging")
 
 	if alias, err := ResolveAlias(""); err != nil || alias != "staging" {
 		t.Errorf("no -c: alias=%q err=%v, want the bound connection", alias, err)

@@ -13,19 +13,21 @@ internal/
 │   ├── usage.go               # top-level LLM reference card
 │   ├── mcp.go                 # `mcp` server via lib-agent-mcp (registered last)
 │   ├── shared/                # GlobalFlags DTO, WithSession, defaults, RegisterUsage
-│   ├── connection/            # connection add/remove/update/list/set-default
-│   ├── credential/            # credential add (--form dialog)/remove/list/logout
+│   ├── connection/            # connection add/remove/update/list/test/set-default
+│   ├── credential/            # credential add (--form dialog)/remove/list/login/logout
 │   ├── configcmd/             # config get/set/reset/list-keys — keyDef table
 │   ├── database/              # database list/stats
 │   ├── collection/            # collection list/schema/indexes/stats
 │   └── query/                 # find/get/count/sample/distinct/aggregate, one
 │                              #   file each + echo.go (--echo-query)
-├── config/                    # ~/.config/agent-mongo/config.json I/O + settings
+├── config/                    # ~/.config/agent-mongo/config.json I/O, settings,
+│                              #   connection resolution, MCP identity pin
 ├── credential/                # kinds table (scram, oidc) + __KEYCHAIN__ sentinel
 │                              #   store via lib-agent-keyring; OIDC flows,
 │                              #   allowed-hosts policy, device-flow session
 ├── mongo/                     # client factory, databases, collections, indexes,
-│                              #   schema inference, query, aggregate
+│                              #   schema inference, query, aggregate; command.go
+│                              #   sends find/aggregate as raw commands (maxTimeMS)
 ├── mongouri/                  # driver-free connection-string parsing: db name,
 │                              #   credential split, redaction, host, TLS, options
 ├── oidc/                      # OpenID Connect client: discovery, RFC 8628
@@ -102,7 +104,7 @@ internal/
   trailing `--` turns appended flags positional). Under that gate
   `config.PinnedConnection` resolves to the bound alias, refuses any other
   requested one, and refuses outright when unbound. Any command that picks a
-  connection must go through `mongo.ResolveAlias` or `config.PinnedConnection`.
+  connection must go through `config.ResolveConnection` (or `ResolveAlias`).
 - **Error messages include valid values** so LLMs can self-correct (e.g.
   `Connection "x" not found. Available: local, staging`).
 - **BSON serialization** (`internal/serialize`): ObjectId → hex, Date →
