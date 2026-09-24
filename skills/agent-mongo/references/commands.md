@@ -57,7 +57,7 @@ All `query` commands accept `--echo-query`, which adds an `{"@query": ...}` line
 
 ## MCP
 
-- `agent-mongo mcp [--http <addr>] [--oauth local] [--public-url <url>] [--tailscale funnel|serve]` — run the read-only data commands (database, collection, query, connection) as MCP tools; stdio by default. Credential/config not exposed.
+- `agent-mongo mcp [--http <addr>] [--oauth local] [--public-url <url>] [--tailscale funnel|serve]` — run database, collection, query (read-only tools) and connection (writes config; annotated destructive) as MCP tools; stdio by default. Credential/config not exposed.
 - `agent-mongo mcp pair rotate|reset` — manage the local-OAuth pairing code and stored secrets
 - `agent-mongo mcp schema` — print the MCP tool manifest as JSON (no server started)
 
