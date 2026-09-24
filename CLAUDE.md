@@ -99,11 +99,12 @@ internal/
   `--allowed-hosts`.
 - **MCP exposure** (`internal/cli/mcp.go`): only read-only leaves are
   reachable. A named principal's pairing binding `connection=<alias>` becomes
-  `--connection <alias>` appended after its args plus
-  `AGENT_MONGO_REQUIRE_IDENTITY=1`; under that gate `config.PinnedConnection`
-  makes -c mandatory (no env/default fallback) and connection list/test stay
-  on the pinned alias. Any new command that picks a connection must go through
-  `mongo.ResolveAlias` or `config.CheckPinnedTo`.
+  `AGENT_MONGO_REQUIRE_IDENTITY=1` + `AGENT_MONGO_BOUND_CONNECTION=<alias>` in
+  the tool process's environment — never argv, which the caller shapes (a
+  trailing `--` turns appended flags positional). Under that gate
+  `config.PinnedConnection` resolves to the bound alias, refuses any other
+  requested one, and refuses outright when unbound. Any command that picks a
+  connection must go through `mongo.ResolveAlias` or `config.PinnedConnection`.
 - **Error messages include valid values** so LLMs can self-correct (e.g.
   `Connection "x" not found. Available: local, staging`).
 - **BSON serialization** (`internal/serialize`): ObjectId → hex, Date →

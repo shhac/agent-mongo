@@ -30,7 +30,8 @@ func TestListShowsOnlyThePinnedConnection(t *testing.T) {
 	}
 
 	t.Setenv(config.IdentityEnv, "1")
-	stdout, err = execute(t, "connection", "list", "-c", "prod")
+	t.Setenv(config.BoundConnectionEnv, "prod")
+	stdout, err = execute(t, "connection", "list")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +39,8 @@ func TestListShowsOnlyThePinnedConnection(t *testing.T) {
 		t.Errorf("pinned list leaked or lost connections:\n%s", stdout)
 	}
 
+	t.Setenv(config.BoundConnectionEnv, "")
 	if _, err := execute(t, "connection", "list"); err == nil {
-		t.Error("a pinned list with no -c must fail closed")
+		t.Error("a pinned list with no binding must fail closed")
 	}
 }

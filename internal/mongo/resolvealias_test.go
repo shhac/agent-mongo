@@ -64,11 +64,12 @@ func TestResolveAliasWhenPinned(t *testing.T) {
 	}
 	t.Setenv("AGENT_MONGO_CONNECTION", "prod")
 	t.Setenv(config.IdentityEnv, "1")
+	t.Setenv(config.BoundConnectionEnv, "staging")
 
-	if alias, err := ResolveAlias("staging"); err != nil || alias != "staging" {
-		t.Errorf("-c: alias=%q err=%v", alias, err)
+	if alias, err := ResolveAlias(""); err != nil || alias != "staging" {
+		t.Errorf("no -c: alias=%q err=%v, want the bound connection", alias, err)
 	}
-	if alias, err := ResolveAlias(""); err == nil {
-		t.Errorf("no -c resolved to %q; must fail closed", alias)
+	if alias, err := ResolveAlias("prod"); err == nil {
+		t.Errorf("-c prod resolved to %q; must refuse a connection outside the binding", alias)
 	}
 }

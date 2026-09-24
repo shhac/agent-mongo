@@ -51,18 +51,15 @@ func registerMCP(root *cobra.Command) {
 const bindingKeyConnection = "connection"
 
 // mcpIdentityBinding pins a named principal's calls to the connection its
-// pairing was bound to. The -c is appended after the caller's own arguments,
-// so it wins over any -c they pass, and the gate makes a call without one — a
-// principal paired with no binding — fail rather than use the operator's
-// default. The MCP server only asks this of named principals; stdio and the
-// shared pairing code run as the operator.
+// pairing was bound to. It is carried in the environment, which the caller
+// cannot touch, and a principal paired without a binding is pinned to nothing
+// and refused. The MCP server only asks this of named principals; stdio and
+// the shared pairing code run as the operator.
 func mcpIdentityBinding(p oauth.Verified) (argv, env []string) {
-	env = []string{config.IdentityEnv + "=1"}
-	alias := p.Binding[bindingKeyConnection]
-	if alias == "" {
-		return nil, env
+	return nil, []string{
+		config.IdentityEnv + "=1",
+		config.BoundConnectionEnv + "=" + p.Binding[bindingKeyConnection],
 	}
-	return []string{"--connection", alias}, env
 }
 
 // exposeReadOnlyLeaves keeps the named subcommands of a group, marked

@@ -333,7 +333,7 @@ With `--oauth local`, each person can get their own pairing, bound to one connec
 agent-mongo mcp pair add alice --bind connection=staging
 ```
 
-Every call alice makes then runs against `staging` only: `-c staging` is forced onto it, `connection list` shows only `staging`, and a principal paired without a `connection` binding is refused rather than given the operator's default connection. The same gate is available outside MCP: with `AGENT_MONGO_REQUIRE_IDENTITY=1` set, a command must be given `-c` and never falls back to `AGENT_MONGO_CONNECTION` or the default.
+Every call alice makes then runs against `staging` only: a `-c` naming any other connection is refused, `connection list` shows only `staging`, and a principal paired without a `connection` binding is refused outright rather than given the operator's default. The binding travels in the tool process's environment (`AGENT_MONGO_REQUIRE_IDENTITY=1`, `AGENT_MONGO_BOUND_CONNECTION=<alias>`), not its arguments, so nothing a caller passes can move it; setting both yourself pins a shell the same way.
 
 ## Safety
 
