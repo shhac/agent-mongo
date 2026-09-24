@@ -11,6 +11,7 @@ import (
 
 	out "github.com/shhac/lib-agent-output"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/topology"
 )
 
 // Context carries the query context used to build hints.
@@ -18,6 +19,9 @@ type Context struct {
 	Database   string
 	Collection string
 	TimeoutMS  int
+	// Connecting marks an error from establishing the connection, before any
+	// query ran: running out of time there is not a slow query.
+	Connecting bool
 }
 
 const maxTimeExpiredCode = 50
@@ -43,8 +47,18 @@ func isAuthError(err error) bool {
 	return strings.Contains(msg, "authentication failed") || strings.Contains(msg, "auth error")
 }
 
+// isSelectionError reports that no server could be reached. Asked before
+// isTimeout: a selection failure wraps the context's deadline error, so the
+// driver's IsTimeout reports it as a timeout too, and an unreachable host would
+// otherwise be sent off to check its indexes.
 func isSelectionError(err error) bool {
-	return strings.Contains(err.Error(), "server selection error")
+	var selErr topology.ServerSelectionError
+	return stderrors.As(err, &selErr) || strings.Contains(err.Error(), "server selection error")
+}
+
+func unreachable(err error) error {
+	return out.Wrap(err, out.FixableByRetry).WithHint(
+		"Could not reach the MongoDB server. Check the connection string and network, then retry: agent-mongo connection test")
 }
 
 // Enhance wraps a mongo operation error with a fixable_by classification and
@@ -59,6 +73,15 @@ func Enhance(err error, ectx Context) error {
 	}
 
 	switch {
+	case isAuthError(err):
+		return out.Wrap(err, out.FixableByHuman).WithHint(
+			"Authentication failed. Check the connection's credential: agent-mongo credential list")
+	case isSelectionError(err):
+		return unreachable(err)
+	case ectx.Connecting && isTimeout(err):
+		return out.Wrap(err, out.FixableByRetry).WithHints(
+			fmt.Sprintf("Could not connect within %dms", ectx.TimeoutMS),
+			"Check the network, or allow longer with --timeout <ms>, then retry: agent-mongo connection test")
 	case isTimeout(err):
 		hints := []string{
 			fmt.Sprintf("Query timed out after %dms", ectx.TimeoutMS),
@@ -69,12 +92,6 @@ func Enhance(err error, ectx Context) error {
 				"Check indexes: agent-mongo collection indexes %s %s", ectx.Database, ectx.Collection))
 		}
 		return out.Wrap(err, out.FixableByAgent).WithHints(hints...)
-	case isAuthError(err):
-		return out.Wrap(err, out.FixableByHuman).WithHint(
-			"Authentication failed. Check the connection's credential: agent-mongo credential list")
-	case isSelectionError(err):
-		return out.Wrap(err, out.FixableByRetry).WithHint(
-			"Could not reach the MongoDB server. Check the connection string and network, then retry: agent-mongo connection test")
 	default:
 		return out.Wrap(err, out.FixableByAgent)
 	}
