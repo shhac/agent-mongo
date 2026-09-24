@@ -192,7 +192,7 @@ Key settings: `defaults.limit` (20), `defaults.sampleSize` (5), `defaults.schema
 
 ## MCP server
 
-`agent-mongo mcp` runs `database`, `collection`, `query` (read-only) and `connection` (writes config, so not annotated read-only) as MCP tools over stdio (or Streamable HTTP with `--http <addr>`). Credential and config commands are not exposed. See `agent-mongo mcp usage` for registration, OAuth, and Tailscale details.
+`agent-mongo mcp` runs the read-only commands (`database`, `collection`, `query`, and `connection list`/`test`) as MCP tools over stdio (or Streamable HTTP with `--http <addr>`). Credential and config commands are not exposed. See `agent-mongo mcp usage` for registration, OAuth, and Tailscale details.
 
 ## Safety
 

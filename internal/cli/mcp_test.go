@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +21,7 @@ func TestMCPToolAnnotations(t *testing.T) {
 	var manifest struct {
 		Tools []struct {
 			Name        string `json:"name"`
+			Description string `json:"description"`
 			Annotations *struct {
 				ReadOnly    bool `json:"readOnlyHint"`
 				Destructive bool `json:"destructiveHint"`
@@ -34,7 +36,7 @@ func TestMCPToolAnnotations(t *testing.T) {
 		"database":   {readOnly: true},
 		"collection": {readOnly: true},
 		"query":      {readOnly: true},
-		"connection": {destructive: true},
+		"connection": {readOnly: true},
 	}
 	got := map[string]bool{}
 	for _, tool := range manifest.Tools {
@@ -51,6 +53,16 @@ func TestMCPToolAnnotations(t *testing.T) {
 		if tool.Annotations.ReadOnly != expected.readOnly || tool.Annotations.Destructive != expected.destructive {
 			t.Errorf("%s: readOnly=%v destructive=%v, want %v/%v", tool.Name,
 				tool.Annotations.ReadOnly, tool.Annotations.Destructive, expected.readOnly, expected.destructive)
+		}
+	}
+	for _, tool := range manifest.Tools {
+		if tool.Name != "connection" {
+			continue
+		}
+		for _, hidden := range []string{"add", "update", "remove", "set-default"} {
+			if strings.Contains(tool.Description, hidden) {
+				t.Errorf("connection tool dispatches %q, which writes config: %s", hidden, tool.Description)
+			}
 		}
 	}
 	for name := range want {

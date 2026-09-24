@@ -312,7 +312,7 @@ If no GUI session is available (SSH, headless host), `--form` exits with a struc
 
 ## MCP server
 
-`agent-mongo mcp` runs `database`, `collection`, `query` and `connection` as [Model Context Protocol](https://modelcontextprotocol.io) tools. The data tools are annotated read-only; `connection` is not, because it can add, update and remove connections (hosts should confirm those calls). Credential and config commands are not exposed.
+`agent-mongo mcp` runs the read-only commands (`database`, `collection`, `query`, and `connection list`/`test`) as [Model Context Protocol](https://modelcontextprotocol.io) tools, all annotated read-only. Commands that write config are not exposed: credential and config management, and `connection add`/`update`/`remove`/`set-default` — repointing a connection that keeps its stored credential would let an agent send that password to a host of its choosing.
 
 ```bash
 # stdio transport (launched by an MCP client)

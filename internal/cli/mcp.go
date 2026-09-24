@@ -14,9 +14,11 @@ import (
 // complete command set. Data-facing groups are exposed as read-only tools;
 // credential management stays CLI-only.
 //
-// `connection` is exposed but not read-only: a group tool can reach every
-// subcommand, and add/update/set-default/remove all write config. The hint is
-// what a host may auto-approve on, so it has to describe the worst call.
+// Of `connection`, only the leaves that read are exposed. The ones that write
+// config are not merely unannotated: pointing a connection at another host
+// while keeping its stored credential (add --credential, update) would send
+// that password to wherever the agent chose, in cleartext under PLAIN, so an
+// agent must not be able to reach them at all.
 func registerMCP(root *cobra.Command) {
 	readOnly := map[string]bool{"database": true, "collection": true, "query": true}
 	skipped := map[string]bool{"credential": true, "config": true}
@@ -28,7 +30,7 @@ func registerMCP(root *cobra.Command) {
 		}
 		if name == "connection" {
 			agentmcp.Expose(cmd)
-			markDestructive(cmd, "remove")
+			exposeReadOnlyLeaves(cmd, "list", "test", "usage")
 		}
 		if skipped[name] {
 			agentmcp.Skip(cmd)
@@ -41,10 +43,16 @@ func registerMCP(root *cobra.Command) {
 	))
 }
 
-func markDestructive(group *cobra.Command, names ...string) {
+// exposeReadOnlyLeaves keeps the named subcommands of a group, marked
+// read-only per leaf, and hides the rest. Per leaf rather than on the group, so
+// a subcommand added later without a decision disqualifies the group's hint
+// instead of inheriting it.
+func exposeReadOnlyLeaves(group *cobra.Command, names ...string) {
 	for _, cmd := range group.Commands() {
 		if slices.Contains(names, cmd.Name()) {
-			agentmcp.Destructive(cmd)
+			agentmcp.ReadOnly(cmd)
+			continue
 		}
+		agentmcp.Skip(cmd)
 	}
 }
