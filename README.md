@@ -271,7 +271,7 @@ inherits exactly the database roles that person's IdP groups map to, and Atlas
 audit logs name a real human instead of a shared service account.
 
 **Where a token may be sent.** An OIDC credential refuses a plaintext
-connection, and only sends a token to a host on its allowlist — by default
+connection, and only sends a token when every host in the seed list is on its allowlist — by default
 MongoDB-owned domains and loopback. The driver applies its own list to the
 interactive flow alone, so without this a workload flow would hand a live
 platform token to whatever host the connection string named, and agent-mongo

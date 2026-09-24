@@ -104,7 +104,7 @@ COMMANDS:
     than invocations.
     The issuer is never stored in config: the deployment is the authority on
     it, so a hand-edited config cannot point the login elsewhere. The session
-    is bound to the host it was obtained for and is not sent anywhere else,
+    is bound to the hosts it was obtained for and is not sent anywhere else,
     and --allowed-hosts is refused for this flow for the same reason.
 
   credential login <name> [-c <alias>]

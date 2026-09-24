@@ -76,15 +76,16 @@ unreachable, not the session dead.
 
 ## Where a token may be sent
 
-An OIDC credential only sends a token to a host on its allowlist: by default
-MongoDB-owned domains and loopback. The driver applies its own list to the
+An OIDC credential only sends a token to hosts on its allowlist — every host in
+the connection string's seed list, since the driver authenticates to each one:
+by default MongoDB-owned domains and loopback. The driver applies its own list to the
 interactive flow alone, so without this a workload flow would hand a live
 platform token to whatever host the connection string named.
 
 `--allowed-hosts 'db-*.corp.example.com,mongo.corp.example.com'` widens it for a
 self-hosted deployment; patterns are globs and matching ignores case. It is
-refused for `--device`, whose session is bound to the deployment it was
-obtained for and is never presented elsewhere.
+refused for `--device`, whose session is bound to the deployment (its whole
+seed list) it was obtained for and is never presented elsewhere.
 
 ## Why a team might want this
 
