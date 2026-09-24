@@ -69,7 +69,7 @@ func TestSettingsAndConnectionWritesDoNotClobberEachOther(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			settingErrs[i] = UpdateSetting(key, values[key])
+			settingErrs[i] = updateSetting(key, values[key])
 		}()
 	}
 	for i := range concurrentWriters {
@@ -85,7 +85,7 @@ func TestSettingsAndConnectionWritesDoNotClobberEachOther(t *testing.T) {
 
 	for i, err := range settingErrs {
 		if err != nil {
-			t.Fatalf("UpdateSetting(%s): %v", keys[i], err)
+			t.Fatalf("updateSetting(%s): %v", keys[i], err)
 		}
 	}
 	for i, err := range connErrs {
@@ -98,7 +98,7 @@ func TestSettingsAndConnectionWritesDoNotClobberEachOther(t *testing.T) {
 		t.Errorf("got %d connections, want %d — connection writes lost to settings writes", got, concurrentWriters)
 	}
 	for _, key := range keys {
-		got, ok := GetSetting(key)
+		got, ok := getSetting(key)
 		if !ok || got != values[key] {
 			t.Errorf("setting %s = %d (set=%v), want %d — settings write lost", key, got, ok, values[key])
 		}

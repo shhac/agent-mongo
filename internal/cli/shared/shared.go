@@ -10,14 +10,12 @@ import (
 	"github.com/shhac/agent-mongo/internal/config"
 )
 
-// GlobalFlags is a snapshot of the root command's persistent flags, resolved
-// against persisted settings (timeout fallback applied in the root pre-run).
+// GlobalFlags is a snapshot of the root command's persistent flags that leaf
+// commands read. Output format and truncation are process-wide, configured in
+// the root pre-run, and not repeated here.
 type GlobalFlags struct {
 	Connection string // -c/--connection
-	Expand     string // --expand
-	Full       bool   // --full
-	Format     string // -f/--format
-	TimeoutMS  int    // -t/--timeout > settings query.timeout > 30000
+	TimeoutMS  int    // -t/--timeout; 0 = unset, see Timeout
 
 	// Command and Version identify this run to the server (comment, appName),
 	// so a DBA can tell an agent-mongo query from the application's own.
@@ -25,27 +23,32 @@ type GlobalFlags struct {
 	Version string
 }
 
-// Timeout returns the effective operation timeout.
+// Timeout returns the effective operation timeout: -t/--timeout, else
+// query.timeout.
 func (g *GlobalFlags) Timeout() time.Duration {
-	ms := g.TimeoutMS
-	if ms <= 0 {
-		ms = config.SettingOr("query.timeout")
+	return time.Duration(SettingDefault(g.TimeoutMS, config.QueryTimeout)) * time.Millisecond
+}
+
+// SettingDefault is a count flag's value when given, else the setting's.
+func SettingDefault(flag int, setting *config.SettingDef) int {
+	if flag > 0 {
+		return flag
 	}
-	return time.Duration(ms) * time.Millisecond
+	return setting.Value()
+}
+
+// CappedCount is SettingDefault held to query.maxDocuments, for a flag that
+// decides how many documents come back.
+func CappedCount(flag int, setting *config.SettingDef) int {
+	return min(SettingDefault(flag, setting), MaxDocuments())
 }
 
 // EffectiveLimit resolves a --limit flag value against the configured default
 // page size, capped at query.maxDocuments.
-func EffectiveLimit(flagValue int) int {
-	limit := flagValue
-	if limit <= 0 {
-		limit = config.SettingOr("defaults.limit")
-	}
-	return min(limit, MaxDocuments())
-}
+func EffectiveLimit(flag int) int { return CappedCount(flag, config.DefaultLimit) }
 
 // MaxDocuments is the most any one query returns (query.maxDocuments).
-func MaxDocuments() int { return config.SettingOr("query.maxDocuments") }
+func MaxDocuments() int { return config.MaxDocuments.Value() }
 
 // MakeContext builds the per-command context: one deadline for everything the
 // command sends. The driver derives each command's maxTimeMS from what is left

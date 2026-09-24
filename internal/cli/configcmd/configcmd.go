@@ -37,11 +37,12 @@ func Register(root *cobra.Command) {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			key := args[0]
-			if _, ok := config.FindSetting(key); !ok {
+			def, ok := config.FindSetting(key)
+			if !ok {
 				return unknownKeyError(key)
 			}
 			result := map[string]any{"key": key}
-			if value, set := config.GetSetting(key); set {
+			if value, set := def.Stored(); set {
 				result["value"] = value
 			}
 			return output.PrintRaw(result)
@@ -62,7 +63,7 @@ func Register(root *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			if err := config.UpdateSetting(key, value); err != nil {
+			if err := def.Set(value); err != nil {
 				return err
 			}
 			return output.PrintRaw(map[string]any{"ok": true, "key": key, "value": value})

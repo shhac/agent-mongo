@@ -36,9 +36,6 @@ type rootFlags struct {
 func (g *rootFlags) shared() *shared.GlobalFlags {
 	return &shared.GlobalFlags{
 		Connection: g.Connection,
-		Expand:     g.Expand,
-		Full:       g.Full,
-		Format:     g.Format,
 		TimeoutMS:  g.TimeoutMS,
 		Command:    g.command,
 		Version:    g.version,
@@ -84,12 +81,8 @@ func applyConfigDefaults(g *rootFlags) {
 	truncation.Configure(truncation.Options{
 		Expand:    g.Expand,
 		Full:      g.Full,
-		MaxLength: config.SettingOr("truncation.maxLength"),
+		MaxLength: config.TruncationMaxLength.Value(),
 	})
-
-	if g.TimeoutMS == 0 {
-		g.TimeoutMS = config.SettingOr("query.timeout")
-	}
 
 	appoutput.ConfigureFormat(g.Format)
 }

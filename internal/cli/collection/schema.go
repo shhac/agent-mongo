@@ -23,13 +23,13 @@ func registerSchema(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
 
-			sample, err := shared.ParsePositiveInt(sampleSize, "--sample-size")
+			parsedSample, err := shared.ParsePositiveInt(sampleSize, "--sample-size")
 			if err != nil {
 				return err
 			}
-			if sample == 0 {
-				sample = config.SettingOr("defaults.schemaSampleSize")
-			}
+			// Not capped at query.maxDocuments: sampled documents are read to
+			// infer a schema, not returned.
+			sample := shared.SettingDefault(parsedSample, config.DefaultSchemaSampleSize)
 			maxDepth, err := shared.ParsePositiveInt(depth, "--depth")
 			if err != nil {
 				return err

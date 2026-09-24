@@ -23,16 +23,11 @@ func registerSample(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
 
-			requestedSize, err := shared.ParsePositiveInt(size, "--size")
+			parsedSize, err := shared.ParsePositiveInt(size, "--size")
 			if err != nil {
 				return err
 			}
-			if requestedSize == 0 {
-				requestedSize = config.SettingOr("defaults.sampleSize")
-			}
-			if max := config.SettingOr("query.maxDocuments"); requestedSize > max {
-				requestedSize = max
-			}
+			requestedSize := shared.CappedCount(parsedSize, config.DefaultSampleSize)
 
 			filterDoc, err := parseOptionalDoc(filter, "filter")
 			if err != nil {
