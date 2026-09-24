@@ -3,8 +3,8 @@ package credential
 // What a session is, and how it is kept: the type, its storage in the OS
 // keychain, and the safe-to-display view of it. What the device flow *does*
 // with one — logging in, presenting a token, renewing it — lives in
-// devicelogin.go, so a later kind that also keeps a session reuses this file
-// untouched.
+// devicelogin.go; the field declaration that says where a session is stored is
+// the OIDC kind's, in oidc.go.
 
 import (
 	"encoding/json"
@@ -15,21 +15,6 @@ import (
 
 // sessionAccount is the keychain account holding a credential's session.
 func sessionAccount(alias string) string { return "session:" + alias }
-
-// sessionField is the one field an OIDC credential may keep in the keychain.
-// Only the device flow fills it; for the others it stays empty and the generic
-// storage skips it.
-//
-// Named rather than declared inline because two paths read it: authentication,
-// which fails when it is missing, and the listing, which reports "not logged
-// in" instead. Both go through this declaration so they cannot drift.
-var sessionField = secretField{
-	account: sessionAccount,
-	value:   func(c *config.Credential) *string { return &c.Session },
-	missing: NotLoggedInError,
-}
-
-var oidcFields = []secretField{sessionField}
 
 // Session is what a completed device login leaves behind.
 //
@@ -122,9 +107,9 @@ func (r Resolution) RequireSession() error {
 // SaveSession stores a completed login against a credential, replacing whatever
 // session it had.
 func SaveSession(alias string, session Session) error {
-	entry, ok := config.Read().Credentials[alias]
-	if !ok {
-		return NotFoundError(alias)
+	entry, err := lookup(alias)
+	if err != nil {
+		return err
 	}
 	return storeSession(alias, entry, session)
 }
@@ -143,8 +128,8 @@ func ClearSession(alias string) error {
 		if !IsDeviceFlow(entry) {
 			return NoSessionToClearError(alias)
 		}
-		_ = keychain.Delete(sessionAccount(alias))
-		entry.Session = ""
+		_ = keychain.Delete(sessionField.account(alias))
+		*sessionField.value(&entry) = ""
 		cfg.SetCredential(alias, entry)
 		return nil
 	})
@@ -179,13 +164,9 @@ func DescribeSession(alias string, entry config.Credential) SessionInfo {
 		return SessionInfo{}
 	}
 
-	raw := entry.Session
-	if raw == Sentinel {
-		stored, found := keychain.Get(sessionAccount(alias))
-		if !found {
-			return SessionInfo{}
-		}
-		raw = stored
+	raw, found := lookupField(sessionField, alias, entry)
+	if !found {
+		return SessionInfo{}
 	}
 	session, err := decodeSession(alias, raw)
 	if err != nil {

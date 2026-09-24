@@ -157,7 +157,7 @@ func TestResolveStates(t *testing.T) {
 
 // connection add/update wire up a reference; they must not demand that the
 // credential can authenticate at that moment.
-func TestRequireExistsAcceptsUnresolvableCredential(t *testing.T) {
+func TestCheckConnectionAcceptsUnresolvableCredential(t *testing.T) {
 	isolateConfig(t)
 	swapKeychain(t, newFakeKeychain())
 	testutil.StageCredential(t, "ghost", config.Credential{Username: Sentinel, Password: Sentinel})
@@ -165,11 +165,12 @@ func TestRequireExistsAcceptsUnresolvableCredential(t *testing.T) {
 	if _, err := Resolve("ghost"); err == nil {
 		t.Fatal("precondition: expected 'ghost' to be unresolvable")
 	}
-	if err := RequireExists("ghost"); err != nil {
-		t.Errorf("RequireExists = %v, want nil for a stored-but-unresolvable entry", err)
+	const uri = "mongodb://localhost:27017/app"
+	if err := CheckConnection("ghost", uri); err != nil {
+		t.Errorf("CheckConnection = %v, want nil for a stored-but-unresolvable entry", err)
 	}
-	if err := RequireExists("absent"); err == nil {
-		t.Error("RequireExists accepted an alias that is not stored")
+	if err := CheckConnection("absent", uri); !errors.Is(err, ErrNotFound) {
+		t.Errorf("CheckConnection(absent) = %v, want ErrNotFound", err)
 	}
 }
 

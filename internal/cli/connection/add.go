@@ -52,9 +52,6 @@ func resolveCredential(alias, connectionString, credentialAlias string) (credent
 			Storage:          storage,
 		}, nil
 	case credentialAlias != "":
-		if err := credential.RequireExists(credentialAlias); err != nil {
-			return credentialResolution{}, err
-		}
 		if err := credential.CheckConnection(credentialAlias, connectionString); err != nil {
 			return credentialResolution{}, err
 		}

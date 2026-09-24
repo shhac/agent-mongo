@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	out "github.com/shhac/lib-agent-output"
@@ -94,14 +94,11 @@ func (r Resolution) AccessToken(ctx context.Context, host string) (string, error
 // re-reading it. The alias-taking CheckConnection is for callers that have no
 // resolution yet, which is the case when a connection is being wired up.
 func (r Resolution) CheckConnection(uri string) error {
-	h, ok := handlerFor(r.Kind)
-	if !ok {
-		return UnsupportedKindError(r.Alias, r.Kind)
+	h, err := requireHandler(r.Alias, r.Kind)
+	if err != nil {
+		return err
 	}
-	if h.checkConnection == nil {
-		return nil
-	}
-	return h.checkConnection(r.Credential, uri)
+	return h.checkEndpoint(r.Credential, uri)
 }
 
 // Resolve turns an alias into usable auth material, or returns a
@@ -140,20 +137,17 @@ type reading struct {
 // read is the pure half both entry points share: look the entry up, dispatch to
 // its kind, resolve its secrets. It writes nothing.
 func read(alias string) (reading, error) {
-	entry, ok := config.Read().Credentials[alias]
-	if !ok {
-		return reading{}, NotFoundError(alias)
+	entry, err := lookup(alias)
+	if err != nil {
+		return reading{}, err
 	}
-
 	kind := entry.ResolvedKind()
-	h, ok := handlerFor(kind)
-	if !ok {
-		return reading{}, UnsupportedKindError(alias, kind)
+	h, err := requireHandler(alias, kind)
+	if err != nil {
+		return reading{}, err
 	}
-	if h.validate != nil {
-		if err := h.validate(alias, entry); err != nil {
-			return reading{}, err
-		}
+	if err := h.validateEntry(alias, entry); err != nil {
+		return reading{}, err
 	}
 	cred, err := resolveFields(h.fields, alias, entry)
 	if err != nil {
@@ -180,22 +174,23 @@ func Aliases() []string { return aliasesOf(All()) }
 // aliasesOf is the sorted-alias logic split out from Aliases so a caller
 // already holding the config lock can answer from its own snapshot instead of
 // re-reading the file.
-func aliasesOf(entries map[string]config.Credential) []string {
-	aliases := make([]string, 0, len(entries))
-	for alias := range entries {
-		aliases = append(aliases, alias)
+func aliasesOf(entries map[string]config.Credential) []string { return sortedNames(entries) }
+
+// lookup is the stored entry for an alias, secrets unresolved.
+func lookup(alias string) (config.Credential, error) {
+	entry, ok := config.Read().Credentials[alias]
+	if !ok {
+		return config.Credential{}, NotFoundError(alias)
 	}
-	sort.Strings(aliases)
-	return aliases
+	return entry, nil
 }
 
 // Store persists a credential, dispatching on its kind. Returns which storage
 // held the secret ("keychain" or "config").
 func Store(alias string, cred config.Credential) (string, error) {
-	kind := cred.ResolvedKind()
-	h, ok := handlerFor(kind)
-	if !ok {
-		return "", UnsupportedKindError(alias, kind)
+	h, err := requireHandler(alias, cred.ResolvedKind())
+	if err != nil {
+		return "", err
 	}
 	return storeCredential(h, alias, cred)
 }
@@ -216,21 +211,8 @@ func connectionsUsing(conns map[string]config.Connection, credentialAlias string
 			used = append(used, alias)
 		}
 	}
-	sort.Strings(used)
+	slices.Sort(used)
 	return used
-}
-
-// RequireExists checks only that the alias names a stored credential.
-//
-// This is the check `connection add` and `connection update` need. A
-// connection may legitimately reference a credential that cannot authenticate
-// at the moment it is wired up, so requiring a full Resolve here would reject
-// valid configuration.
-func RequireExists(alias string) error {
-	if _, ok := config.Read().Credentials[alias]; !ok {
-		return NotFoundError(alias)
-	}
-	return nil
 }
 
 // Remove deletes the kind's keychain secrets inside the same critical section
@@ -303,18 +285,13 @@ func remove(alias string, detach bool) (detachedFrom []string, err error) {
 // function's problem, so an unreadable secret passes here and fails later with
 // its own error.
 func CheckConnection(alias, uri string) error {
-	entry, ok := config.Read().Credentials[alias]
-	if !ok {
-		return NotFoundError(alias)
+	entry, err := lookup(alias)
+	if err != nil {
+		return err
 	}
-	h, ok := handlerFor(entry.ResolvedKind())
-	if !ok {
-		return UnsupportedKindError(alias, entry.ResolvedKind())
-	}
-	if h.checkConnection == nil {
-		return nil
-	}
-	return h.checkConnection(entry, uri)
+	// The endpoint hooks read only the entry's recipe, never its secrets, so
+	// the unresolved entry stands in for a resolution.
+	return Resolution{Alias: alias, Kind: entry.ResolvedKind(), Credential: entry}.CheckConnection(uri)
 }
 
 // StorageType reports where an entry's secret lives. It takes the entry rather

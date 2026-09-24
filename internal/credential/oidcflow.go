@@ -3,7 +3,6 @@ package credential
 import (
 	"context"
 	"path/filepath"
-	"sort"
 
 	"github.com/shhac/agent-mongo/internal/config"
 )
@@ -53,14 +52,7 @@ func flowHandlerFor(flowType config.FlowType) (flowHandler, bool) {
 }
 
 // SupportedFlowTypes lists the flows this build implements.
-func SupportedFlowTypes() []string {
-	names := make([]string, 0, len(flows))
-	for flowType := range flows {
-		names = append(names, string(flowType))
-	}
-	sort.Strings(names)
-	return names
-}
+func SupportedFlowTypes() []string { return sortedNames(flows) }
 
 // ValidateFlow checks a flow recipe is one this build can actually drive,
 // naming the valid values so a caller can correct itself.
