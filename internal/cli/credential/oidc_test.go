@@ -12,6 +12,7 @@ import (
 
 	out "github.com/shhac/lib-agent-output"
 
+	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -324,7 +325,7 @@ func TestLogoutClearsTheSession(t *testing.T) {
 	}
 
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root, nil)
+	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{} })
 	root.SetArgs([]string{"credential", "logout", "corp"})
 	root.SetOut(io.Discard)
 	buf, restore := testutil.CaptureStdout(t)

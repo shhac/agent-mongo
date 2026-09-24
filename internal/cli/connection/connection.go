@@ -1,5 +1,5 @@
 // Package connection implements `agent-mongo connection` — saved connection
-// management. The `test` subcommand is registered from the mongo-backed layer.
+// management.
 package connection
 
 import (
@@ -11,19 +11,15 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// Register attaches the connection group. testCmd is the mongo-backed
-// `connection test` leaf, built by the caller to keep this package free of
-// driver dependencies.
-func Register(root *cobra.Command, globals func() *shared.GlobalFlags, testCmd *cobra.Command) {
+// Register attaches the connection group.
+func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 	cmd := &cobra.Command{Use: "connection", Short: "Manage MongoDB connections"}
 
 	registerAdd(cmd)
 	registerRemove(cmd)
 	registerUpdate(cmd)
 	registerList(cmd, globals)
-	if testCmd != nil {
-		cmd.AddCommand(testCmd)
-	}
+	registerTest(cmd, globals)
 	registerSetDefault(cmd)
 	shared.RegisterUsage(cmd, "connection", usageText)
 

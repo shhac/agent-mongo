@@ -1,12 +1,7 @@
 // Package cli assembles the agent-mongo root command on lib-agent-cli's
 // shared scaffolding: family persistent flags (--format, --timeout, --debug,
-// --color) plus the domain flags -c/--connection, --expand, --full.
-// Package cli assembles the command tree.
-//
-// A few leaves live here rather than in their own group's package because they
-// need the MongoDB driver, and those packages are deliberately kept free of it:
-// connection test and credential login. They are built here and injected into
-// the group's Register.
+// --color) plus the domain flags -c/--connection, --expand, --full, then each
+// command group, usage and the MCP server.
 package cli
 
 import (
@@ -71,8 +66,8 @@ func newRootCmd(version string) *cobra.Command {
 		"Expand truncated fields (comma-separated field names)")
 	pf.BoolVarP(&g.Full, "full", "F", false, "Show full content for all truncated fields")
 
-	cliconnection.Register(root, g.shared, newConnectionTestCommand(g.shared))
-	clicredential.Register(root, newCredentialLoginCommand(g.shared))
+	cliconnection.Register(root, g.shared)
+	clicredential.Register(root, g.shared)
 	configcmd.Register(root)
 	clidatabase.Register(root, g.shared)
 	clicollection.Register(root, g.shared)

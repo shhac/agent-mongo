@@ -1,7 +1,6 @@
-package cli
+package credential
 
 import (
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
-	"github.com/shhac/agent-mongo/internal/credential"
+	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
@@ -104,67 +103,6 @@ func TestConnectionForLogin(t *testing.T) {
 	})
 }
 
-// Every other command takes -c; a local --connection flag here shadowed the
-// root's persistent one, and cobra drops a persistent flag whose name is
-// already taken, so "credential login corp -c prod" failed outright.
-func TestLoginAcceptsTheGlobalConnectionFlag(t *testing.T) {
-	testutil.IsolateConfig(t)
-	seed(t, "prod", "corp")
-
-	root := newRootCmd("test")
-	root.SetArgs([]string{"credential", "login", "corp", "-c", "prod"})
-	root.SetOut(io.Discard)
-	root.SetErr(io.Discard)
-
-	// It gets as far as connecting, which is as far as it can go here. What
-	// matters is that flag parsing did not reject -c.
-	err := root.Execute()
-	if err != nil && strings.Contains(err.Error(), "unknown shorthand flag") {
-		t.Fatalf("-c was rejected: %v", err)
-	}
-	if err != nil && strings.Contains(err.Error(), "unknown flag") {
-		t.Fatalf("flag parsing failed: %v", err)
-	}
-}
-
-func TestSessionExpiry(t *testing.T) {
-	expiry := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
-
-	t.Run("reported when there is a session", func(t *testing.T) {
-		testutil.IsolateConfig(t)
-		seed(t, "prod", "corp")
-		if err := credential.SaveSession("corp", credential.Session{
-			AccessToken: "t", ExpiresAt: expiry, Host: "prod.abc.mongodb.net",
-		}); err != nil {
-			t.Fatalf("SaveSession: %v", err)
-		}
-
-		credAlias, got, ok := sessionExpiry("prod")
-		if !ok {
-			t.Fatal("no expiry reported for a logged-in credential")
-		}
-		if credAlias != "corp" || !got.Equal(expiry) {
-			t.Errorf("got %q/%s, want corp/%s", credAlias, got, expiry)
-		}
-	})
-
-	t.Run("silent for credentials with no session", func(t *testing.T) {
-		testutil.IsolateConfig(t)
-		seed(t, "prod", "corp")
-		if _, _, ok := sessionExpiry("prod"); ok {
-			t.Error("an expiry was reported before anyone logged in")
-		}
-
-		seed(t, "plain", "")
-		if _, _, ok := sessionExpiry("plain"); ok {
-			t.Error("an expiry was reported for a connection with no credential")
-		}
-		if _, _, ok := sessionExpiry("absent"); ok {
-			t.Error("an expiry was reported for a connection that does not exist")
-		}
-	})
-}
-
 // The receipt is what an agent reads back; it must carry the binding and never
 // a token.
 func TestLoginReceipt(t *testing.T) {
@@ -172,7 +110,7 @@ func TestLoginReceipt(t *testing.T) {
 	seed(t, "prod", "corp")
 	expiry := time.Date(2026, 9, 2, 13, 0, 0, 0, time.UTC)
 
-	receipt := loginReceipt("corp", "prod", credential.Session{
+	receipt := loginReceipt("corp", "prod", credstore.Session{
 		AccessToken: "secret-token", RefreshToken: "secret-refresh",
 		ExpiresAt: expiry, Issuer: "https://idp.example.com", Host: "prod.abc.mongodb.net",
 	})
@@ -191,7 +129,7 @@ func TestLoginReceipt(t *testing.T) {
 }
 
 func TestPromptTextPrefersTheCompleteURI(t *testing.T) {
-	withComplete := promptText(credential.DevicePrompt{
+	withComplete := promptText(credstore.DevicePrompt{
 		UserCode:                "WDJB-MJHT",
 		VerificationURI:         "https://idp/activate",
 		VerificationURIComplete: "https://idp/activate?user_code=WDJB-MJHT",
@@ -200,7 +138,7 @@ func TestPromptTextPrefersTheCompleteURI(t *testing.T) {
 		t.Errorf("prompt = %q, want the link that carries the code", withComplete)
 	}
 
-	bare := promptText(credential.DevicePrompt{
+	bare := promptText(credstore.DevicePrompt{
 		UserCode: "WDJB-MJHT", VerificationURI: "https://idp/activate",
 	})
 	if !strings.Contains(bare, "https://idp/activate") || !strings.Contains(bare, "WDJB-MJHT") {

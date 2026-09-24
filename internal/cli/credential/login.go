@@ -1,4 +1,4 @@
-package cli
+package credential
 
 import (
 	"fmt"
@@ -9,15 +9,13 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
-	"github.com/shhac/agent-mongo/internal/credential"
+	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// newCredentialLoginCommand builds `credential login`. It lives here for the
-// reason given in this package's doc comment: it needs the driver.
-func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+func registerLogin(parent *cobra.Command, globals func() *shared.GlobalFlags) {
+	parent.AddCommand(&cobra.Command{
 		Use:   "login <credential>",
 		Short: "Log in an OIDC credential against its deployment",
 		Args:  cobra.ExactArgs(1),
@@ -35,7 +33,7 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 			// The same endpoint rules a query is held to: a login carries a
 			// token back, so it must not happen over plaintext or against a
 			// host this credential is not allowed to talk to.
-			if err := credential.CheckConnection(alias, conn.ConnectionString); err != nil {
+			if err := credstore.CheckConnection(alias, conn.ConnectionString); err != nil {
 				return err
 			}
 
@@ -43,31 +41,31 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 			// it is not the command's result, and an agent relaying it to a
 			// person needs it before the command finishes.
 			appName := mongo.AppName(globals().Version)
-			session, err := mongo.DeviceLogin(cmd.Context(), conn, appName, func(p credential.DevicePrompt) {
+			session, err := mongo.DeviceLogin(cmd.Context(), conn, appName, func(p credstore.DevicePrompt) {
 				out.WriteNotice(cmd.ErrOrStderr(), promptText(p), "")
 			})
 			if err != nil {
 				return err
 			}
-			if err := credential.SaveSession(alias, session); err != nil {
+			if err := credstore.SaveSession(alias, session); err != nil {
 				return err
 			}
 
 			return output.PrintRaw(loginReceipt(alias, connAlias, session))
 		},
-	}
+	})
 }
 
 // loginReceipt is what a completed login reports. Pure, so the shape can be
 // asserted without a deployment to log in to.
-func loginReceipt(alias, connAlias string, session credential.Session) map[string]any {
+func loginReceipt(alias, connAlias string, session credstore.Session) map[string]any {
 	receipt := map[string]any{
 		"ok":         true,
 		"credential": alias,
 		"connection": connAlias,
 		"host":       session.Host,
 		"issuer":     session.Issuer,
-		"storage":    credential.StorageType(credential.All()[alias]),
+		"storage":    credstore.StorageType(credstore.All()[alias]),
 	}
 	if !session.ExpiresAt.IsZero() {
 		receipt["expiresAt"] = shared.FormatExpiry(session.ExpiresAt)
@@ -75,7 +73,7 @@ func loginReceipt(alias, connAlias string, session credential.Session) map[strin
 	return receipt
 }
 
-func promptText(p credential.DevicePrompt) string {
+func promptText(p credstore.DevicePrompt) string {
 	if p.VerificationURIComplete != "" {
 		return fmt.Sprintf("To finish signing in, open %s and confirm the code %s",
 			p.VerificationURIComplete, p.UserCode)
@@ -99,7 +97,7 @@ func connectionForLogin(credAlias, requested string) (config.Connection, string,
 		return conn, requested, nil
 	}
 
-	using := credential.ConnectionsUsing(credAlias)
+	using := credstore.ConnectionsUsing(credAlias)
 	switch len(using) {
 	case 1:
 		conn, _ := config.GetConnection(using[0])

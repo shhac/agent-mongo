@@ -20,7 +20,7 @@ func execute(t *testing.T, args ...string) (string, error) {
 	root := &cobra.Command{Use: "agent-mongo"}
 	var connection string
 	root.PersistentFlags().StringVarP(&connection, "connection", "c", "", "")
-	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{Connection: connection} }, nil)
+	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{Connection: connection} })
 	root.SetArgs(args)
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)

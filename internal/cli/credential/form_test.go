@@ -14,6 +14,7 @@ import (
 	"github.com/shhac/lib-agent-cli/dialog/dialogtest"
 	out "github.com/shhac/lib-agent-output"
 
+	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
@@ -186,7 +187,7 @@ func TestCredentialAddFormDoesNotLeakSecretToStdout(t *testing.T) {
 	stdout, restore := testutil.CaptureStdout(t)
 
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root, nil)
+	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{} })
 	root.SetArgs([]string{"credential", "add", "leak-test", "--username", "deploy", "--form"})
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)

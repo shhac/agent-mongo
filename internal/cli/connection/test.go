@@ -1,4 +1,4 @@
-package cli
+package connection
 
 import (
 	"time"
@@ -13,10 +13,8 @@ import (
 	"github.com/shhac/agent-mongo/internal/serialize"
 )
 
-// newConnectionTestCommand builds `connection test`. It lives here for the
-// reason given in this package's doc comment: it needs the driver.
-func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+func registerTest(parent *cobra.Command, globals func() *shared.GlobalFlags) {
+	parent.AddCommand(&cobra.Command{
 		Use:   "test [alias]",
 		Short: "Test a MongoDB connection (ping)",
 		Args:  cobra.MaximumNArgs(1),
@@ -48,7 +46,7 @@ func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command
 				return output.PrintRaw(receipt)
 			})
 		},
-	}
+	})
 }
 
 // sessionExpiry reports when a connection's credential session runs out, when

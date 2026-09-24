@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/testutil"
 )
@@ -17,7 +18,7 @@ func runList(t *testing.T) []map[string]any {
 	t.Helper()
 	buf, restore := testutil.CaptureStdout(t)
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root, nil)
+	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{} })
 	root.SetArgs([]string{"credential", "list"})
 	err := root.Execute()
 	restore()

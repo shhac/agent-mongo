@@ -10,18 +10,14 @@ import (
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
-// Register builds the credential group. loginCmd is injected because logging in
-// needs a MongoDB connection, and this package is kept free of driver
-// dependencies; it may be nil where that command is not wanted.
-func Register(root *cobra.Command, loginCmd *cobra.Command) {
+// Register builds the credential group.
+func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 	cmd := &cobra.Command{Use: "credential", Short: "Manage stored credentials"}
 	registerAdd(cmd)
 	registerRemove(cmd)
 	registerList(cmd)
 	registerLogout(cmd)
-	if loginCmd != nil {
-		cmd.AddCommand(loginCmd)
-	}
+	registerLogin(cmd, globals)
 	shared.RegisterUsage(cmd, "credential", usageText)
 	root.AddCommand(cmd)
 }

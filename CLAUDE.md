@@ -11,8 +11,6 @@ internal/
 ├── cli/
 │   ├── root.go                # lib-agent-cli NewRoot + domain flags -c/--expand/--full
 │   ├── usage.go               # top-level LLM reference card
-│   ├── conntest.go            # `connection test` (kept here for the driver dep)
-│   ├── credlogin.go           # `credential login` (same reason)
 │   ├── mcp.go                 # `mcp` server via lib-agent-mcp (registered last)
 │   ├── shared/                # GlobalFlags DTO, WithSession, defaults, RegisterUsage
 │   ├── connection/            # connection add/remove/update/list/set-default
