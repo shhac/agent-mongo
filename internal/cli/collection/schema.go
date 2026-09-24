@@ -43,7 +43,7 @@ func registerSchema(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				return err
 			}
 
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.InferSchema(ctx.Ctx, mongo.SchemaOpts{
 					Ref:        ref,
 					SampleSize: sample,

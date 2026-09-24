@@ -26,7 +26,7 @@ func registerDistinct(parent *cobra.Command, globals func() *shared.GlobalFlags)
 				return err
 			}
 
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				values, err := ctx.Session.DistinctValues(ctx.Ctx, ref, field, filterDoc)
 				if err != nil {
 					return err

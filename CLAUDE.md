@@ -113,7 +113,7 @@ internal/
 - **Read-only safety**: no write operations; `$out`/`$merge` rejected in
   pipelines; results capped at `query.maxDocuments`.
 - **Timeouts**: `-t/--timeout` (ms) > config `query.timeout` > 30s, once for
-  connecting and once for the command. `WithSessionRef` pings under its own
+  connecting and once for the command. `shared.WithSession` pings under its own
   budget first (so DNS/TLS/auth never spend the query's time, and connect
   failures are classified as such), then starts a context carrying exactly the
   timeout (no grace: a ctx deadline overrides the client `SetTimeout`, so grace

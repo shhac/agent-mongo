@@ -46,10 +46,11 @@ func TestEveryCommandEchoesFaithfully(t *testing.T) {
 		{
 			name: "find",
 			run: func() error {
-				return printFind(mongo.FindResult{}, ref(), findEcho{
-					filter: trickyFilter(),
-					sort:   bson.D{{Key: "_id", Value: -1}},
-					limit:  20,
+				return printFind(mongo.FindResult{}, mongo.FindOpts{
+					Ref:    ref(),
+					Filter: trickyFilter(),
+					Sort:   bson.D{{Key: "_id", Value: -1}},
+					Limit:  20,
 				})
 			},
 			want: `{"@query":{"filter":{"status":"pending","deletedAt":null},"sort":{"_id":-1},"limit":20}}`,
@@ -103,7 +104,7 @@ func TestEveryCommandEchoesFaithfully(t *testing.T) {
 // feature existed.
 func TestNoCommandEchoesWhenTheFlagIsOff(t *testing.T) {
 	runs := map[string]func() error{
-		"find":      func() error { return printFind(mongo.FindResult{}, ref(), findEcho{filter: trickyFilter()}) },
+		"find":      func() error { return printFind(mongo.FindResult{}, mongo.FindOpts{Ref: ref(), Filter: trickyFilter()}) },
 		"count":     func() error { return printCount(7, ref(), trickyFilter()) },
 		"sample":    func() error { return printSample(nil, ref(), trickyFilter(), 5) },
 		"distinct":  func() error { return printDistinct(nil, ref(), "status", trickyFilter()) },

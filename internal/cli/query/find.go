@@ -21,46 +21,17 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 		Short: "Find documents matching a filter",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			g := globals()
-			ref := mongo.Ref{DB: args[0], Collection: args[1]}
-
-			filterDoc, err := parseOptionalDoc(filter, "filter")
+			query, err := findQuery(mongo.Ref{DB: args[0], Collection: args[1]},
+				filter, sort, projection, limit, skip)
 			if err != nil {
 				return err
 			}
-			sortDoc, err := parseOptionalDoc(sort, "sort")
-			if err != nil {
-				return err
-			}
-			if sortDoc == nil {
-				sortDoc = bson.D{{Key: "_id", Value: -1}}
-			}
-			projectionDoc, err := parseOptionalDoc(projection, "projection")
-			if err != nil {
-				return err
-			}
-
-			effectiveLimit := shared.EffectiveLimit(limit)
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
-				result, err := ctx.Session.FindDocuments(ctx.Ctx, mongo.FindOpts{
-					Ref:        ref,
-					Filter:     filterDoc,
-					Sort:       sortDoc,
-					Projection: projectionDoc,
-					Limit:      effectiveLimit,
-					Skip:       skip,
-				})
+			return shared.WithSession(globals(), query.Ref, func(ctx shared.SessionCtx) error {
+				result, err := ctx.Session.FindDocuments(ctx.Ctx, query)
 				if err != nil {
 					return err
 				}
-
-				return printFind(result, ref, findEcho{
-					filter:     filterDoc,
-					sort:       sortDoc,
-					projection: projectionDoc,
-					limit:      effectiveLimit,
-					skip:       skip,
-				})
+				return printFind(result, query)
 			})
 		},
 	}
@@ -75,17 +46,40 @@ func registerFind(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 	parent.AddCommand(cmd)
 }
 
-// findEcho is what `find` sent to the server, as sent — including the defaults
-// this CLI supplied rather than only the flags the caller typed.
-type findEcho struct {
-	filter, sort, projection bson.D
-	limit, skip              int
+// findQuery is what find sends: the parsed flags plus the defaults the CLI
+// supplies (newest first, the configured page size). The echo is printed from
+// the same value, so it reports the query that ran rather than a copy of it.
+func findQuery(ref mongo.Ref, filter, sort, projection string, limit, skip int) (mongo.FindOpts, error) {
+	filterDoc, err := parseOptionalDoc(filter, "filter")
+	if err != nil {
+		return mongo.FindOpts{}, err
+	}
+	sortDoc, err := parseOptionalDoc(sort, "sort")
+	if err != nil {
+		return mongo.FindOpts{}, err
+	}
+	if sortDoc == nil {
+		sortDoc = bson.D{{Key: "_id", Value: -1}}
+	}
+	projectionDoc, err := parseOptionalDoc(projection, "projection")
+	if err != nil {
+		return mongo.FindOpts{}, err
+	}
+	return mongo.FindOpts{
+		Ref:        ref,
+		Filter:     filterDoc,
+		Sort:       sortDoc,
+		Projection: projectionDoc,
+		Limit:      shared.EffectiveLimit(limit),
+		Skip:       skip,
+	}, nil
 }
 
 // printFind assembles the record set, its metadata and the optional query echo.
 // Split from the command so it is testable without a live session, following
 // collection.printIndexes.
-func printFind(result mongo.FindResult, ref mongo.Ref, q findEcho) error {
+func printFind(result mongo.FindResult, q mongo.FindOpts) error {
+	ref := q.Ref
 	meta := output.Meta(map[string]any{
 		"database":   ref.DB,
 		"collection": ref.Collection,
@@ -93,11 +87,11 @@ func printFind(result mongo.FindResult, ref mongo.Ref, q findEcho) error {
 	maps.Copy(meta, output.PaginationMeta(result.HasMore, "", int(result.TotalMatching)))
 
 	var e echo
-	e.doc("filter", q.filter)
-	e.doc("sort", q.sort)
-	e.doc("projection", q.projection)
-	e.num("limit", q.limit)
-	e.num("skip", q.skip)
+	e.doc("filter", q.Filter)
+	e.doc("sort", q.Sort)
+	e.doc("projection", q.Projection)
+	e.num("limit", q.Limit)
+	e.num("skip", q.Skip)
 	maps.Copy(meta, e.meta())
 
 	return output.PrintList(result.Documents, meta)

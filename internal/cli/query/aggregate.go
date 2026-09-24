@@ -26,7 +26,7 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 		Use:   "aggregate <database> <collection> [pipeline]",
 		Short: "Run a read-only aggregation pipeline",
 		Args:  cobra.RangeArgs(2, 3),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
 
@@ -34,13 +34,13 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 			if len(args) == 3 {
 				positional = args[2]
 			}
-			pipeline, err := resolvePipeline(positional, pipelineFlag)
+			pipeline, err := resolvePipeline(positional, pipelineFlag, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
 
 			maxResults := aggregateLimit(pipeline, limit)
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.Aggregate(ctx.Ctx, mongo.AggregateOpts{
 					Ref:      ref,
 					Pipeline: pipeline,
@@ -72,28 +72,31 @@ func aggregateLimit(pipeline bson.A, flag int) int {
 	return shared.EffectiveLimit(flag)
 }
 
-func resolvePipeline(positional, flag string) (bson.A, error) {
+// resolvePipeline takes the pipeline from the positional argument, else
+// --pipeline, else stdin.
+func resolvePipeline(positional, flag string, stdin io.Reader) (bson.A, error) {
 	raw := positional
 	if raw == "" {
 		raw = flag
 	}
 	if raw == "" {
-		stdin, err := readStdin()
+		piped, err := readPiped(stdin)
 		if err != nil {
 			return nil, err
 		}
-		raw = stdin
+		raw = piped
 	}
 	return ejson.ParseArray(raw, "pipeline")
 }
 
-func readStdin() (string, error) {
-	info, err := os.Stdin.Stat()
-	if err != nil || info.Mode()&os.ModeCharDevice != 0 {
+// readPiped reads a pipeline piped in. A terminal is refused rather than read:
+// waiting on one would hang an agent that simply forgot the argument.
+func readPiped(stdin io.Reader) (string, error) {
+	if isTerminal(stdin) {
 		return "", errors.New(
 			"Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.")
 	}
-	data, err := io.ReadAll(os.Stdin)
+	data, err := io.ReadAll(stdin)
 	if err != nil {
 		return "", err
 	}
@@ -103,6 +106,15 @@ func readStdin() (string, error) {
 			"Empty stdin. Provide pipeline as argument, --pipeline <json>, or pipe a JSON array via stdin.")
 	}
 	return trimmed, nil
+}
+
+func isTerminal(r io.Reader) bool {
+	file, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err != nil || info.Mode()&os.ModeCharDevice != 0
 }
 
 // printAggregate assembles the aggregation output and its optional echo, split

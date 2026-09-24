@@ -34,7 +34,7 @@ func registerSample(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				return err
 			}
 
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				docs, err := ctx.Session.SampleDocuments(ctx.Ctx, ref, requestedSize, filterDoc)
 				if err != nil {
 					return err

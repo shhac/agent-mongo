@@ -21,7 +21,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
-			return shared.WithSession(g, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, mongo.Ref{}, func(ctx shared.SessionCtx) error {
 				collections, err := ctx.Session.ListCollections(ctx.Ctx, args[0])
 				if err != nil {
 					return err
@@ -42,7 +42,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				indexes, err := ctx.Session.ListIndexes(ctx.Ctx, ref)
 				if err != nil {
 					return err
@@ -59,7 +59,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.CollectionStats(ctx.Ctx, ref)
 				if err != nil {
 					return err

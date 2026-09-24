@@ -15,20 +15,16 @@ type SessionCtx struct {
 }
 
 // WithSession connects using the global flags, runs fn, and closes the
-// session. Errors are enhanced with fixable_by classification and hints.
-func WithSession(g *GlobalFlags, fn func(SessionCtx) error) error {
-	return WithSessionRef(g, mongo.Ref{}, fn)
-}
-
-// WithSessionRef is WithSession with database/collection context for
-// timeout-error hints (index suggestions).
+// session. Errors are enhanced with fixable_by classification and hints; ref
+// is the database/collection a command targets, which a timeout hint names
+// (mongo.Ref{} when there is none).
 //
 // The connection is established before the command's deadline starts, under a
 // budget of its own. Otherwise DNS, TLS and authentication would spend the
 // query's time — shortening the maxTimeMS the server is given, failing a short
 // --timeout before any query ran, and reporting an unreachable server as a
 // query that needs an index.
-func WithSessionRef(g *GlobalFlags, ref mongo.Ref, fn func(SessionCtx) error) error {
+func WithSession(g *GlobalFlags, ref mongo.Ref, fn func(SessionCtx) error) error {
 	session, err := mongo.Connect(mongo.ConnectOpts{
 		AliasFlag: g.Connection,
 		Timeout:   g.Timeout(),

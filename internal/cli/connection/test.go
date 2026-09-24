@@ -9,6 +9,7 @@ import (
 	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
+	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 	"github.com/shhac/agent-mongo/internal/serialize"
 )
@@ -23,7 +24,7 @@ func registerTest(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			if len(args) == 1 {
 				g.Connection = args[0]
 			}
-			return shared.WithSession(g, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, mongo.Ref{}, func(ctx shared.SessionCtx) error {
 				var result bson.D
 				err := ctx.Session.Client.Database("admin").
 					RunCommand(ctx.Ctx, bson.D{{Key: "ping", Value: 1}}).

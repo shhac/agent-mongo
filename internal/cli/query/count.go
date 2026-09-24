@@ -23,7 +23,7 @@ func registerCount(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			if err != nil {
 				return err
 			}
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				count, err := ctx.Session.CountDocuments(ctx.Ctx, ref, filterDoc)
 				if err != nil {
 					return err

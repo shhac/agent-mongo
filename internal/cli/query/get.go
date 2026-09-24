@@ -32,7 +32,7 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 				return err
 			}
 
-			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, ref, func(ctx shared.SessionCtx) error {
 				doc, err := ctx.Session.FindByID(ctx.Ctx, mongo.FindByIDOpts{
 					Ref:        ref,
 					ID:         parsedID,

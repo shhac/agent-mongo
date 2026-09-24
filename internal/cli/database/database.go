@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
+	"github.com/shhac/agent-mongo/internal/mongo"
 	"github.com/shhac/agent-mongo/internal/output"
 )
 
@@ -18,7 +19,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			g := globals()
-			return shared.WithSession(g, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, mongo.Ref{}, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.ListDatabases(ctx.Ctx)
 				if err != nil {
 					return err
@@ -36,7 +37,7 @@ func Register(root *cobra.Command, globals func() *shared.GlobalFlags) {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
-			return shared.WithSession(g, func(ctx shared.SessionCtx) error {
+			return shared.WithSession(g, mongo.Ref{}, func(ctx shared.SessionCtx) error {
 				result, err := ctx.Session.DatabaseStats(ctx.Ctx, args[0])
 				if err != nil {
 					return err

@@ -22,19 +22,15 @@ import (
 // that password to wherever the agent chose, in cleartext under PLAIN, so an
 // agent must not be able to reach them at all.
 func registerMCP(root *cobra.Command) {
-	readOnly := map[string]bool{"database": true, "collection": true, "query": true}
-	skipped := map[string]bool{"credential": true, "config": true}
 	for _, cmd := range root.Commands() {
-		name := cmd.Name()
-		if readOnly[name] {
+		switch cmd.Name() {
+		case "database", "collection", "query":
 			agentmcp.Expose(cmd)
 			agentmcp.ReadOnly(cmd)
-		}
-		if name == "connection" {
+		case "connection":
 			agentmcp.Expose(cmd)
 			exposeReadOnlyLeaves(cmd, "list", "test", "usage")
-		}
-		if skipped[name] {
+		case "credential", "config":
 			agentmcp.Skip(cmd)
 		}
 	}
