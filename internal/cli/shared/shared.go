@@ -18,6 +18,11 @@ type GlobalFlags struct {
 	Full       bool   // --full
 	Format     string // -f/--format
 	TimeoutMS  int    // -t/--timeout > settings query.timeout > 30000
+
+	// Command and Version identify this run to the server (comment, appName),
+	// so a DBA can tell an agent-mongo query from the application's own.
+	Command string
+	Version string
 }
 
 // Timeout returns the effective operation timeout.
@@ -36,17 +41,22 @@ func EffectiveLimit(flagValue int) int {
 	if limit <= 0 {
 		limit = config.SettingOr("defaults.limit")
 	}
-	if max := config.SettingOr("query.maxDocuments"); limit > max {
-		return max
-	}
-	return limit
+	return min(limit, MaxDocuments())
 }
 
-// MakeContext builds the per-command context. The deadline gets a small grace
-// period beyond the server-side maxTimeMS so MongoDB's own timeout error
-// (code 50, which carries better hints) fires before the context does.
+// MaxDocuments is the most any one query returns (query.maxDocuments).
+func MaxDocuments() int { return config.SettingOr("query.maxDocuments") }
+
+// MakeContext builds the per-command context: one deadline for everything the
+// command sends. The driver derives each command's maxTimeMS from what is left
+// of it (less the round trip), so the server stops the work at the same moment
+// the CLI stops waiting for it.
+//
+// It has to be the timeout exactly. A deadline takes precedence over the
+// client-level timeout, so any grace added here would lengthen both what the
+// caller waits and what the server is allowed to run.
 func (g *GlobalFlags) MakeContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), g.Timeout()+5*time.Second)
+	return context.WithTimeout(context.Background(), g.Timeout())
 }
 
 // FormatExpiry renders a session or token expiry for output. One function so

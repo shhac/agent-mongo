@@ -15,7 +15,7 @@ func TestClientOptionsPoolIsCLISized(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	conn := config.Connection{ConnectionString: "mongodb://localhost:27017/db"}
-	opts, err := clientOptions(conn, 30*time.Second)
+	opts, err := clientOptions(conn, ConnectOpts{Timeout: 30 * time.Second})
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestClientOptionsPoolIsCLISized(t *testing.T) {
 func TestClientOptionsZeroTimeoutLeavesDriverDefault(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	opts, err := clientOptions(config.Connection{ConnectionString: "mongodb://localhost:27017"}, 0)
+	opts, err := clientOptions(config.Connection{ConnectionString: "mongodb://localhost:27017"}, ConnectOpts{})
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
@@ -55,8 +55,22 @@ func TestClientOptionsUnknownCredential(t *testing.T) {
 	_, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017",
 		Credential:       "ghost",
-	}, 0)
+	}, ConnectOpts{})
 	if err == nil {
 		t.Fatal("expected error for unknown credential")
+	}
+}
+
+// The handshake names agent-mongo so a DBA can attribute its connections, but
+// an appName the connection string sets is the operator's choice and wins.
+func TestAppName(t *testing.T) {
+	opts := baseClientOptions("mongodb://localhost:27017/app", AppName("1.2.3"))
+	if opts.AppName == nil || *opts.AppName != "agent-mongo/1.2.3" {
+		t.Errorf("AppName = %v, want agent-mongo/1.2.3", opts.AppName)
+	}
+
+	opts = baseClientOptions("mongodb://localhost:27017/app?appName=reporting", AppName("1.2.3"))
+	if opts.AppName == nil || *opts.AppName != "reporting" {
+		t.Errorf("AppName = %v, want the connection string's", opts.AppName)
 	}
 }

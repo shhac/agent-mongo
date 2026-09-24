@@ -22,7 +22,7 @@ func oidcConnection(t *testing.T, uri string, flow *config.Flow) (*optionsAuth, 
 	opts, err := clientOptions(config.Connection{
 		ConnectionString: uri,
 		Credential:       "corp",
-	}, 0)
+	}, ConnectOpts{})
 	if err != nil {
 		return nil, err
 	}

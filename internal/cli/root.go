@@ -32,6 +32,9 @@ type rootFlags struct {
 	Connection string
 	Expand     string
 	Full       bool
+
+	version string
+	command string // path of the command being run, recorded in the pre-run
 }
 
 // shared snapshots the live flag values for leaf commands.
@@ -42,19 +45,24 @@ func (g *rootFlags) shared() *shared.GlobalFlags {
 		Full:       g.Full,
 		Format:     g.Format,
 		TimeoutMS:  g.TimeoutMS,
+		Command:    g.command,
+		Version:    g.version,
 	}
 }
 
 func newRootCmd(version string) *cobra.Command {
-	g := &rootFlags{}
+	g := &rootFlags{version: version}
 	root := libcli.NewRoot(libcli.Options{
-		Use:            "agent-mongo",
-		Short:          "Read-only MongoDB CLI for AI agents",
-		Version:        version,
-		Globals:        &g.Globals,
-		DefaultFormat:  output.FormatNDJSON,
-		UnknownHint:    "run 'agent-mongo usage' to see the available commands",
-		ConfigDefaults: func(_ *cobra.Command) { applyConfigDefaults(g) },
+		Use:           "agent-mongo",
+		Short:         "Read-only MongoDB CLI for AI agents",
+		Version:       version,
+		Globals:       &g.Globals,
+		DefaultFormat: output.FormatNDJSON,
+		UnknownHint:   "run 'agent-mongo usage' to see the available commands",
+		ConfigDefaults: func(cmd *cobra.Command) {
+			g.command = cmd.CommandPath()
+			applyConfigDefaults(g)
+		},
 	})
 
 	pf := root.PersistentFlags()

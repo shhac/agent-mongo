@@ -68,14 +68,14 @@ func (d *deviceLogin) callback(
 // No operation timeout is applied. A person has to read a code, open a link and
 // approve on another device, which is not a query.
 func DeviceLogin(
-	ctx context.Context, conn config.Connection, prompt func(credential.DevicePrompt),
+	ctx context.Context, conn config.Connection, appName string, prompt func(credential.DevicePrompt),
 ) (credential.Session, error) {
 	login := &deviceLogin{
 		host:   mongouri.ParseHostFromURI(conn.ConnectionString),
 		prompt: prompt,
 	}
 
-	clientOpts := baseClientOptions(conn.ConnectionString).
+	clientOpts := baseClientOptions(conn.ConnectionString, appName).
 		SetAuth(options.Credential{
 			AuthMechanism:     oidcMechanism,
 			OIDCHumanCallback: login.callback,

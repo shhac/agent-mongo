@@ -38,23 +38,8 @@ func orEmpty(filter bson.D) bson.D {
 }
 
 func (s *Session) FindDocuments(ctx context.Context, opts FindOpts) (FindResult, error) {
-	collection := s.Client.Database(opts.DB).Collection(opts.Collection)
-	filter := orEmpty(opts.Filter)
-
-	findOpts := options.Find().SetSkip(int64(opts.Skip)).SetLimit(int64(opts.Limit + 1))
-	if opts.Sort != nil {
-		findOpts = findOpts.SetSort(opts.Sort)
-	}
-	if opts.Projection != nil {
-		findOpts = findOpts.SetProjection(opts.Projection)
-	}
-
-	cursor, err := collection.Find(ctx, filter, findOpts)
+	raw, err := s.runCursor(ctx, opts.DB, findCommand(opts))
 	if err != nil {
-		return FindResult{}, err
-	}
-	var raw []bson.D
-	if err := cursor.All(ctx, &raw); err != nil {
 		return FindResult{}, err
 	}
 
@@ -63,7 +48,7 @@ func (s *Session) FindDocuments(ctx context.Context, opts FindOpts) (FindResult,
 		raw = raw[:opts.Limit]
 	}
 
-	totalMatching, err := s.countWithFilter(ctx, collection, filter)
+	totalMatching, err := s.countWithFilter(ctx, opts.Ref, orEmpty(opts.Filter))
 	if err != nil {
 		return FindResult{}, err
 	}
@@ -76,13 +61,20 @@ func (s *Session) FindDocuments(ctx context.Context, opts FindOpts) (FindResult,
 	}, nil
 }
 
-func (s *Session) countWithFilter(
-	ctx context.Context, collection *driver.Collection, filter bson.D,
-) (int64, error) {
+func (s *Session) countWithFilter(ctx context.Context, ref Ref, filter bson.D) (int64, error) {
 	if len(filter) == 0 {
-		return collection.EstimatedDocumentCount(ctx)
+		return s.estimatedCount(ctx, ref)
 	}
-	return collection.CountDocuments(ctx, filter)
+	return s.collection(ref).CountDocuments(ctx, filter, commented(options.Count(), s.comment))
+}
+
+func (s *Session) estimatedCount(ctx context.Context, ref Ref) (int64, error) {
+	return s.collection(ref).EstimatedDocumentCount(ctx,
+		commented(options.EstimatedDocumentCount(), s.comment))
+}
+
+func (s *Session) collection(ref Ref) *driver.Collection {
+	return s.Client.Database(ref.DB).Collection(ref.Collection)
 }
 
 type FindByIDOpts struct {
@@ -115,12 +107,12 @@ func (s *Session) FindByID(ctx context.Context, opts FindByIDOpts) (map[string]a
 	if err != nil {
 		return nil, err
 	}
-	findOpts := options.FindOne()
+	findOpts := commented(options.FindOne(), s.comment)
 	if opts.Projection != nil {
 		findOpts = findOpts.SetProjection(opts.Projection)
 	}
 	var doc bson.D
-	err = s.Client.Database(opts.DB).Collection(opts.Collection).
+	err = s.collection(opts.Ref).
 		FindOne(ctx, bson.D{{Key: "_id", Value: id}}, findOpts).
 		Decode(&doc)
 	if err != nil {
@@ -133,15 +125,14 @@ func (s *Session) FindByID(ctx context.Context, opts FindByIDOpts) (map[string]a
 }
 
 func (s *Session) CountDocuments(ctx context.Context, ref Ref, filter bson.D) (int64, error) {
-	collection := s.Client.Database(ref.DB).Collection(ref.Collection)
-	return s.countWithFilter(ctx, collection, orEmpty(filter))
+	return s.countWithFilter(ctx, ref, orEmpty(filter))
 }
 
 func (s *Session) DistinctValues(
 	ctx context.Context, ref Ref, field string, filter bson.D,
 ) ([]any, error) {
-	collection := s.Client.Database(ref.DB).Collection(ref.Collection)
-	result := collection.Distinct(ctx, field, orEmpty(filter))
+	result := s.collection(ref).Distinct(ctx, field, orEmpty(filter),
+		commented(options.Distinct(), s.comment))
 	// Asked first because Decode ignores it despite documenting otherwise: a
 	// failed distinct would surface as "error decoding key arr: unexpected EOF",
 	// losing the timeout or auth failure an agent needs to act on.
@@ -169,12 +160,8 @@ func (s *Session) SampleDocuments(
 	}
 	pipeline = append(pipeline, bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: size}}}})
 
-	cursor, err := s.Client.Database(ref.DB).Collection(ref.Collection).Aggregate(ctx, pipeline)
+	raw, err := s.runCursor(ctx, ref.DB, aggregateCommand(ref.Collection, pipeline, size))
 	if err != nil {
-		return nil, err
-	}
-	var raw []bson.D
-	if err := cursor.All(ctx, &raw); err != nil {
 		return nil, err
 	}
 	return serialize.Documents(raw), nil

@@ -39,27 +39,37 @@ func registerAggregate(parent *cobra.Command, globals func() *shared.GlobalFlags
 				return err
 			}
 
-			effectiveLimit := shared.EffectiveLimit(limit)
+			maxResults := aggregateLimit(pipeline, limit)
 			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
-				docs, err := ctx.Session.Aggregate(ctx.Ctx, mongo.AggregateOpts{
+				result, err := ctx.Session.Aggregate(ctx.Ctx, mongo.AggregateOpts{
 					Ref:      ref,
 					Pipeline: pipeline,
-					Limit:    effectiveLimit,
+					Limit:    maxResults,
 				})
 				if err != nil {
 					return err
 				}
-				return printAggregate(docs, ref, pipeline, effectiveLimit)
+				return printAggregate(result, ref, pipeline, maxResults)
 			})
 		},
 	}
 
 	cmd.Flags().StringVar(&pipelineFlag, "pipeline", "",
 		"Aggregation pipeline as JSON array (or pipe via stdin)")
-	cmd.Flags().IntVar(&limit, "limit", 0, "Max results if pipeline has no $limit stage")
+	cmd.Flags().IntVar(&limit, "limit", 0, "Max results if the pipeline has no $limit stage (a pipeline's own $limit is capped at query.maxDocuments)")
 	cmd.Flags().BoolVar(&stream, "stream", false, "Deprecated no-op: NDJSON is the default output")
 	_ = cmd.Flags().MarkHidden("stream")
 	parent.AddCommand(cmd)
+}
+
+// aggregateLimit is the cap an aggregation runs under. A pipeline with a $limit
+// of its own decides how many results it wants, up to query.maxDocuments like
+// every other query; one without gets --limit or the default page size.
+func aggregateLimit(pipeline bson.A, flag int) int {
+	if mongo.HasLimitStage(pipeline) {
+		return shared.MaxDocuments()
+	}
+	return shared.EffectiveLimit(flag)
 }
 
 func resolvePipeline(positional, flag string) (bson.A, error) {
@@ -97,16 +107,17 @@ func readStdin() (string, error) {
 
 // printAggregate assembles the aggregation output and its optional echo, split
 // from the command so it is testable without a live session.
-func printAggregate(docs []map[string]any, ref mongo.Ref, pipeline bson.A, limit int) error {
+func printAggregate(result mongo.AggregateResult, ref mongo.Ref, pipeline bson.A, limit int) error {
 	meta := output.Meta(map[string]any{
 		"database":   ref.DB,
 		"collection": ref.Collection,
-		"count":      len(docs),
+		"count":      len(result.Documents),
 	})
+	maps.Copy(meta, output.PaginationMeta(result.HasMore, "", 0))
 	var e echo
 	// Both orders matter: the sequence of stages, and each stage's fields.
 	e.value("pipeline", serialize.OrderedValue(pipeline))
 	e.num("limit", limit)
 	maps.Copy(meta, e.meta())
-	return output.PrintList(docs, meta)
+	return output.PrintList(result.Documents, meta)
 }

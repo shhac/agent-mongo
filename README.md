@@ -333,8 +333,9 @@ agent-mongo is strictly read-only:
 
 - No insert, update, or delete operations
 - Aggregation pipelines reject `$out` and `$merge` stages
-- Results capped at `query.maxDocuments` (default 100)
-- Timeout applies to both connections and queries (default 30s), override per-command with `-t/--timeout <ms>`
+- Results capped at `query.maxDocuments` (default 100), including aggregation pipelines with their own `$limit`
+- Timeout applies to both connections and queries (default 30s), override per-command with `-t/--timeout <ms>`. The server gets the same limit as `maxTimeMS`, so a query the CLI gives up on stops on the server too
+- Commands are tagged for DBAs: `comment: "agent-mongo <command>"` on each command, and `appName: "agent-mongo/<version>"` on the connection (unless the connection string sets its own)
 
 ## Configuration
 

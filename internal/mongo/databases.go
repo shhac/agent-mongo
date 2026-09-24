@@ -31,7 +31,7 @@ func (s *Session) ListDatabases(ctx context.Context) (DatabaseList, error) {
 
 func (s *Session) DatabaseStats(ctx context.Context, dbName string) (map[string]any, error) {
 	var result bson.M
-	err := s.Client.Database(dbName).RunCommand(ctx, bson.D{{Key: "dbStats", Value: 1}}).Decode(&result)
+	err := s.Client.Database(dbName).RunCommand(ctx, s.tag(bson.D{{Key: "dbStats", Value: 1}})).Decode(&result)
 	if err != nil {
 		return nil, err
 	}

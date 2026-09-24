@@ -49,8 +49,7 @@ func (s *Session) InferSchema(ctx context.Context, opts SchemaOpts) (SchemaResul
 		return SchemaResult{}, err
 	}
 
-	collection := s.Client.Database(opts.DB).Collection(opts.Collection)
-	totalDocuments, err := collection.EstimatedDocumentCount(ctx)
+	totalDocuments, err := s.estimatedCount(ctx, opts.Ref)
 	if err != nil {
 		return SchemaResult{}, err
 	}
@@ -60,14 +59,10 @@ func (s *Session) InferSchema(ctx context.Context, opts SchemaOpts) (SchemaResul
 		effectiveSize = int(totalDocuments)
 	}
 
-	cursor, err := collection.Aggregate(ctx, bson.A{
+	docs, err := s.runCursor(ctx, opts.DB, aggregateCommand(opts.Collection, bson.A{
 		bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: effectiveSize}}}},
-	})
+	}, effectiveSize))
 	if err != nil {
-		return SchemaResult{}, err
-	}
-	var docs []bson.D
-	if err := cursor.All(ctx, &docs); err != nil {
 		return SchemaResult{}, err
 	}
 

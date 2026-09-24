@@ -80,7 +80,7 @@ func TestEveryCommandEchoesFaithfully(t *testing.T) {
 		{
 			name: "aggregate",
 			run: func() error {
-				return printAggregate(nil, ref(), bson.A{
+				return printAggregate(mongo.AggregateResult{}, ref(), bson.A{
 					bson.D{{Key: "$match", Value: bson.D{{Key: "status", Value: "pending"}, {Key: "deletedAt", Value: nil}}}},
 				}, 20)
 			},
@@ -108,7 +108,7 @@ func TestNoCommandEchoesWhenTheFlagIsOff(t *testing.T) {
 		"sample":    func() error { return printSample(nil, ref(), trickyFilter(), 5) },
 		"distinct":  func() error { return printDistinct(nil, ref(), "status", trickyFilter()) },
 		"get":       func() error { return printGet(map[string]any{"_id": "x"}, ref(), "abc", "", nil) },
-		"aggregate": func() error { return printAggregate(nil, ref(), bson.A{}, 20) },
+		"aggregate": func() error { return printAggregate(mongo.AggregateResult{}, ref(), bson.A{}, 20) },
 	}
 
 	for name, run := range runs {

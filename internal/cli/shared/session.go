@@ -22,23 +22,34 @@ func WithSession(g *GlobalFlags, fn func(SessionCtx) error) error {
 
 // WithSessionRef is WithSession with database/collection context for
 // timeout-error hints (index suggestions).
+//
+// The connection is established before the command's deadline starts, under a
+// budget of its own. Otherwise DNS, TLS and authentication would spend the
+// query's time — shortening the maxTimeMS the server is given, failing a short
+// --timeout before any query ran, and reporting an unreachable server as a
+// query that needs an index.
 func WithSessionRef(g *GlobalFlags, ref mongo.Ref, fn func(SessionCtx) error) error {
-	ctx, cancel := g.MakeContext()
-	defer cancel()
-
 	session, err := mongo.Connect(mongo.ConnectOpts{
 		AliasFlag: g.Connection,
 		Timeout:   g.Timeout(),
+		AppName:   mongo.AppName(g.Version),
+		Comment:   g.Command,
 	})
 	if err != nil {
-		return enhance(err, g, ref)
+		return enhance(err, g, ref, true)
 	}
-	defer session.Close(context.Background())
+	defer session.Close()
 
-	return enhance(fn(SessionCtx{Ctx: ctx, Session: session, Globals: g}), g, ref)
+	if err := session.Ping(g.Timeout()); err != nil {
+		return enhance(err, g, ref, true)
+	}
+
+	ctx, cancel := g.MakeContext()
+	defer cancel()
+	return enhance(fn(SessionCtx{Ctx: ctx, Session: session, Globals: g}), g, ref, false)
 }
 
-func enhance(err error, g *GlobalFlags, ref mongo.Ref) error {
+func enhance(err error, g *GlobalFlags, ref mongo.Ref, connecting bool) error {
 	if err == nil {
 		return nil
 	}
@@ -46,5 +57,6 @@ func enhance(err error, g *GlobalFlags, ref mongo.Ref) error {
 		Database:   ref.DB,
 		Collection: ref.Collection,
 		TimeoutMS:  int(g.Timeout().Milliseconds()),
+		Connecting: connecting,
 	})
 }

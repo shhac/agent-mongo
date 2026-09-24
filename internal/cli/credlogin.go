@@ -42,7 +42,8 @@ func newCredentialLoginCommand(globals func() *shared.GlobalFlags) *cobra.Comman
 			// The prompt is a notice on stderr rather than a record on stdout:
 			// it is not the command's result, and an agent relaying it to a
 			// person needs it before the command finishes.
-			session, err := mongo.DeviceLogin(cmd.Context(), conn, func(p credential.DevicePrompt) {
+			appName := mongo.AppName(globals().Version)
+			session, err := mongo.DeviceLogin(cmd.Context(), conn, appName, func(p credential.DevicePrompt) {
 				out.WriteNotice(cmd.ErrOrStderr(), promptText(p), "")
 			})
 			if err != nil {

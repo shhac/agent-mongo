@@ -121,7 +121,7 @@ func TestDeviceLoginCallbackReportsDenial(t *testing.T) {
 // The login path uses the same pool policy as every other connection, rather
 // than restating the numbers.
 func TestBaseClientOptionsAreShared(t *testing.T) {
-	opts := baseClientOptions("mongodb://localhost:27017/app")
+	opts := baseClientOptions("mongodb://localhost:27017/app", "")
 	if opts.MaxPoolSize == nil || *opts.MaxPoolSize != 1 {
 		t.Errorf("MaxPoolSize = %v, want 1", opts.MaxPoolSize)
 	}

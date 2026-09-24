@@ -43,7 +43,9 @@ CONNECTION: -c flag > AGENT_MONGO_CONNECTION env > config default.
   named after the connection alias; displayed connection strings redact passwords.
 
 SAFETY: Read-only. No write operations. Aggregation rejects $out/$merge.
-  Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).
+  Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s),
+  enforced on the server too (maxTimeMS). Commands carry comment "agent-mongo <command>"
+  and connect as appName "agent-mongo/<version>", so a DBA can attribute them.
 
 OUTPUT: NDJSON to stdout — one JSON record per line; metadata rides on
   @-prefixed lines (e.g. {"@pagination": ...}). Use -f json for a pretty

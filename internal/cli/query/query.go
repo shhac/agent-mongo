@@ -58,6 +58,9 @@ COMMANDS:
   query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]
     Run aggregation pipeline. Write stages ($out, $merge) are rejected.
     Pipeline can be passed as positional arg, via --pipeline flag, or piped via stdin.
+    --limit (default 20) applies when the pipeline has no $limit of its own; a
+    pipeline's $limit is still capped at query.maxDocuments. When a cap cuts
+    results short, a trailing {"@pagination": {"has_more": true}} line says so.
 
 ECHO: --echo-query adds an {"@query": ...} line reporting what actually ran —
   filter, sort, projection, limit, skip, pipeline, as sent to the server,
@@ -71,7 +74,10 @@ JSON ARGS: All --filter, --sort, --projection, --pipeline values accept MongoDB 
   Use {"$date":"2026-01-01T00:00:00Z"} for dates, {"$oid":"..."} for ObjectIds, etc.
 
 LIMITS: Results capped at query.maxDocuments (default 100). Timeout: query.timeout (default 30s).
-  Override per-command with -t/--timeout <ms>. On timeout, hints suggest increasing timeout or checking indexes.
+  Override per-command with -t/--timeout <ms>. The server is given the same limit
+  (maxTimeMS), so a query that times out stops on the server too rather than
+  running on after the CLI gives up. On timeout, hints suggest increasing the
+  timeout or checking indexes.
 
 OUTPUT: NDJSON — one JSON record per line; metadata on @-prefixed lines.
   Use -f json for a pretty {"data": [...]} envelope.

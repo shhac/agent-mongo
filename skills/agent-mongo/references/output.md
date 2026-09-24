@@ -196,6 +196,8 @@ Index specs are **verbatim**, unlike every other command's output — safe to co
 {"@meta":{"collection":"orders","count":2,"database":"testdb"}}
 ```
 
+When the limit (or `query.maxDocuments`, for a pipeline with its own `$limit`) cuts the result short, a `{"@pagination":{"has_more":true}}` line follows. There is no `total_items`: counting the full result would mean running the pipeline to completion.
+
 ## Connection list (`connection list`)
 
 ```

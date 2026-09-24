@@ -102,9 +102,18 @@ internal/
   ≤2^53-1 else string, Decimal128 → string, Regex → `/pattern/flags`.
 - **Read-only safety**: no write operations; `$out`/`$merge` rejected in
   pipelines; results capped at `query.maxDocuments`.
-- **Timeouts**: `-t/--timeout` (ms) > config `query.timeout` > 30s, applied as
-  the driver's client-level CSOT (`SetTimeout`); per-command contexts get a 5s
-  grace so server-side timeout errors (better hints) fire first.
+- **Timeouts**: `-t/--timeout` (ms) > config `query.timeout` > 30s, once for
+  connecting and once for the command. `WithSessionRef` pings under its own
+  budget first (so DNS/TLS/auth never spend the query's time, and connect
+  failures are classified as such), then starts a context carrying exactly the
+  timeout (no grace: a ctx deadline overrides the client `SetTimeout`, so grace
+  would lengthen the server's limit too). The driver derives each command's
+  `maxTimeMS` from it. The driver
+  never sends `maxTimeMS` on `Collection.Find`/`Aggregate`, so find and
+  aggregate go through `Session.runCursor` (`RunCommandCursor`, which forwards
+  the URI's read preference/concern). Never use the collection cursor helpers
+  for queries. Every data command carries `comment` = the command path;
+  connections carry `appName` = `agent-mongo/<version>`.
 - **Usage subcommands**: every group has an LLM-optimized `usage` leaf. When
   changing a command's behavior, options, or output shape, update its
   usageText and the top-level card in `internal/cli/usage.go`.

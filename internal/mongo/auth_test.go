@@ -25,7 +25,7 @@ func TestClientOptionsAppliesSCRAMCredential(t *testing.T) {
 	opts, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017/db",
 		Credential:       "acme",
-	}, 0)
+	}, ConnectOpts{})
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestClientOptionsPropagatesUnresolvableCredential(t *testing.T) {
 	opts, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017/db",
 		Credential:       "ghost",
-	}, 0)
+	}, ConnectOpts{})
 	if err == nil {
 		t.Fatal("clientOptions accepted a credential whose secret cannot be read")
 	}
@@ -67,7 +67,7 @@ func TestClientOptionsRejectsUnsupportedKind(t *testing.T) {
 	_, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017/db",
 		Credential:       "future",
-	}, 0)
+	}, ConnectOpts{})
 	if err == nil {
 		t.Fatal("clientOptions accepted a kind this build cannot drive")
 	}
@@ -125,7 +125,7 @@ func TestClientOptionsAuthSourceFollowsTheURI(t *testing.T) {
 			opts, err := clientOptions(config.Connection{
 				ConnectionString: tt.uri,
 				Credential:       "acme",
-			}, 0)
+			}, ConnectOpts{})
 			if err != nil {
 				t.Fatalf("clientOptions: %v", err)
 			}
@@ -154,7 +154,7 @@ func TestClientOptionsKeepsURIAuthMechanism(t *testing.T) {
 	opts, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://localhost:27017/app?authMechanism=SCRAM-SHA-1",
 		Credential:       "acme",
-	}, 0)
+	}, ConnectOpts{})
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestClientOptionsOverlaysOntoURIDerivedAuth(t *testing.T) {
 	opts, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://uri-user:uri-pass@host:27017/app?authMechanism=SCRAM-SHA-1&authSource=admin",
 		Credential:       "acme",
-	}, 0)
+	}, ConnectOpts{})
 	if err != nil {
 		t.Fatalf("clientOptions: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestClientOptionsAllowsPlaintextSCRAM(t *testing.T) {
 	if _, err := clientOptions(config.Connection{
 		ConnectionString: "mongodb://anywhere.example.com:27017/app",
 		Credential:       "acme",
-	}, 0); err != nil {
+	}, ConnectOpts{}); err != nil {
 		t.Fatalf("a plaintext SCRAM connection was refused: %v", err)
 	}
 }

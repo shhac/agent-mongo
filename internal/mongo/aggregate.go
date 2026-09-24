@@ -65,7 +65,8 @@ func validateSubPipelines(elem bson.E) error {
 	return nil
 }
 
-func hasLimitStage(pipeline bson.A) bool {
+// HasLimitStage reports whether the pipeline sets its own top-level $limit.
+func HasLimitStage(pipeline bson.A) bool {
 	for _, stage := range pipeline {
 		doc, ok := stage.(bson.D)
 		if !ok {
@@ -83,27 +84,35 @@ func hasLimitStage(pipeline bson.A) bool {
 type AggregateOpts struct {
 	Ref
 	Pipeline bson.A
-	Limit    int
+	// Limit caps the results, whatever the pipeline's own $limit says.
+	Limit int
 }
 
-func (s *Session) Aggregate(ctx context.Context, opts AggregateOpts) ([]map[string]any, error) {
+type AggregateResult struct {
+	Documents []map[string]any
+	// HasMore reports that the pipeline produced more than Limit results.
+	HasMore bool
+}
+
+func (s *Session) Aggregate(ctx context.Context, opts AggregateOpts) (AggregateResult, error) {
 	if err := ValidatePipeline(opts.Pipeline); err != nil {
-		return nil, err
+		return AggregateResult{}, err
 	}
 
-	pipeline := opts.Pipeline
-	if !hasLimitStage(pipeline) {
-		pipeline = append(append(bson.A{}, pipeline...),
-			bson.D{{Key: "$limit", Value: opts.Limit}})
-	}
+	// One past the cap, so a capped result can say so. Appended even after a
+	// $limit of the pipeline's own, which would otherwise decide how much comes
+	// back regardless of query.maxDocuments.
+	fetch := opts.Limit + 1
+	pipeline := append(append(bson.A{}, opts.Pipeline...),
+		bson.D{{Key: "$limit", Value: fetch}})
 
-	cursor, err := s.Client.Database(opts.DB).Collection(opts.Collection).Aggregate(ctx, pipeline)
+	raw, err := s.runCursor(ctx, opts.DB, aggregateCommand(opts.Collection, pipeline, fetch))
 	if err != nil {
-		return nil, err
+		return AggregateResult{}, err
 	}
-	var raw []bson.D
-	if err := cursor.All(ctx, &raw); err != nil {
-		return nil, err
+	hasMore := len(raw) > opts.Limit
+	if hasMore {
+		raw = raw[:opts.Limit]
 	}
-	return serialize.Documents(raw), nil
+	return AggregateResult{Documents: serialize.Documents(raw), HasMore: hasMore}, nil
 }

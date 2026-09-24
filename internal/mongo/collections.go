@@ -59,7 +59,7 @@ func (s *Session) ListCollections(ctx context.Context, dbName string) ([]Collect
 func (s *Session) CollectionStats(ctx context.Context, ref Ref) (map[string]any, error) {
 	var result bson.M
 	err := s.Client.Database(ref.DB).
-		RunCommand(ctx, bson.D{{Key: "collStats", Value: ref.Collection}}).
+		RunCommand(ctx, s.tag(bson.D{{Key: "collStats", Value: ref.Collection}})).
 		Decode(&result)
 	if err != nil {
 		return nil, err

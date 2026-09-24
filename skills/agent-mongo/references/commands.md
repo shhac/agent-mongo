@@ -53,7 +53,7 @@ All `query` commands accept `--echo-query`, which adds an `{"@query": ...}` line
 - `agent-mongo query count <database> <collection> [--filter <json>] [-c <alias>]` — count documents (omit filter for total)
 - `agent-mongo query sample <database> <collection> [--size <n>] [--filter <json>] [-c <alias>]` — random documents (default: 5, configurable via defaults.sampleSize). Use --filter to sample from a subset.
 - `agent-mongo query distinct <database> <collection> <field> [--filter <json>] [-c <alias>]` — distinct values (supports dot notation)
-- `agent-mongo query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]` — run aggregation ($out/$merge rejected; pipeline as positional arg, --pipeline flag, or stdin)
+- `agent-mongo query aggregate <database> <collection> [pipeline] [--pipeline <json>] [--limit <n>] [-c <alias>]` — run aggregation ($out/$merge rejected; pipeline as positional arg, --pipeline flag, or stdin). `--limit` applies when the pipeline has no `$limit`; a pipeline's own `$limit` is capped at `query.maxDocuments`, with `@pagination.has_more` when cut short
 
 ## MCP
 
