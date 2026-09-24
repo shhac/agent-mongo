@@ -77,10 +77,10 @@ func TestUpdateRejectsUnknownCredential(t *testing.T) {
 	}
 }
 
-// RequireExists, not Resolve: wiring up a reference must not demand that the
+// CheckConnection, not Resolve: wiring up a reference must not demand that the
 // credential can authenticate at that moment. A keychain-backed entry whose
 // secret is momentarily unreadable is still a valid thing to point a
-// connection at, and phases 2-4 add kinds that have no session until someone
+// connection at, and a device-flow credential has no session until someone
 // logs in.
 func TestUpdateAcceptsCredentialThatCannotResolve(t *testing.T) {
 	testutil.IsolateConfig(t)

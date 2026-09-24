@@ -11,7 +11,6 @@ import (
 type SessionCtx struct {
 	Ctx     context.Context
 	Session *mongo.Session
-	Globals *GlobalFlags
 }
 
 // WithSession connects using the global flags, runs fn, and closes the
@@ -42,7 +41,7 @@ func WithSession(g *GlobalFlags, ref mongo.Ref, fn func(SessionCtx) error) error
 
 	ctx, cancel := g.MakeContext()
 	defer cancel()
-	return enhance(fn(SessionCtx{Ctx: ctx, Session: session, Globals: g}), g, ref, false)
+	return enhance(fn(SessionCtx{Ctx: ctx, Session: session}), g, ref, false)
 }
 
 func enhance(err error, g *GlobalFlags, ref mongo.Ref, connecting bool) error {

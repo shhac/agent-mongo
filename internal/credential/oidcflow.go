@@ -15,7 +15,7 @@ type flowHandler struct {
 	// validate rejects a recipe this build cannot drive.
 	validate func(alias string, flow *config.Flow) error
 	// mayWidenHosts says whether an operator may replace this flow's
-	// allowed-hosts list. See flowsThatMayWidenHosts' reasoning in oidchosts.go.
+	// allowed-hosts list. See the reasoning above allowedHostsFor in oidchosts.go.
 	mayWidenHosts bool
 	// token fetches the access token when agent-mongo is the one holding it.
 	// Nil when the driver obtains the token itself, as it does for the

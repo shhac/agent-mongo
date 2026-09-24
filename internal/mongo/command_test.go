@@ -152,9 +152,6 @@ func TestNewSessionKeepsReadPreferenceAndConcern(t *testing.T) {
 	if session.readConcern != "majority" {
 		t.Errorf("readConcern = %q, want majority", session.readConcern)
 	}
-	if session.DBName != "app" {
-		t.Errorf("DBName = %q", session.DBName)
-	}
 }
 
 func TestStatsRecords(t *testing.T) {

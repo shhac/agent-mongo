@@ -4,7 +4,6 @@
 package errors
 
 import (
-	"context"
 	stderrors "errors"
 	"fmt"
 	"strings"
@@ -24,19 +23,9 @@ type Context struct {
 	Connecting bool
 }
 
-const maxTimeExpiredCode = 50
-
-func isTimeout(err error) bool {
-	if driver.IsTimeout(err) || stderrors.Is(err, context.DeadlineExceeded) {
-		return true
-	}
-	var cmdErr driver.CommandError
-	if stderrors.As(err, &cmdErr) && cmdErr.Code == maxTimeExpiredCode {
-		return true
-	}
-	var srvErr driver.ServerError
-	return stderrors.As(err, &srvErr) && srvErr.HasErrorCode(maxTimeExpiredCode)
-}
+// isTimeout covers both sides: the server's MaxTimeMSExpired (code 50) and the
+// client's own deadline.
+func isTimeout(err error) bool { return driver.IsTimeout(err) }
 
 func isAuthError(err error) bool {
 	var srvErr driver.ServerError

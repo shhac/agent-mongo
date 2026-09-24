@@ -271,13 +271,13 @@ func TestCheckConnectionEnforcesAllowedHosts(t *testing.T) {
 			uri:   "mongodb+srv://axexample.com/app", allowed: false,
 		},
 		{
-			// ParseHostFromURI cannot read a host out of this, and a URI whose
+			// ParseHostsFromURI cannot read a host out of this, and a URI whose
 			// host is unknown is exactly the one a token must not go to.
 			name: "a schemeless URI has no host and is denied",
 			uri:  "evil.example.com:27017?tls=true", allowed: false,
 		},
 		{
-			// IsTLS and ParseHostFromURI disagree about where the query starts
+			// IsTLS and ParseHostsFromURI disagree about where the query starts
 			// here; both currently fail closed, and this pins that.
 			name: "a host smuggled into the userinfo is denied",
 			uri:  "mongodb://user:x?tls=true&@evil.example.com/app", allowed: false,

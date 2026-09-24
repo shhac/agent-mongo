@@ -1,4 +1,4 @@
-// Package mongo is the driver-facing domain layer: connection resolution,
+// Package mongo is the driver-facing domain layer: the client factory,
 // database/collection discovery, schema inference, and read-only queries.
 package mongo
 
@@ -18,9 +18,6 @@ import (
 type Session struct {
 	Client *driver.Client
 	Alias  string
-	// DBName is the connection's configured database ("" when the URI has
-	// none); commands take explicit database arguments so this is advisory.
-	DBName string
 
 	// comment tags every data command sent (see tag).
 	comment string
@@ -154,7 +151,6 @@ func newSession(
 	session := &Session{
 		Client:   client,
 		Alias:    alias,
-		DBName:   conn.EffectiveDatabase(),
 		comment:  comment,
 		readPref: clientOpts.ReadPreference,
 	}

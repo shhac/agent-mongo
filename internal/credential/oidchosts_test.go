@@ -36,9 +36,8 @@ func TestAllowedHostsFor(t *testing.T) {
 		{
 			// The device flow's refresh token lives in the keychain and is
 			// exactly what an agent cannot otherwise obtain, so its binding is
-			// not overridable. This pins that before the flow exists: adding it
-			// to flowsThatMayWidenHosts has to be a deliberate act that breaks
-			// this test.
+			// not overridable. Setting mayWidenHosts on the device flow has to
+			// be a deliberate act that breaks this test.
 			name: "a flow that may not widen ignores its own allowlist",
 			flow: &config.Flow{Type: config.FlowType("device"), AllowedHosts: widened},
 			want: DefaultAllowedHosts,
