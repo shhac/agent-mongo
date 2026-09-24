@@ -141,9 +141,15 @@ func (s *Session) DistinctValues(
 	ctx context.Context, ref Ref, field string, filter bson.D,
 ) ([]any, error) {
 	collection := s.Client.Database(ref.DB).Collection(ref.Collection)
+	result := collection.Distinct(ctx, field, orEmpty(filter))
+	// Asked first because Decode ignores it despite documenting otherwise: a
+	// failed distinct would surface as "error decoding key arr: unexpected EOF",
+	// losing the timeout or auth failure an agent needs to act on.
+	if err := result.Err(); err != nil {
+		return nil, err
+	}
 	var values bson.A
-	err := collection.Distinct(ctx, field, orEmpty(filter)).Decode(&values)
-	if err != nil {
+	if err := result.Decode(&values); err != nil {
 		return nil, err
 	}
 	out := make([]any, len(values))
