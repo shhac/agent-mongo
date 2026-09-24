@@ -105,6 +105,25 @@ func findCommand(opts FindOpts) bson.D {
 	)
 }
 
+// keepLimit trims a result fetched one past its limit, reporting whether there
+// was more.
+func keepLimit(raw []bson.D, limit int) ([]bson.D, bool) {
+	if len(raw) > limit {
+		return raw[:limit], true
+	}
+	return raw, false
+}
+
+// samplePipeline draws size random documents, from those matching filter when
+// there is one: the $match has to come first for $sample to draw from it.
+func samplePipeline(filter bson.D, size int) bson.A {
+	pipeline := bson.A{}
+	if len(filter) > 0 {
+		pipeline = append(pipeline, bson.D{{Key: "$match", Value: filter}})
+	}
+	return append(pipeline, bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: size}}}})
+}
+
 // aggregateCommand wraps a pipeline whose result size is already bounded,
 // asking for the whole result in the first batch. The batch is one larger than
 // the most the pipeline can produce: a batch it exactly fills leaves the server

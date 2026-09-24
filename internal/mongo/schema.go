@@ -59,9 +59,8 @@ func (s *Session) InferSchema(ctx context.Context, opts SchemaOpts) (SchemaResul
 		effectiveSize = int(totalDocuments)
 	}
 
-	docs, err := s.runCursor(ctx, opts.DB, aggregateCommand(opts.Collection, bson.A{
-		bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: effectiveSize}}}},
-	}, effectiveSize))
+	docs, err := s.runCursor(ctx, opts.DB,
+		aggregateCommand(opts.Collection, samplePipeline(nil, effectiveSize), effectiveSize))
 	if err != nil {
 		return SchemaResult{}, err
 	}
@@ -109,7 +108,7 @@ func (w *walker) walkDocument(doc bson.D, prefix string, depth int) {
 		}
 		w.recordField(path, typeName(elem.Value))
 
-		if w.maxDepth > 0 && depth >= w.maxDepth {
+		if !w.canDescend(depth) {
 			continue
 		}
 
@@ -126,11 +125,8 @@ func (w *walker) walkArrayElements(arr bson.A, parentPath string, depth int) {
 	elemPath := parentPath + ".$"
 	for _, elem := range arr {
 		w.recordFieldType(elemPath, typeName(elem))
-
-		if w.maxDepth == 0 || depth < w.maxDepth {
-			if doc, ok := elem.(bson.D); ok {
-				w.walkDocument(doc, elemPath, depth+1)
-			}
+		if doc, ok := elem.(bson.D); ok && w.canDescend(depth) {
+			w.walkDocument(doc, elemPath, depth+1)
 		}
 	}
 
@@ -138,6 +134,10 @@ func (w *walker) walkArrayElements(arr bson.A, parentPath string, depth int) {
 		w.markPresent(elemPath)
 	}
 }
+
+// canDescend is the depth limit, asked the same way for fields and array
+// elements (0 = unlimited).
+func (w *walker) canDescend(depth int) bool { return w.maxDepth == 0 || depth < w.maxDepth }
 
 // markPresent bumps a path's per-document presence count, at most once per
 // walked document.
@@ -202,8 +202,6 @@ func typeName(value any) string {
 		return "double"
 	case bool:
 		return "boolean"
-	case bson.D, bson.M, map[string]any:
-		return "object"
 	default:
 		return "object"
 	}

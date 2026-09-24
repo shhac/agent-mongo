@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
@@ -25,7 +27,6 @@ type FindOpts struct {
 
 type FindResult struct {
 	Documents     []map[string]any
-	Count         int
 	HasMore       bool
 	TotalMatching int64
 }
@@ -43,25 +44,23 @@ func (s *Session) FindDocuments(ctx context.Context, opts FindOpts) (FindResult,
 		return FindResult{}, err
 	}
 
-	hasMore := len(raw) > opts.Limit
-	if hasMore {
-		raw = raw[:opts.Limit]
-	}
+	raw, hasMore := keepLimit(raw, opts.Limit)
 
-	totalMatching, err := s.countWithFilter(ctx, opts.Ref, orEmpty(opts.Filter))
+	totalMatching, err := s.CountDocuments(ctx, opts.Ref, opts.Filter)
 	if err != nil {
 		return FindResult{}, err
 	}
 
 	return FindResult{
 		Documents:     serialize.Documents(raw),
-		Count:         len(raw),
 		HasMore:       hasMore,
 		TotalMatching: totalMatching,
 	}, nil
 }
 
-func (s *Session) countWithFilter(ctx context.Context, ref Ref, filter bson.D) (int64, error) {
+// CountDocuments counts what a filter matches; with no filter, the collection's
+// metadata count, which is instant where a full count scans.
+func (s *Session) CountDocuments(ctx context.Context, ref Ref, filter bson.D) (int64, error) {
 	if len(filter) == 0 {
 		return s.estimatedCount(ctx, ref)
 	}
@@ -79,15 +78,21 @@ func (s *Session) collection(ref Ref) *driver.Collection {
 
 type FindByIDOpts struct {
 	Ref
-	RawID      string
-	IDType     string // "objectid", "string", "number", or "" for auto-detect
+	ID         any // from ParseID
 	Projection bson.D
 }
 
 var objectIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{24}$`)
 
+// IDTypes are the --type values ParseID understands; "" auto-detects.
+var IDTypes = []string{"objectid", "string", "number"}
+
 // ParseID interprets a raw _id argument, auto-detecting ObjectIds by shape.
+// Pure, so a malformed id or --type fails before anything connects.
 func ParseID(raw, idType string) (any, error) {
+	if idType != "" && !slices.Contains(IDTypes, idType) {
+		return nil, fmt.Errorf("Invalid --type: %q. Valid: %s", idType, strings.Join(IDTypes, ", "))
+	}
 	if idType == "objectid" || (idType == "" && objectIDPattern.MatchString(raw)) {
 		return bson.ObjectIDFromHex(raw)
 	}
@@ -103,17 +108,13 @@ func ParseID(raw, idType string) (any, error) {
 
 // FindByID returns the serialized document, or nil when not found.
 func (s *Session) FindByID(ctx context.Context, opts FindByIDOpts) (map[string]any, error) {
-	id, err := ParseID(opts.RawID, opts.IDType)
-	if err != nil {
-		return nil, err
-	}
 	findOpts := commented(options.FindOne(), s.comment)
 	if opts.Projection != nil {
 		findOpts = findOpts.SetProjection(opts.Projection)
 	}
 	var doc bson.D
-	err = s.collection(opts.Ref).
-		FindOne(ctx, bson.D{{Key: "_id", Value: id}}, findOpts).
+	err := s.collection(opts.Ref).
+		FindOne(ctx, bson.D{{Key: "_id", Value: opts.ID}}, findOpts).
 		Decode(&doc)
 	if err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
@@ -122,10 +123,6 @@ func (s *Session) FindByID(ctx context.Context, opts FindByIDOpts) (map[string]a
 		return nil, err
 	}
 	return serialize.Document(doc), nil
-}
-
-func (s *Session) CountDocuments(ctx context.Context, ref Ref, filter bson.D) (int64, error) {
-	return s.countWithFilter(ctx, ref, orEmpty(filter))
 }
 
 func (s *Session) DistinctValues(
@@ -154,13 +151,7 @@ func (s *Session) DistinctValues(
 func (s *Session) SampleDocuments(
 	ctx context.Context, ref Ref, size int, filter bson.D,
 ) ([]map[string]any, error) {
-	pipeline := bson.A{}
-	if len(filter) > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$match", Value: filter}})
-	}
-	pipeline = append(pipeline, bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: size}}}})
-
-	raw, err := s.runCursor(ctx, ref.DB, aggregateCommand(ref.Collection, pipeline, size))
+	raw, err := s.runCursor(ctx, ref.DB, aggregateCommand(ref.Collection, samplePipeline(filter, size), size))
 	if err != nil {
 		return nil, err
 	}

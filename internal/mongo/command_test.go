@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/shhac/agent-mongo/internal/config"
 )
 
 func keys(doc bson.D) []string {
@@ -97,5 +99,71 @@ func TestTagAddsTheCommentOnlyWhenSet(t *testing.T) {
 	got := (&Session{comment: "agent-mongo database stats"}).tag(cmd)
 	if lookup(t, got, "comment") != "agent-mongo database stats" {
 		t.Errorf("comment missing: %v", got)
+	}
+}
+
+func TestKeepLimit(t *testing.T) {
+	docs := []bson.D{{}, {}, {}}
+	if kept, more := keepLimit(docs, 2); len(kept) != 2 || !more {
+		t.Errorf("one past the limit: %d kept, more=%v", len(kept), more)
+	}
+	if kept, more := keepLimit(docs, 3); len(kept) != 3 || more {
+		t.Errorf("exactly the limit: %d kept, more=%v", len(kept), more)
+	}
+}
+
+// $sample draws from what reaches it, so the filter has to come first.
+func TestSamplePipelineMatchesBeforeSampling(t *testing.T) {
+	filter := bson.D{{Key: "status", Value: "active"}}
+	got := samplePipeline(filter, 5)
+	if len(got) != 2 || got[0].(bson.D)[0].Key != "$match" || got[1].(bson.D)[0].Key != "$sample" {
+		t.Errorf("pipeline = %v", got)
+	}
+	if got := samplePipeline(nil, 5); len(got) != 1 || got[0].(bson.D)[0].Key != "$sample" {
+		t.Errorf("unfiltered pipeline = %v", got)
+	}
+}
+
+func TestHasLimitStageLooksAtTheTopLevelOnly(t *testing.T) {
+	limit := bson.D{{Key: "$limit", Value: 5}}
+	if !HasLimitStage(bson.A{bson.D{{Key: "$match", Value: bson.D{}}}, limit}) {
+		t.Error("a top-level $limit was missed")
+	}
+	nested := bson.A{bson.D{{Key: "$facet", Value: bson.D{{Key: "a", Value: bson.A{limit}}}}}}
+	if HasLimitStage(nested) {
+		t.Error("a $limit inside $facet bounds one facet, not the result")
+	}
+}
+
+// RunCommand applies neither, so what the connection string asked for has to
+// ride on the session.
+func TestNewSessionKeepsReadPreferenceAndConcern(t *testing.T) {
+	conn := config.Connection{
+		ConnectionString: "mongodb://localhost/app?readPreference=secondary&readConcernLevel=majority",
+	}
+	opts, err := clientOptions(conn, ConnectOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := newSession(nil, "prod", conn, opts, "agent-mongo query find")
+	if session.readPref == nil || session.readPref.Mode().String() != "secondary" {
+		t.Errorf("readPref = %v, want secondary", session.readPref)
+	}
+	if session.readConcern != "majority" {
+		t.Errorf("readConcern = %q, want majority", session.readConcern)
+	}
+	if session.DBName != "app" {
+		t.Errorf("DBName = %q", session.DBName)
+	}
+}
+
+func TestStatsRecords(t *testing.T) {
+	coll := collectionStatsRecord(Ref{DB: "app", Collection: "users"}, bson.M{"count": 3, "nindexes": 2})
+	if coll["documentCount"] != 3 || coll["indexes"] != 2 || coll["capped"] != false {
+		t.Errorf("collection stats = %v", coll)
+	}
+	db := databaseStatsRecord("app", bson.M{"objects": 7, "collections": 2})
+	if db["documents"] != 7 || db["collections"] != 2 || db["database"] != "app" {
+		t.Errorf("database stats = %v", db)
 	}
 }

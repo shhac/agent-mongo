@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	out "github.com/shhac/lib-agent-output"
+
+	"github.com/shhac/agent-mongo/internal/mongouri"
 )
 
 type Connection struct {
@@ -18,6 +20,14 @@ type Connection struct {
 	Name             string `json:"name,omitempty"`
 	Database         string `json:"database,omitempty"`
 	Credential       string `json:"credential,omitempty"`
+}
+
+// EffectiveDatabase is the configured database, else the connection string's.
+func (c Connection) EffectiveDatabase() string {
+	if c.Database != "" {
+		return c.Database
+	}
+	return mongouri.ParseDBFromURI(c.ConnectionString)
 }
 
 func GetConnection(alias string) (Connection, bool) {

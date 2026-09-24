@@ -23,8 +23,9 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			ref := mongo.Ref{DB: args[0], Collection: args[1]}
 			id := args[2]
 
-			if idType != "" && idType != "objectid" && idType != "string" && idType != "number" {
-				return fmt.Errorf("Invalid --type: %q. Valid: objectid, string, number", idType)
+			parsedID, err := mongo.ParseID(id, idType)
+			if err != nil {
+				return err
 			}
 			projectionDoc, err := parseOptionalDoc(projection, "projection")
 			if err != nil {
@@ -34,8 +35,7 @@ func registerGet(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 			return shared.WithSessionRef(g, ref, func(ctx shared.SessionCtx) error {
 				doc, err := ctx.Session.FindByID(ctx.Ctx, mongo.FindByIDOpts{
 					Ref:        ref,
-					RawID:      id,
-					IDType:     idType,
+					ID:         parsedID,
 					Projection: projectionDoc,
 				})
 				if err != nil {

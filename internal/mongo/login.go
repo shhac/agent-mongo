@@ -85,7 +85,7 @@ func DeviceLogin(
 	if err != nil {
 		return credential.Session{}, err
 	}
-	defer func() { _ = client.Disconnect(context.Background()) }()
+	defer disconnect(client)
 
 	// The connection is lazy, so something has to actually run for the driver
 	// to authenticate and the callback to fire.

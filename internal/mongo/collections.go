@@ -64,6 +64,12 @@ func (s *Session) CollectionStats(ctx context.Context, ref Ref) (map[string]any,
 	if err != nil {
 		return nil, err
 	}
+	return collectionStatsRecord(ref, result), nil
+}
+
+// collectionStatsRecord renames collStats' fields for output, reading an absent
+// "capped" as false.
+func collectionStatsRecord(ref Ref, result bson.M) map[string]any {
 	capped := result["capped"]
 	if capped == nil {
 		capped = false
@@ -78,5 +84,5 @@ func (s *Session) CollectionStats(ctx context.Context, ref Ref) (map[string]any,
 		"indexes":         result["nindexes"],
 		"indexSize":       result["totalIndexSize"],
 		"capped":          capped,
-	}, nil
+	}
 }

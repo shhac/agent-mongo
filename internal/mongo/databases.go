@@ -35,6 +35,11 @@ func (s *Session) DatabaseStats(ctx context.Context, dbName string) (map[string]
 	if err != nil {
 		return nil, err
 	}
+	return databaseStatsRecord(dbName, result), nil
+}
+
+// databaseStatsRecord renames dbStats' fields for output.
+func databaseStatsRecord(dbName string, result bson.M) map[string]any {
 	return map[string]any{
 		"database":    dbName,
 		"collections": result["collections"],
@@ -43,5 +48,5 @@ func (s *Session) DatabaseStats(ctx context.Context, dbName string) (map[string]
 		"storageSize": result["storageSize"],
 		"indexes":     result["indexes"],
 		"indexSize":   result["indexSize"],
-	}, nil
+	}
 }

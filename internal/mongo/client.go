@@ -12,7 +12,6 @@ import (
 
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
-	"github.com/shhac/agent-mongo/internal/mongouri"
 )
 
 // Session bundles a connected client with its resolved connection metadata.
@@ -37,10 +36,12 @@ type Session struct {
 // network has gone.
 const closeTimeout = 2 * time.Second
 
-func (s *Session) Close() {
+func (s *Session) Close() { disconnect(s.Client) }
+
+func disconnect(client *driver.Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 	defer cancel()
-	_ = s.Client.Disconnect(ctx)
+	_ = client.Disconnect(ctx)
 }
 
 // AppName is how agent-mongo introduces itself in the connection handshake.
@@ -141,19 +142,24 @@ func Connect(opts ConnectOpts) (*Session, error) {
 		return nil, err
 	}
 
-	dbName := conn.Database
-	if dbName == "" {
-		dbName = mongouri.ParseDBFromURI(conn.ConnectionString)
-	}
+	return newSession(client, alias, conn, clientOpts, opts.Comment), nil
+}
+
+// newSession records what the commands sent through RunCommand need from the
+// parsed connection string, since RunCommand would not apply it itself.
+func newSession(
+	client *driver.Client, alias string, conn config.Connection,
+	clientOpts *options.ClientOptions, comment string,
+) *Session {
 	session := &Session{
 		Client:   client,
 		Alias:    alias,
-		DBName:   dbName,
-		comment:  opts.Comment,
+		DBName:   conn.EffectiveDatabase(),
+		comment:  comment,
 		readPref: clientOpts.ReadPreference,
 	}
 	if clientOpts.ReadConcern != nil {
 		session.readConcern = clientOpts.ReadConcern.Level
 	}
-	return session, nil
+	return session
 }

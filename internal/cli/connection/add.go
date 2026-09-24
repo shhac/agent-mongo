@@ -139,10 +139,9 @@ func registerAdd(parent *cobra.Command) {
 				}
 			}
 
-			resolvedDB := database
-			if resolvedDB == "" {
-				resolvedDB = mongouri.ParseDBFromURI(resolved.ConnectionString)
-			}
+			resolvedDB := config.Connection{
+				ConnectionString: resolved.ConnectionString, Database: database,
+			}.EffectiveDatabase()
 			result := map[string]any{
 				"ok":         true,
 				"alias":      alias,

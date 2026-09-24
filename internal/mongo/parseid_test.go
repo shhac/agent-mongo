@@ -27,6 +27,7 @@ func TestParseID(t *testing.T) {
 		{name: "type number parses float", raw: "42.5", idType: "number", want: 42.5},
 		{name: "type number parses int", raw: "7", idType: "number", want: 7.0},
 		{name: "type number rejects non-numeric", raw: "abc", idType: "number", wantErr: true},
+		{name: "an unknown type is refused, not read as a string", raw: "abc", idType: "uuid", wantErr: true},
 	}
 
 	for _, tt := range tests {

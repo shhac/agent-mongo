@@ -33,36 +33,36 @@ func ValidatePipeline(pipeline bson.A) error {
 }
 
 func validateSubPipelines(elem bson.E) error {
+	spec, ok := elem.Value.(bson.D)
+	if !ok {
+		return nil
+	}
 	switch elem.Key {
 	case "$facet":
-		facets, ok := elem.Value.(bson.D)
-		if !ok {
-			return nil
-		}
-		for _, facet := range facets {
-			if sub, ok := facet.Value.(bson.A); ok {
-				if err := ValidatePipeline(sub); err != nil {
-					return err
-				}
+		for _, facet := range spec {
+			if err := validateIfPipeline(facet.Value); err != nil {
+				return err
 			}
 		}
 	case "$lookup", "$unionWith":
-		spec, ok := elem.Value.(bson.D)
-		if !ok {
-			return nil
-		}
 		for _, field := range spec {
 			if field.Key != "pipeline" {
 				continue
 			}
-			if sub, ok := field.Value.(bson.A); ok {
-				if err := ValidatePipeline(sub); err != nil {
-					return err
-				}
+			if err := validateIfPipeline(field.Value); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func validateIfPipeline(value any) error {
+	pipeline, ok := value.(bson.A)
+	if !ok {
+		return nil
+	}
+	return ValidatePipeline(pipeline)
 }
 
 // HasLimitStage reports whether the pipeline sets its own top-level $limit.
@@ -110,9 +110,6 @@ func (s *Session) Aggregate(ctx context.Context, opts AggregateOpts) (AggregateR
 	if err != nil {
 		return AggregateResult{}, err
 	}
-	hasMore := len(raw) > opts.Limit
-	if hasMore {
-		raw = raw[:opts.Limit]
-	}
+	raw, hasMore := keepLimit(raw, opts.Limit)
 	return AggregateResult{Documents: serialize.Documents(raw), HasMore: hasMore}, nil
 }
