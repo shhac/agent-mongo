@@ -131,18 +131,20 @@ func SaveSession(alias string, session Session) error {
 
 // ClearSession ends a session without removing the credential, which is the
 // operation an administrator asks for: stop the access, keep the configuration.
+//
+// Read and written inside one critical section, so a credential re-added or
+// edited concurrently is not reverted to the snapshot this started from.
 func ClearSession(alias string) error {
-	entry, ok := config.Read().Credentials[alias]
-	if !ok {
-		return NotFoundError(alias)
-	}
-	if !IsDeviceFlow(entry) {
-		return NoSessionToClearError(alias)
-	}
-
-	_ = keychain.Delete(sessionAccount(alias))
-	entry.Session = ""
 	return config.Update(func(cfg *config.Config) error {
+		entry, ok := cfg.Credentials[alias]
+		if !ok {
+			return notFoundError(alias, aliasesOf(cfg.Credentials))
+		}
+		if !IsDeviceFlow(entry) {
+			return NoSessionToClearError(alias)
+		}
+		_ = keychain.Delete(sessionAccount(alias))
+		entry.Session = ""
 		cfg.SetCredential(alias, entry)
 		return nil
 	})

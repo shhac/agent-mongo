@@ -235,18 +235,38 @@ func RequireExists(alias string) error {
 
 // Remove deletes the kind's keychain secrets inside the same critical section
 // that drops the config entry, so the two cannot be separated by a concurrent
-// writer re-adding the alias between them.
+// writer re-adding the alias between them. A credential a connection still
+// references is refused.
 func Remove(alias string) error {
-	return config.Update(func(cfg *config.Config) error {
+	_, err := remove(alias, false)
+	return err
+}
+
+// RemoveAndDetach is Remove for a credential still in use: it clears the
+// reference from every connection naming it, in the same critical section, and
+// reports which ones. Either all of that happens or none of it does.
+func RemoveAndDetach(alias string) (detachedFrom []string, err error) {
+	return remove(alias, true)
+}
+
+func remove(alias string, detach bool) (detachedFrom []string, err error) {
+	err = config.Update(func(cfg *config.Config) error {
 		entry, ok := cfg.Credentials[alias]
 		if !ok {
 			return notFoundError(alias, aliasesOf(cfg.Credentials))
 		}
-		if used := connectionsUsing(cfg.Connections, alias); len(used) > 0 {
+		used := connectionsUsing(cfg.Connections, alias)
+		if len(used) > 0 && !detach {
 			return fmt.Errorf(
 				"Credential %q is used by connections: %s. Remove or update those connections first.",
 				alias, strings.Join(used, ", "))
 		}
+		for _, connAlias := range used {
+			conn := cfg.Connections[connAlias]
+			conn.Credential = ""
+			cfg.Connections[connAlias] = conn
+		}
+		detachedFrom = used
 
 		// Ask the kind which accounts it owns rather than naming SCRAM's pair:
 		// a kind whose secret is not a username and password would otherwise
@@ -267,6 +287,10 @@ func Remove(alias string) error {
 		delete(cfg.Credentials, alias)
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return detachedFrom, nil
 }
 
 // CheckConnection asks the credential's kind whether it may be used with this

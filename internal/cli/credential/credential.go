@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shhac/agent-mongo/internal/cli/shared"
-	"github.com/shhac/agent-mongo/internal/config"
 	credstore "github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/output"
 )
@@ -36,25 +35,20 @@ func registerRemove(parent *cobra.Command) {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			name := args[0]
-			usedBy := credstore.ConnectionsUsing(name)
-
-			if len(usedBy) > 0 && force {
-				empty := ""
-				for _, connAlias := range usedBy {
-					err := config.UpdateConnection(connAlias, config.ConnectionUpdates{Credential: &empty})
-					if err != nil {
-						return err
-					}
+			if !force {
+				if err := credstore.Remove(name); err != nil {
+					return err
 				}
+				return output.PrintRaw(map[string]any{"ok": true, "removed": name})
 			}
 
-			if err := credstore.Remove(name); err != nil {
+			detached, err := credstore.RemoveAndDetach(name)
+			if err != nil {
 				return err
 			}
-
 			result := map[string]any{"ok": true, "removed": name}
-			if len(usedBy) > 0 && force {
-				result["clearedFrom"] = usedBy
+			if len(detached) > 0 {
+				result["clearedFrom"] = detached
 			}
 			return output.PrintRaw(result)
 		},

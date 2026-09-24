@@ -170,6 +170,44 @@ func TestRemoveCredentialSucceedsAfterClearingReferences(t *testing.T) {
 	}
 }
 
+// Detaching and removing are one change: the references go only if the
+// credential does, and every one of them goes.
+func TestRemoveAndDetachClearsEveryReferenceAtOnce(t *testing.T) {
+	testutil.IsolateConfig(t)
+	if _, err := Store("acme", config.Credential{Username: "deploy", Password: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, alias := range []string{"prod", "staging", "other"} {
+		credAlias := "acme"
+		if alias == "other" {
+			credAlias = ""
+		}
+		if err := config.StoreConnection(alias, config.Connection{
+			ConnectionString: "mongodb://" + alias, Credential: credAlias,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	detached, err := RemoveAndDetach("acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(detached, ",") != "prod,staging" {
+		t.Errorf("detached = %v, want [prod staging]", detached)
+	}
+	if got := ConnectionsUsing("acme"); len(got) != 0 {
+		t.Errorf("still referenced by %v", got)
+	}
+	if _, err := Resolve("acme"); err == nil {
+		t.Error("credential survived")
+	}
+
+	if _, err := RemoveAndDetach("acme"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("second removal: %v, want ErrNotFound", err)
+	}
+}
+
 func TestStoreCredentialDoesNotTouchConnectionData(t *testing.T) {
 	testutil.IsolateConfig(t)
 	err := config.StoreConnection("local", config.Connection{ConnectionString: "mongodb://localhost"})
