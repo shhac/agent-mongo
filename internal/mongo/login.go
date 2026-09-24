@@ -71,7 +71,7 @@ func DeviceLogin(
 	ctx context.Context, conn config.Connection, appName string, prompt func(credential.DevicePrompt),
 ) (credential.Session, error) {
 	login := &deviceLogin{
-		host:   mongouri.ParseHostFromURI(conn.ConnectionString),
+		host:   mongouri.HostKey(conn.ConnectionString),
 		prompt: prompt,
 	}
 

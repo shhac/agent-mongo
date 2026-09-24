@@ -58,18 +58,24 @@ func checkOIDCConnection(entry config.Credential, uri string) error {
 		return InsecureConnectionError()
 	}
 	allowed := allowedHostsFor(entry.Flow)
-	host := mongouri.ParseHostFromURI(uri)
-	if hostAllowed(host, allowed) {
-		return nil
+	// Every seed, not the first: the driver authenticates to each host it is
+	// given, so one allowed host at the front would carry the token to the rest.
+	hosts := mongouri.ParseHostsFromURI(uri)
+	if len(hosts) == 0 {
+		return HostNotAllowedError("", allowed)
 	}
-	return HostNotAllowedError(host, allowed)
+	for _, host := range hosts {
+		if !hostAllowed(host, allowed) {
+			return HostNotAllowedError(host, allowed)
+		}
+	}
+	return nil
 }
 
 // hostAllowed matches a host against glob patterns.
 //
-// An empty host denies: ParseHostFromURI returns "" for anything it cannot read
-// as a connection string, and a URI whose host cannot be determined is exactly
-// the one a token must not be sent to.
+// An empty host denies: a URI whose hosts cannot be determined is exactly the
+// one a token must not be sent to.
 func hostAllowed(host string, patterns []string) bool {
 	if host == "" {
 		return false

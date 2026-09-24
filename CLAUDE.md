@@ -88,13 +88,15 @@ internal/
   `device` logs a person in and keeps a keychain-backed session that
   agent-mongo refreshes itself — the driver never hands a per-process CLI its
   refresh token and never checks expiry.
-- **OIDC safety**: an OIDC connection must use TLS and must point at a host on
-  the credential's allowlist, checked when a connection is wired up and again
+- **OIDC safety**: an OIDC connection must use TLS and every host in its seed
+  list must be on the credential's allowlist (the driver authenticates to each
+  seed, not only the first), checked when a connection is wired up and again
   at connect. The driver applies its own list only to the human flow, so a
   machine flow would otherwise send a platform token wherever the connection
-  string named. A device session is additionally bound to the host it was
-  obtained for and fails closed when either host is unknown; its binding is not
-  overridable, unlike the other flows' `--allowed-hosts`.
+  string named. A device session is additionally bound to the whole seed list
+  it was obtained for (`mongouri.HostKey`) and fails closed when either side is
+  unknown; its binding is not overridable, unlike the other flows'
+  `--allowed-hosts`.
 - **MCP exposure** (`internal/cli/mcp.go`): only read-only leaves are
   reachable. A named principal's pairing binding `connection=<alias>` becomes
   `--connection <alias>` appended after its args plus

@@ -36,8 +36,8 @@ var oidcFields = []secretField{sessionField}
 // Issuer and ClientID are recorded because a refresh needs them and the flow
 // stores neither: they come from the server at login time, which is what keeps
 // a hand-edited config from pointing the login at a different provider. Host is
-// the deployment the session was obtained for, and the token is not presented
-// anywhere else.
+// the deployment the session was obtained for — its whole seed list, as
+// mongouri.HostKey renders it — and the token is not presented anywhere else.
 type Session struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token,omitempty"`

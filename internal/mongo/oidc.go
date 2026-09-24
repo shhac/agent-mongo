@@ -63,7 +63,7 @@ func oidcCredential(conn config.Connection, res credential.Resolution) (options.
 		return options.Credential{
 			AuthMechanism: oidcMechanism,
 			OIDCMachineCallback: func(ctx context.Context, _ *options.OIDCArgs) (*options.OIDCCredential, error) {
-				token, err := res.AccessToken(ctx, mongouri.ParseHostFromURI(conn.ConnectionString))
+				token, err := res.AccessToken(ctx, mongouri.HostKey(conn.ConnectionString))
 				if err != nil {
 					return nil, err
 				}

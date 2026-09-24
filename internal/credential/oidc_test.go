@@ -210,6 +210,13 @@ func TestCheckConnectionEnforcesAllowedHosts(t *testing.T) {
 		{"ipv4 loopback by default", nil, "mongodb://127.0.0.1:27017/app?tls=true", true},
 		{"ipv6 loopback by default", nil, "mongodb://[::1]:27017/app?tls=true", true},
 		{"a stranger is refused", nil, "mongodb+srv://evil.example.com/app", false},
+		// The driver authenticates to every seed, so each one must be allowed.
+		{"a stranger behind an allowed seed is refused", nil,
+			"mongodb://c0.abc.mongodb.net:27017,evil.example.com:27017/app?tls=true", false},
+		{"a stranger in front of an allowed seed is refused", nil,
+			"mongodb://evil.example.com:27017,c0.abc.mongodb.net:27017/app?tls=true", false},
+		{"a seed list that is all allowed passes", nil,
+			"mongodb://c0-00.abc.mongodb.net:27017,c0-01.abc.mongodb.net:27017/app?tls=true", true},
 		{
 			name: "a bare domain does not match its own wildcard",
 			// "*.mongodb.net" matches a subdomain, not mongodb.net itself.

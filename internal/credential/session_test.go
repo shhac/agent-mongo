@@ -11,6 +11,7 @@ import (
 	out "github.com/shhac/lib-agent-output"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/mongouri"
 	"github.com/shhac/agent-mongo/internal/oidc"
 	"github.com/shhac/agent-mongo/internal/oidc/oidctest"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -414,4 +415,25 @@ func TestRequireSession(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A session is bound to its deployment's whole seed list: sharing one seed with
+// it is not being it, whatever else the list names.
+func TestDeviceFlowBindsTheWholeSeedList(t *testing.T) {
+	idp := useMockIDP(t, frozen)
+	session := liveSession(idp.Issuer())
+	session.Host = mongouri.HostKey("mongodb://a.abc.mongodb.net,b.abc.mongodb.net/app")
+	res := deviceResolution(t, session)
+
+	if err := getToken(res, mongouri.HostKey("mongodb://B.abc.mongodb.net:27017,a.abc.mongodb.net/x")); err != nil {
+		t.Errorf("the same deployment, reordered: %v", err)
+	}
+	for _, uri := range []string{
+		"mongodb://a.abc.mongodb.net,b.abc.mongodb.net,attacker.mongodb.net/app",
+		"mongodb://a.abc.mongodb.net/app",
+	} {
+		if err := getToken(res, mongouri.HostKey(uri)); !errors.Is(err, ErrSessionHostMismatch) {
+			t.Errorf("%s: error = %v, want ErrSessionHostMismatch", uri, err)
+		}
+	}
 }

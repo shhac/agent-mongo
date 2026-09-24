@@ -1,6 +1,9 @@
 package mongouri
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestSplitURICredentials(t *testing.T) {
 	tests := []struct {
@@ -228,30 +231,64 @@ func TestParseAuthMechanismFromURI(t *testing.T) {
 	}
 }
 
-func TestParseHostFromURI(t *testing.T) {
+func TestParseHostsFromURI(t *testing.T) {
 	tests := []struct {
 		name string
 		uri  string
-		want string
+		want []string
 	}{
-		{"simple", "mongodb://host.example.net:27017/app", "host.example.net"},
-		{"no port", "mongodb://host.example.net/app", "host.example.net"},
-		{"no path", "mongodb://host.example.net", "host.example.net"},
-		{"srv", "mongodb+srv://c0.abc.mongodb.net/app", "c0.abc.mongodb.net"},
-		{"first of several hosts", "mongodb://a.example.net:27017,b.example.net:27017/app", "a.example.net"},
-		{"userinfo stripped", "mongodb://user:pass@host.example.net:27017/app", "host.example.net"},
-		{"password containing an @", "mongodb://user:p@ss@host.example.net/app", "host.example.net"},
-		{"ipv4", "mongodb://127.0.0.1:27017", "127.0.0.1"},
-		{"ipv6 literal keeps its colons", "mongodb://[::1]:27017/app", "::1"},
-		{"query only", "mongodb://host.example.net?tls=true", "host.example.net"},
-		{"not a connection string", "host.example.net:27017", ""},
+		{"simple", "mongodb://host.example.net:27017/app", []string{"host.example.net"}},
+		{"no port", "mongodb://host.example.net/app", []string{"host.example.net"}},
+		{"no path", "mongodb://host.example.net", []string{"host.example.net"}},
+		{"srv", "mongodb+srv://c0.abc.mongodb.net/app", []string{"c0.abc.mongodb.net"}},
+		{"every seed", "mongodb://a.example.net:27017,b.example.net:27017/app", []string{"a.example.net", "b.example.net"}},
+		{"userinfo stripped", "mongodb://user:pass@host.example.net:27017/app", []string{"host.example.net"}},
+		{"password containing an @", "mongodb://user:p@ss@host.example.net/app", []string{"host.example.net"}},
+		{"ipv4", "mongodb://127.0.0.1:27017", []string{"127.0.0.1"}},
+		{"ipv6 literals keep their colons", "mongodb://[::1]:27017,[::2]:27017/app", []string{"::1", "::2"}},
+		{"query only", "mongodb://host.example.net?tls=true", []string{"host.example.net"}},
+		{"an empty seed makes the list unknown", "mongodb://a.example.net,,b.example.net/app", nil},
+		{"not a connection string", "host.example.net:27017", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ParseHostFromURI(tt.uri); got != tt.want {
-				t.Errorf("ParseHostFromURI(%q) = %q, want %q", tt.uri, got, tt.want)
+			if got := ParseHostsFromURI(tt.uri); !slices.Equal(got, tt.want) {
+				t.Errorf("ParseHostsFromURI(%q) = %q, want %q", tt.uri, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestHostKeyIgnoresOrderAndCaseOnly(t *testing.T) {
+	a := HostKey("mongodb://B.example.net:27017,a.example.net./app")
+	b := HostKey("mongodb://a.example.net,b.example.net:27018/other")
+	if a != "a.example.net,b.example.net" || a != b {
+		t.Errorf("same deployment keyed differently: %q vs %q", a, b)
+	}
+	if HostKey("mongodb://a.example.net/app") == a {
+		t.Error("a subset of the seed list must not key the same")
+	}
+	if HostKey("not a uri") != "" {
+		t.Error("an unreadable URI must key as empty")
+	}
+}
+
+func TestParseDBFromURI(t *testing.T) {
+	tests := map[string]string{
+		"mongodb://host/app":                        "app",
+		"mongodb://host/app?authSource=admin":       "app",
+		"mongodb://user:p@ss@host/app":              "app",
+		"mongodb://[::1]:27017,[::2]:27017/app?x=1": "app",
+		"mongodb://a:1,b:2/db%20x":                  "db x",
+		"mongodb://host":                            "",
+		"mongodb://host/":                           "",
+		"mongodb://host?tls=true":                   "",
+		"not a uri":                                 "",
+	}
+	for uri, want := range tests {
+		if got := ParseDBFromURI(uri); got != want {
+			t.Errorf("ParseDBFromURI(%q) = %q, want %q", uri, got, want)
+		}
 	}
 }
 

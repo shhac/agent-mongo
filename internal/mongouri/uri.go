@@ -5,17 +5,19 @@ package mongouri
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 )
 
 // ParseDBFromURI extracts the database name from a MongoDB connection string's
-// path segment, or "" when absent/unparseable.
+// path segment, percent-decoded, or "" when absent/unparseable.
 func ParseDBFromURI(uri string) string {
-	u, err := url.Parse(uri)
-	if err != nil {
+	a, ok := splitAuthority(uri)
+	if !ok || !strings.HasPrefix(a.rest, "/") {
 		return ""
 	}
-	return strings.TrimPrefix(u.Path, "/")
+	path, _, _ := strings.Cut(a.rest[1:], "?")
+	return unescape(path)
 }
 
 // ParseAuthSourceFromURI returns the connection string's authSource option, or
@@ -48,6 +50,35 @@ func uriOption(uri, name string) string {
 	return ""
 }
 
+// authority is one parse of a connection string around its authority.
+type authority struct {
+	prefix      string // scheme plus "://"
+	userinfo    string // raw (still percent-encoded); meaningful only when hasUserinfo
+	hasUserinfo bool
+	hosts       string // the comma-separated host list
+	rest        string // path and query onward, from the "/" or "?"
+}
+
+// splitAuthority separates a connection string into scheme, userinfo, hosts
+// and the rest. Parsed by hand because url.Parse rejects multi-host URIs
+// (mongodb://a:1,b:2/db). The last "@" before the path delimits the userinfo,
+// matching driver behaviour for passwords containing an unescaped "@".
+func splitAuthority(uri string) (authority, bool) {
+	schemeEnd := strings.Index(uri, "://")
+	if schemeEnd < 0 {
+		return authority{}, false
+	}
+	tail := uri[schemeEnd+3:]
+	a := authority{prefix: uri[:schemeEnd+3], hosts: tail}
+	if end := strings.IndexAny(tail, "/?"); end >= 0 {
+		a.hosts, a.rest = tail[:end], tail[end:]
+	}
+	if at := strings.LastIndex(a.hosts, "@"); at >= 0 {
+		a.userinfo, a.hasUserinfo, a.hosts = a.hosts[:at], true, a.hosts[at+1:]
+	}
+	return a, true
+}
+
 // userinfoParts is one parse of a connection string around its userinfo.
 type userinfoParts struct {
 	prefix  string // scheme plus "://"
@@ -57,31 +88,18 @@ type userinfoParts struct {
 	rest    string // host onward, after the "@"
 }
 
-// splitUserinfo separates a connection string around its userinfo section.
-// Parsed by hand because url.Parse rejects multi-host URIs
-// (mongodb://a:1,b:2/db). The last "@" before the path delimits the userinfo,
-// matching driver behaviour for passwords containing an unescaped "@".
 func splitUserinfo(uri string) (userinfoParts, bool) {
-	schemeEnd := strings.Index(uri, "://")
-	if schemeEnd < 0 {
+	a, ok := splitAuthority(uri)
+	if !ok || !a.hasUserinfo {
 		return userinfoParts{}, false
 	}
-	tail := uri[schemeEnd+3:]
-	authority := tail
-	if end := strings.IndexAny(tail, "/?"); end >= 0 {
-		authority = tail[:end]
-	}
-	at := strings.LastIndex(authority, "@")
-	if at < 0 {
-		return userinfoParts{}, false
-	}
-	user, pass, hasPass := strings.Cut(authority[:at], ":")
+	user, pass, hasPass := strings.Cut(a.userinfo, ":")
 	return userinfoParts{
-		prefix:  uri[:schemeEnd+3],
+		prefix:  a.prefix,
 		user:    user,
 		pass:    pass,
 		hasPass: hasPass,
-		rest:    tail[at+1:],
+		rest:    a.hosts + a.rest,
 	}, true
 }
 
@@ -116,32 +134,47 @@ func unescape(s string) string {
 	return decoded
 }
 
-// ParseHostFromURI returns the first host in a connection string, without its
-// port, or "" when unparseable. Hand-parsed for the same reason splitUserinfo
-// is: url.Parse cannot cope with a multi-host URI, and the first host is enough
-// to decide whether a deployment is one a credential may authenticate against.
-func ParseHostFromURI(uri string) string {
-	schemeEnd := strings.Index(uri, "://")
-	if schemeEnd < 0 {
-		return ""
+// ParseHostsFromURI returns every host in a connection string's seed list,
+// without ports, or nil when unparseable. Every one matters to a check about
+// where a credential may go: the driver connects and authenticates to each
+// seed it is given, not only the first.
+func ParseHostsFromURI(uri string) []string {
+	a, ok := splitAuthority(uri)
+	if !ok || a.hosts == "" {
+		return nil
 	}
-	authority := uri[schemeEnd+3:]
-	if end := strings.IndexAny(authority, "/?"); end >= 0 {
-		authority = authority[:end]
+	var hosts []string
+	for _, seed := range strings.Split(a.hosts, ",") {
+		host := hostWithoutPort(seed)
+		if host == "" {
+			return nil // one unreadable seed makes the whole list unknown
+		}
+		hosts = append(hosts, host)
 	}
-	if at := strings.LastIndex(authority, "@"); at >= 0 {
-		authority = authority[at+1:]
-	}
-	host, _, _ := strings.Cut(authority, ",")
+	return hosts
+}
 
+// HostKey is a connection string's seed list as one comparable value: sorted,
+// lower-cased and comma-joined, so a session bound to a deployment matches that
+// deployment however its hosts are ordered or cased, and nothing broader. ""
+// when the hosts cannot be read.
+func HostKey(uri string) string {
+	hosts := ParseHostsFromURI(uri)
+	for i, host := range hosts {
+		hosts[i] = strings.ToLower(strings.TrimSuffix(host, "."))
+	}
+	slices.Sort(hosts)
+	return strings.Join(slices.Compact(hosts), ",")
+}
+
+func hostWithoutPort(seed string) string {
 	// An IPv6 literal is bracketed, and its own colons must not be read as a
 	// port separator.
-	if strings.HasPrefix(host, "[") {
-		if literal, _, ok := strings.Cut(host[1:], "]"); ok {
-			return literal
-		}
+	if strings.HasPrefix(seed, "[") {
+		literal, _, _ := strings.Cut(seed[1:], "]")
+		return literal
 	}
-	host, _, _ = strings.Cut(host, ":")
+	host, _, _ := strings.Cut(seed, ":")
 	return host
 }
 
