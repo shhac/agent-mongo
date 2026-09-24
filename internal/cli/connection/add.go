@@ -151,8 +151,10 @@ func registerAdd(parent *cobra.Command) {
 				"alias":      alias,
 				"database":   resolvedDB,
 				"credential": resolved.Alias,
-				"isDefault":  setDefault,
-				"hint":       "Test with: agent-mongo connection test " + alias,
+				// Read back rather than echoing --default: the first connection
+				// saved becomes the default without it.
+				"isDefault": config.DefaultConnectionAlias() == alias,
+				"hint":      "Test with: agent-mongo connection test " + alias,
 			}
 			if resolved.Created {
 				result["credentialCreated"] = true

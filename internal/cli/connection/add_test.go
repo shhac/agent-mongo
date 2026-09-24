@@ -255,3 +255,27 @@ func TestListRedactsEmbeddedPasswords(t *testing.T) {
 		t.Errorf("list output missing redacted connection string: %s", stdout)
 	}
 }
+
+// The receipt reports what was stored: the first connection becomes the
+// default without --default, and saying otherwise would mislead an agent about
+// which connection its next command uses.
+func TestAddReceiptReportsTheResultingDefault(t *testing.T) {
+	testutil.IsolateConfig(t)
+
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"connection", "add", "first", "mongodb://first/app"}, `"isDefault":true`},
+		{[]string{"connection", "add", "second", "mongodb://second/app"}, `"isDefault":false`},
+		{[]string{"connection", "add", "third", "mongodb://third/app", "--default"}, `"isDefault":true`},
+	} {
+		stdout, err := execute(t, tc.args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(stdout, tc.want) {
+			t.Errorf("%v: receipt %s, want %s", tc.args, stdout, tc.want)
+		}
+	}
+}
