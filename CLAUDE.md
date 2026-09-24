@@ -95,6 +95,13 @@ internal/
   string named. A device session is additionally bound to the host it was
   obtained for and fails closed when either host is unknown; its binding is not
   overridable, unlike the other flows' `--allowed-hosts`.
+- **MCP exposure** (`internal/cli/mcp.go`): only read-only leaves are
+  reachable. A named principal's pairing binding `connection=<alias>` becomes
+  `--connection <alias>` appended after its args plus
+  `AGENT_MONGO_REQUIRE_IDENTITY=1`; under that gate `config.PinnedConnection`
+  makes -c mandatory (no env/default fallback) and connection list/test stay
+  on the pinned alias. Any new command that picks a connection must go through
+  `mongo.ResolveAlias` or `config.CheckPinnedTo`.
 - **Error messages include valid values** so LLMs can self-correct (e.g.
   `Connection "x" not found. Available: local, staging`).
 - **BSON serialization** (`internal/serialize`): ObjectId → hex, Date →

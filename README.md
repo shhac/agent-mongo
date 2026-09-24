@@ -327,6 +327,14 @@ agent-mongo mcp --http :8000
 
 The HTTP transport is unauthenticated unless `--oauth local` is set (self-contained OAuth 2.1) — bind to loopback or front it with an auth proxy. Run `agent-mongo mcp usage` for the full transport, registration, OAuth, and Tailscale details.
 
+With `--oauth local`, each person can get their own pairing, bound to one connection:
+
+```bash
+agent-mongo mcp pair add alice --bind connection=staging
+```
+
+Every call alice makes then runs against `staging` only: `-c staging` is forced onto it, `connection list` shows only `staging`, and a principal paired without a `connection` binding is refused rather than given the operator's default connection. The same gate is available outside MCP: with `AGENT_MONGO_REQUIRE_IDENTITY=1` set, a command must be given `-c` and never falls back to `AGENT_MONGO_CONNECTION` or the default.
+
 ## Safety
 
 agent-mongo is strictly read-only:

@@ -184,12 +184,17 @@ func (r result) stderrJSON(t *testing.T) map[string]any {
 
 func runIn(t *testing.T, home string, args ...string) result {
 	t.Helper()
+	return runInEnv(t, home, nil, args...)
+}
+
+func runInEnv(t *testing.T, home string, env []string, args ...string) result {
+	t.Helper()
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(append(os.Environ(),
 		"XDG_CONFIG_HOME="+home,
 		"AGENT_MONGO_NO_KEYCHAIN=1",
 		"AGENT_MONGO_CONNECTION=",
-	)
+	), env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

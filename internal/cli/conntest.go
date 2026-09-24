@@ -23,6 +23,9 @@ func newConnectionTestCommand(globals func() *shared.GlobalFlags) *cobra.Command
 		RunE: func(_ *cobra.Command, args []string) error {
 			g := globals()
 			if len(args) == 1 {
+				if err := config.CheckPinnedTo(g.Connection, args[0]); err != nil {
+					return err
+				}
 				g.Connection = args[0]
 			}
 			return shared.WithSession(g, func(ctx shared.SessionCtx) error {

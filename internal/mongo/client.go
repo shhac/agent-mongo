@@ -76,8 +76,12 @@ func availableConnections() string {
 }
 
 // ResolveAlias resolves the connection to use:
-// -c flag > AGENT_MONGO_CONNECTION env > config default > error.
+// -c flag > AGENT_MONGO_CONNECTION env > config default > error. A process
+// pinned by config.IdentityEnv takes -c only.
 func ResolveAlias(flag string) (string, error) {
+	if pinned, ok, err := config.PinnedConnection(flag); ok {
+		return pinned, err
+	}
 	if trimmed := strings.TrimSpace(flag); trimmed != "" {
 		return trimmed, nil
 	}

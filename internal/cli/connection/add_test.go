@@ -9,6 +9,7 @@ import (
 
 	out "github.com/shhac/lib-agent-output"
 
+	"github.com/shhac/agent-mongo/internal/cli/shared"
 	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
 	"github.com/shhac/agent-mongo/internal/testutil"
@@ -17,7 +18,9 @@ import (
 func execute(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	root := &cobra.Command{Use: "agent-mongo"}
-	Register(root, nil)
+	var connection string
+	root.PersistentFlags().StringVarP(&connection, "connection", "c", "", "")
+	Register(root, func() *shared.GlobalFlags { return &shared.GlobalFlags{Connection: connection} }, nil)
 	root.SetArgs(args)
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)

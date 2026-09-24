@@ -4,8 +4,10 @@ import (
 	"slices"
 
 	agentmcp "github.com/shhac/lib-agent-mcp"
+	"github.com/shhac/lib-agent-mcp/oauth"
 	"github.com/spf13/cobra"
 
+	"github.com/shhac/agent-mongo/internal/config"
 	"github.com/shhac/agent-mongo/internal/credential"
 )
 
@@ -40,7 +42,27 @@ func registerMCP(root *cobra.Command) {
 	root.AddCommand(agentmcp.Command(root,
 		agentmcp.WithHiddenFlags("color", "expand", "full"),
 		agentmcp.WithOAuthKeyringService(credential.Service+".mcp"),
+		agentmcp.WithIdentityBinding(mcpIdentityBinding),
 	))
+}
+
+// bindingKeyConnection is the pairing-binding key naming the connection a
+// principal acts through: mcp pair add <name> --bind connection=<alias>.
+const bindingKeyConnection = "connection"
+
+// mcpIdentityBinding pins a named principal's calls to the connection its
+// pairing was bound to. The -c is appended after the caller's own arguments,
+// so it wins over any -c they pass, and the gate makes a call without one — a
+// principal paired with no binding — fail rather than use the operator's
+// default. The MCP server only asks this of named principals; stdio and the
+// shared pairing code run as the operator.
+func mcpIdentityBinding(p oauth.Verified) (argv, env []string) {
+	env = []string{config.IdentityEnv + "=1"}
+	alias := p.Binding[bindingKeyConnection]
+	if alias == "" {
+		return nil, env
+	}
+	return []string{"--connection", alias}, env
 }
 
 // exposeReadOnlyLeaves keeps the named subcommands of a group, marked

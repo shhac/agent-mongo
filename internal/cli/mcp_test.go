@@ -3,8 +3,13 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/shhac/lib-agent-mcp/oauth"
+
+	"github.com/shhac/agent-mongo/internal/config"
 )
 
 // The annotations are what an MCP host decides auto-approval on, so a library
@@ -69,5 +74,22 @@ func TestMCPToolAnnotations(t *testing.T) {
 		if !got[name] {
 			t.Errorf("tool %q missing", name)
 		}
+	}
+}
+
+func TestMCPIdentityBindingPinsTheBoundConnection(t *testing.T) {
+	argv, env := mcpIdentityBinding(oauth.Verified{PrincipalGrant: oauth.PrincipalGrant{
+		Name: "alice", Binding: map[string]string{"connection": "prod"},
+	}})
+	if strings.Join(argv, " ") != "--connection prod" {
+		t.Errorf("argv = %v", argv)
+	}
+	if !slices.Contains(env, config.IdentityEnv+"=1") {
+		t.Errorf("env = %v, want the fail-closed gate", env)
+	}
+
+	argv, env = mcpIdentityBinding(oauth.Verified{PrincipalGrant: oauth.PrincipalGrant{Name: "bob"}})
+	if len(argv) != 0 || !slices.Contains(env, config.IdentityEnv+"=1") {
+		t.Errorf("unbound principal: argv=%v env=%v; the gate alone must make it fail closed", argv, env)
 	}
 }

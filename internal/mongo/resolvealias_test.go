@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/shhac/agent-mongo/internal/config"
+	"github.com/shhac/agent-mongo/internal/testutil"
 )
 
 func TestResolveAliasPrecedence(t *testing.T) {
@@ -52,4 +53,22 @@ func TestResolveAliasPrecedence(t *testing.T) {
 			t.Fatalf("got %v", err)
 		}
 	})
+}
+
+// A pinned process never falls back to the operator's env or default
+// connection: those are exactly what a bound principal was not given.
+func TestResolveAliasWhenPinned(t *testing.T) {
+	testutil.IsolateConfig(t)
+	if err := config.StoreConnection("prod", config.Connection{ConnectionString: "mongodb://prod/app"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENT_MONGO_CONNECTION", "prod")
+	t.Setenv(config.IdentityEnv, "1")
+
+	if alias, err := ResolveAlias("staging"); err != nil || alias != "staging" {
+		t.Errorf("-c: alias=%q err=%v", alias, err)
+	}
+	if alias, err := ResolveAlias(""); err == nil {
+		t.Errorf("no -c resolved to %q; must fail closed", alias)
+	}
 }

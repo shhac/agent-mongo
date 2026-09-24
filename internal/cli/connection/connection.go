@@ -14,13 +14,13 @@ import (
 // Register attaches the connection group. testCmd is the mongo-backed
 // `connection test` leaf, built by the caller to keep this package free of
 // driver dependencies.
-func Register(root *cobra.Command, testCmd *cobra.Command) {
+func Register(root *cobra.Command, globals func() *shared.GlobalFlags, testCmd *cobra.Command) {
 	cmd := &cobra.Command{Use: "connection", Short: "Manage MongoDB connections"}
 
 	registerAdd(cmd)
 	registerRemove(cmd)
 	registerUpdate(cmd)
-	registerList(cmd)
+	registerList(cmd, globals)
 	if testCmd != nil {
 		cmd.AddCommand(testCmd)
 	}
@@ -44,7 +44,7 @@ func registerRemove(parent *cobra.Command) {
 	})
 }
 
-func registerList(parent *cobra.Command) {
+func registerList(parent *cobra.Command, globals func() *shared.GlobalFlags) {
 	parent.AddCommand(&cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -53,9 +53,13 @@ func registerList(parent *cobra.Command) {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			connections := config.Connections()
 			defaultAlias := config.DefaultConnectionAlias()
+			aliases, err := visibleAliases(globals().Connection)
+			if err != nil {
+				return err
+			}
 
-			items := make([]any, 0, len(connections))
-			for _, alias := range config.ConnectionAliases() {
+			items := make([]any, 0, len(aliases))
+			for _, alias := range aliases {
 				conn := connections[alias]
 				items = append(items, map[string]any{
 					"alias":             alias,
@@ -68,6 +72,22 @@ func registerList(parent *cobra.Command) {
 			return output.PrintList(items, nil)
 		},
 	})
+}
+
+// visibleAliases is every saved connection, or only the pinned one: a principal
+// bound to one connection has no business learning the others' hosts.
+func visibleAliases(flag string) ([]string, error) {
+	pinned, ok, err := config.PinnedConnection(flag)
+	if !ok {
+		return config.ConnectionAliases(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, found := config.GetConnection(pinned); !found {
+		return nil, nil
+	}
+	return []string{pinned}, nil
 }
 
 func registerSetDefault(parent *cobra.Command) {
