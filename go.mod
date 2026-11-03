@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/shhac/lib-agent-cli v0.26.0
-	github.com/shhac/lib-agent-mcp v0.23.2
+	github.com/shhac/lib-agent-mcp v0.24.0
 	github.com/shhac/lib-agent-output v0.12.0
 	github.com/spf13/cobra v1.10.2
 	go.mongodb.org/mongo-driver/v2 v2.9.1
@@ -23,7 +23,7 @@ require (
 	github.com/ncruces/zenity v0.10.14 // indirect
 	github.com/randall77/makefat v0.0.0-20210315173500-7ddd0e42c844 // indirect
 	github.com/shhac/lib-agent-keyring v0.1.1 // indirect
-	github.com/shhac/lib-agent-oauth v0.7.1 // indirect
+	github.com/shhac/lib-agent-oauth-server v0.8.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect

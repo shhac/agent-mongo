@@ -33,10 +33,10 @@ github.com/shhac/lib-agent-cli v0.26.0 h1:ugEuIzlEh00kLtJo69Z4+RVD1R3zTLVnP4EJRc
 github.com/shhac/lib-agent-cli v0.26.0/go.mod h1:+f4RsI2kX5rkh/BQW2Sr5KFXeZud/vL9RmwsUjeH7Fc=
 github.com/shhac/lib-agent-keyring v0.1.1 h1:cAwFr0UzlQ0xsgO0zY607lmwhvSamPN6Tp1DCNJO7hg=
 github.com/shhac/lib-agent-keyring v0.1.1/go.mod h1:nTk+YfRDc2dc8Nghd1o9w4c40xU8Pqx/UgToN0yGvZ8=
-github.com/shhac/lib-agent-mcp v0.23.2 h1:jHgZFEZH2RLZpxMdeFe2tUmv6B7XUFQZdP6+DaYYh9I=
-github.com/shhac/lib-agent-mcp v0.23.2/go.mod h1:XShbumGMp4FPDZM2Utn/O5PgxdFt7aNUvHVKfw1+pA0=
-github.com/shhac/lib-agent-oauth v0.7.1 h1:/ysYhPZi+7evkryQYAAuSlqN42RcGvqiwNjMIayny4A=
-github.com/shhac/lib-agent-oauth v0.7.1/go.mod h1:IL7jpL5DCcOZ4rHzIBQOxVYHtP53Q3Y0sMIcgSE4ibk=
+github.com/shhac/lib-agent-mcp v0.24.0 h1:SBTldY9sM+wA6eW48zX0Z0QYQUdarNjWzknxav+I/AU=
+github.com/shhac/lib-agent-mcp v0.24.0/go.mod h1:K8zwo67qSuJKW1+qVIyMIQigCZqzpTJ2/SzVKFw+DZw=
+github.com/shhac/lib-agent-oauth-server v0.8.0 h1:c7fl+kSxK470aQKbNVspXlm98YNAcOnEAkjAxgATP1A=
+github.com/shhac/lib-agent-oauth-server v0.8.0/go.mod h1:x4gOQ3Aa3CGFYQnVPaDLl/89oNVkRaUbyT4cgLZKWmk=
 github.com/shhac/lib-agent-output v0.12.0 h1:Xlfvjew68PGwc3oMPp58AHfiSsHaaY/gULe11Cc0Ft8=
 github.com/shhac/lib-agent-output v0.12.0/go.mod h1:YyO2KSKAZxRrCJGanfB6qAyV0DvG+GSsZNShQoLslT0=
 github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
